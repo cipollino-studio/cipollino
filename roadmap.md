@@ -2,10 +2,11 @@
 - Timeline
 - Undo/Redo system
 - Line Drawing
+- Rendering
 - Color
 - Onion Skin
-- Sound
 - Fill
 - Cutting
+- Sound
 - Hierarchical Assets
 - Hierarchical Layers

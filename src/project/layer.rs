@@ -24,7 +24,8 @@ impl ObjData for LayerData {
 }
 
 pub struct Layer {
-    pub data: LayerData
+    pub data: LayerData,
+    pub frames: Vec<u64>
 }
 
 impl Project {
@@ -42,6 +43,7 @@ impl Project {
         };
         self.layers.insert(key, Layer {
             data: data.clone(), 
+            frames: Vec::new()
         });
         Some((key, ObjAction::addition(key, data)))
     }
@@ -57,6 +59,17 @@ impl Project {
         let res = ObjAction::modification(key, layer.data.clone(), data.clone());
         layer.data = data;
         Some(res)
+    }
+
+    pub fn get_frame_exactly_at(&self, layer: u64, time: i32) -> Option<u64> {
+        let layer = self.layers.get(&layer)?;
+        for frame_key in &layer.frames {
+            let frame = self.frames.get(frame_key)?;
+            if frame.data.time == time {
+                return Some(*frame_key);
+            }
+        }
+        None
     }
 
 }

@@ -1,6 +1,33 @@
 
-use crate::{panels, project::{Project, graphic::Graphic, action::ActionManager}};
+use std::sync::{Arc, Mutex};
+
+use crate::{panels::{self, timeline::new_frame}, project::{Project, graphic::Graphic, action::ActionManager}, renderer::scene::SceneRenderer};
 use egui::Modifiers;
+
+pub struct EditorRenderer {
+    pub gl_ctx: Arc<Mutex<Option<Arc<glow::Context>>>>,
+    renderer: Option<SceneRenderer>,
+}
+
+impl EditorRenderer {
+
+    pub fn new() -> Self {
+        Self {
+            renderer: None,
+            gl_ctx: Arc::new(Mutex::new(None))
+        }
+    }
+
+    pub fn use_renderer<F>(&mut self, f: F) where F: FnOnce(&Arc<glow::Context>, &mut SceneRenderer) {
+        if let Some(gl) = self.gl_ctx.lock().unwrap().as_ref() {
+            if let None = self.renderer {
+                self.renderer = Some(SceneRenderer::new(gl));
+            }
+            f(gl, self.renderer.as_mut().unwrap());
+        }
+    }
+
+}
 
 pub struct EditorState {
     pub project: Project, 
@@ -8,7 +35,8 @@ pub struct EditorState {
     pub open_graphic: Option<u64>,
     pub active_layer: u64,
     pub time: f32,
-    pub playing: bool
+    pub playing: bool,
+    pub renderer: EditorRenderer
 }
 
 impl EditorState {
@@ -20,7 +48,8 @@ impl EditorState {
             open_graphic: None,
             active_layer: 0,
             time: 0.0,
-            playing: false
+            playing: false,
+            renderer: EditorRenderer::new() 
         }
     }
 
@@ -40,12 +69,14 @@ impl EditorState {
         (self.time / (1.0 / 24.0)).floor() as i32
     }
 
+    
+
 }
 
 pub struct Editor {
     state: EditorState,
     panels: panels::PanelManager,
-    config_path: String
+    config_path: String,
 }
 
 impl Editor {
@@ -64,14 +95,13 @@ impl Editor {
         let res = Self {
             state: EditorState::new(),
             panels,
-            config_path 
+            config_path,
         };
         
         res
     }
 
     pub fn render(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-
         if let Some(open_gfx) = self.state.open_graphic {
             if let Some(gfx) = self.state.project.graphics.get(&open_gfx) {
                 if self.state.playing {
@@ -101,7 +131,7 @@ impl Editor {
                 self.state.playing = !self.state.playing;
             }
             if ui.input_mut(|i| i.consume_shortcut(&frame_shortcut)) {
-
+                new_frame(&mut self.state);
             }
 
             egui::menu::bar(ui, |ui| {
@@ -126,6 +156,9 @@ impl Editor {
                         }
                         if ui.button("Timeline").clicked() {
                             self.panels.add_panel(panels::Panel::Timeline(panels::timeline::TimelinePanel::new()));
+                        }
+                        if ui.button("Scene").clicked() {
+                            self.panels.add_panel(panels::Panel::Scene(panels::scene::ScenePanel::new()));
                         }
                     })
                 });

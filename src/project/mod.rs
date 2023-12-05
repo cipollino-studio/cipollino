@@ -2,9 +2,10 @@
 pub mod graphic;
 pub mod layer;
 pub mod action;
+pub mod frame;
 
 use std::collections::HashMap;
-use self::{graphic::Graphic, layer::Layer};
+use self::{graphic::Graphic, layer::Layer, frame::Frame};
 
 pub trait ObjData {
 
@@ -18,6 +19,7 @@ pub struct Project {
 
     pub graphics: HashMap<u64, Graphic>,
     pub layers: HashMap<u64, Layer>,
+    pub frames: HashMap<u64, Frame>,
 
     curr_key: u64
 
@@ -29,6 +31,7 @@ impl Project {
         Self {
             graphics: HashMap::new(),
             layers: HashMap::new(),
+            frames: HashMap::new(),
             curr_key: 1
         }
     }

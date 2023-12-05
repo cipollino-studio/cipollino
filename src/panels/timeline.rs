@@ -1,7 +1,7 @@
 
 use egui::Vec2;
 
-use crate::{editor::EditorState, project::{action::Action, graphic::GraphicData}};
+use crate::{editor::{EditorState, Editor}, project::{action::{Action, self}, graphic::GraphicData}};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct TimelinePanel {
@@ -27,7 +27,6 @@ impl TimelinePanel {
     }
 
     pub fn render(&mut self, ui: &mut egui::Ui, state: &mut EditorState) {
-
         if let None = state.project.graphics.get(&state.open_graphic.unwrap_or(0)) {
             ui.centered_and_justified(|ui| {
                 ui.label("No Graphic Open");
@@ -253,29 +252,21 @@ impl TimelinePanel {
             0.0,
             egui::Color32::from_rgba_unmultiplied(0, 0, 0, 40),
             egui::Stroke::NONE);
+
+        // Active layer highlight
         let mut y = 0.0;
         for layer_key in gfx.layers.iter() {
-            if let Some(layer) = state.project.layers.get(layer_key) {
-                if *layer_key == state.active_layer {
-                    ui.painter().rect(
-                        egui::Rect::from_min_max(win_tl + Vec2::new(0.0, y * frame_h), win_tl + Vec2::new((n_frames as f32) * frame_w, (y + 1.0) * frame_h)),
-                        0.0,
-                        highlight,
-                        egui::Stroke::NONE);
-                }
-                // for frame_key in layer.frames.iter() {
-                //     if let Some(frame) = state.project.get_frame(frame_key) {
-                //         ui.painter().circle(
-                //             win_tl + Vec2::new((0.5 + frame.data.time as f32) * frame_w, (y + 0.5) * frame_h),
-                //             0.4 * frame_w,
-                //             ui.visuals().text_color(),
-                //             egui::Stroke::NONE);
-                //     }
-                // }
-                y += 1.0;
+            if *layer_key == state.active_layer {
+                ui.painter().rect(
+                    egui::Rect::from_min_max(win_tl + Vec2::new(0.0, y * frame_h), win_tl + Vec2::new((n_frames as f32) * frame_w, (y + 1.0) * frame_h)),
+                    0.0,
+                    highlight,
+                    egui::Stroke::NONE);
             }
+            y += 1.0;
         }
 
+        // Frame interval highlight
         for x in (4..n_frames).step_by(5) {
             ui.painter().rect(
                 egui::Rect::from_min_max(win_tl + Vec2::new((x as f32) * frame_w, 0.0), win_tl + Vec2::new((x as f32 + 1.0) * frame_w, rect.height())),
@@ -284,8 +275,25 @@ impl TimelinePanel {
                 egui::Stroke::NONE);
         }
 
+        // Frame dots
+        let mut y = 0.0;
+        for layer_key in gfx.layers.iter() {
+            let layer = state.project.layers.get(layer_key).unwrap();
+            for frame_key in &layer.frames {
+                let frame = state.project.frames.get(frame_key).unwrap();
+                ui.painter().circle(
+                    win_tl + Vec2::new((frame.data.time as f32 + 0.5) * frame_w, (y + 0.5) * frame_h),
+                    frame_w * 0.3,
+                    ui.visuals().text_color(),
+                    egui::Stroke::NONE);
+            }
+            y += 1.0;
+        }
+
+        // Playhead
         ui.painter().vline(rect.left() + (state.frame() as f32 + 0.5) * frame_w, egui::Rangef::new(rect.top(), rect.top() + total_height), egui::Stroke::new(1.0, egui::Color32::from_rgb(125, 125, 255)));
 
+        // After graphic end shadow realm
         let darken = egui::Color32::from_rgba_unmultiplied(0, 0, 0, 60);
         ui.painter().rect(
             egui::Rect::from_min_max(win_tl + Vec2::new((gfx.data.len as f32) * frame_w, 0.0), rect.max),
@@ -295,4 +303,15 @@ impl TimelinePanel {
 
     }
 
+}
+
+pub fn new_frame(state: &mut EditorState) -> Option<()> {
+    if let Some(_layer) = state.project.layers.get(&state.active_layer) { 
+        if let None = state.project.get_frame_exactly_at(state.active_layer, state.frame()) {
+            if let Some((_key, act)) = state.project.add_frame(state.active_layer, state.frame()) {
+                state.actions.add(Action::from_single(act));
+            }
+        }
+    }
+    None
 }

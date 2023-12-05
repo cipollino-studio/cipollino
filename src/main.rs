@@ -4,6 +4,7 @@ use editor::Editor;
 pub mod editor;
 pub mod panels;
 pub mod project;
+pub mod renderer;
 
 fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {

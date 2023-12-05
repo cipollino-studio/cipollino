@@ -1,11 +1,13 @@
 
 pub mod assets;
 pub mod timeline;
+pub mod scene;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum Panel {
     Assets(assets::AssetsPanel),
-    Timeline(timeline::TimelinePanel)
+    Timeline(timeline::TimelinePanel),
+    Scene(scene::ScenePanel)
 }
 
 pub struct PanelViewer<'a> {
@@ -18,7 +20,8 @@ impl egui_dock::TabViewer for PanelViewer<'_> {
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
         match tab.1 {
             Panel::Assets(..) => "Assets",
-            Panel::Timeline(..) => "Timeline"
+            Panel::Timeline(..) => "Timeline",
+            Panel::Scene(..) => "Scene"
         }.into()
     }
 
@@ -29,7 +32,8 @@ impl egui_dock::TabViewer for PanelViewer<'_> {
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
         match &mut tab.1 {
             Panel::Assets(assets) => assets.render(ui, &mut self.state),
-            Panel::Timeline(timeline) => timeline.render(ui, &mut self.state) 
+            Panel::Timeline(timeline) => timeline.render(ui, &mut self.state), 
+            Panel::Scene(scene) => scene.render(ui, &mut self.state)
         }
     }
 }
