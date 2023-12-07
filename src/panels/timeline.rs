@@ -1,7 +1,7 @@
 
 use egui::Vec2;
 
-use crate::{editor::{EditorState, Editor}, project::{action::{Action, self}, graphic::GraphicData}};
+use crate::{editor::EditorState, project::{action::Action, graphic::GraphicData}};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct TimelinePanel {
@@ -69,7 +69,7 @@ impl TimelinePanel {
                         .exact_height(header_height)
                         .show_separator_line(false)
                         .frame(no_margin)
-                        .show_inside(ui, |ui| {
+                        .show_inside(ui, |_ui| {
                             // ui.label("EYE/LOCK ICONS?");
                         });
                     let hovering_layers = if let Some(pos) = ui.ctx().input(|i| i.pointer.hover_pos()) {
@@ -294,7 +294,7 @@ impl TimelinePanel {
         ui.painter().vline(rect.left() + (state.frame() as f32 + 0.5) * frame_w, egui::Rangef::new(rect.top(), rect.top() + total_height), egui::Stroke::new(1.0, egui::Color32::from_rgb(125, 125, 255)));
 
         // After graphic end shadow realm
-        let darken = egui::Color32::from_rgba_unmultiplied(0, 0, 0, 60);
+        let darken = egui::Color32::from_rgba_unmultiplied(0, 0, 0, 100);
         ui.painter().rect(
             egui::Rect::from_min_max(win_tl + Vec2::new((gfx.data.len as f32) * frame_w, 0.0), rect.max),
             0.0,

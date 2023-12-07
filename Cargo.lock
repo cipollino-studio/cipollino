@@ -548,6 +548,7 @@ dependencies = [
 name = "cipollino"
 version = "0.1.0"
 dependencies = [
+ "cc",
  "directories",
  "eframe",
  "egui",

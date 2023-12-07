@@ -25,6 +25,7 @@ impl ObjData for FrameData {
 
 pub struct Frame {
     pub data: FrameData,
+    pub strokes: Vec<u64>
 }
 
 impl Project {
@@ -42,12 +43,16 @@ impl Project {
         };
         self.frames.insert(key, Frame {
             data: data.clone(), 
+            strokes: Vec::new()
         });
         Some((key, ObjAction::addition(key, data)))
     } 
 
     pub fn delete_frame(&mut self, key: u64) -> Option<()> {
         let frame = self.frames.remove(&key)?;
+        for stroke in frame.strokes {
+            self.delete_stroke(stroke);
+        }
         self.layers.get_mut(&frame.data.layer)?.frames.retain(|frame| *frame != key);
         None
     }

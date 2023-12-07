@@ -50,6 +50,9 @@ impl Project {
 
     pub fn delete_layer(&mut self, key: u64) -> Option<()> {
         let layer = self.layers.remove(&key)?;
+        for frame in layer.frames {
+            self.delete_frame(frame);
+        }
         self.graphics.get_mut(&layer.data.gfx)?.layers.retain(|layer| *layer != key);
         None
     }
@@ -59,6 +62,24 @@ impl Project {
         let res = ObjAction::modification(key, layer.data.clone(), data.clone());
         layer.data = data;
         Some(res)
+    }
+
+    pub fn get_frame_at(&self, layer: u64, time: i32) -> Option<u64> {
+        let layer = self.layers.get(&layer)?;
+        let mut best_frame = 0;
+        let mut best_time = -1;
+        for frame_key in &layer.frames {
+            let frame = self.frames.get(frame_key)?;
+            if frame.data.time <= time && frame.data.time > best_time {
+                best_frame = *frame_key;
+                best_time = frame.data.time;
+            }
+        }
+        if best_frame == 0 {
+            None
+        } else {
+            Some(best_frame)
+        }
     }
 
     pub fn get_frame_exactly_at(&self, layer: u64, time: i32) -> Option<u64> {

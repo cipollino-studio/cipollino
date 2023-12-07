@@ -61,7 +61,7 @@ impl Mesh {
         self.tris = (tris.len() / 3) as u32;
     }
 
-    pub fn render(&mut self, gl: &Arc<Context>) {
+    pub fn render(&self, gl: &Arc<Context>) {
         if self.tris == 0 {
             return;
         }
@@ -74,7 +74,7 @@ impl Mesh {
         }
     }
 
-    fn config_attribs(&mut self, gl: &Arc<Context>) {
+    fn config_attribs(&self, gl: &Arc<Context>) {
         self.attribs.iter().fold((0, 0), |(i, offset), attrib| {
             unsafe {
                 gl.vertex_attrib_pointer_f32(i, *attrib as i32, glow::FLOAT, false, (self.vals_per_vert * 4) as i32, offset * 4);

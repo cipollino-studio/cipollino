@@ -2,6 +2,7 @@
 pub mod assets;
 pub mod timeline;
 pub mod scene;
+pub mod tools;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum Panel {

@@ -1,7 +1,7 @@
 
-use std::sync::{Arc, Mutex};
+use std::{sync::{Arc, Mutex}, rc::Rc, cell::RefCell};
 
-use crate::{panels::{self, timeline::new_frame}, project::{Project, graphic::Graphic, action::ActionManager}, renderer::scene::SceneRenderer};
+use crate::{panels::{self, timeline::new_frame, tools::{pencil::Pencil, Tool}}, project::{Project, graphic::Graphic, action::ActionManager}, renderer::scene::SceneRenderer};
 use egui::Modifiers;
 
 pub struct EditorRenderer {
@@ -36,12 +36,16 @@ pub struct EditorState {
     pub active_layer: u64,
     pub time: f32,
     pub playing: bool,
-    pub renderer: EditorRenderer
+    pub renderer: EditorRenderer,
+    
+    pub pencil: Rc<RefCell<dyn Tool>>,
+    pub curr_tool: Rc<RefCell<dyn Tool>>
 }
 
 impl EditorState {
 
     pub fn new() -> Self {
+        let pencil = Rc::new(RefCell::new(Pencil::new()));
         Self {
             project: Project::new(),
             actions: ActionManager::new(),
@@ -49,7 +53,9 @@ impl EditorState {
             active_layer: 0,
             time: 0.0,
             playing: false,
-            renderer: EditorRenderer::new() 
+            renderer: EditorRenderer::new(),
+            pencil: pencil.clone(),
+            curr_tool: pencil
         }
     }
 
@@ -135,7 +141,7 @@ impl Editor {
             }
 
             egui::menu::bar(ui, |ui| {
-                ui.menu_button("File", |ui| {
+                ui.menu_button("File", |_ui| {
                 });
                 ui.menu_button("Edit", |ui| {
                     if ui.add_enabled(

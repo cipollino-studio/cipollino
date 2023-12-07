@@ -1,0 +1,3 @@
+[submodule "libs/curve_fit"]
+	path = libs/curve_fit
+	url = https://github.com/ideasman42/curve-fit-nd.git

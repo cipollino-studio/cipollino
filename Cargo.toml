@@ -15,3 +15,6 @@ glam = "0.24.2"
 glow = "0.12"
 serde = {version = "1.0.192", features = ["derive"]}
 serde_json = "1.0.108"
+
+[build-dependencies]
+cc = "1.0"

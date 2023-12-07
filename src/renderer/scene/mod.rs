@@ -1,11 +1,13 @@
 
+mod meshgen;
+
 use std::sync::Arc;
 
 use glow::{Context, HasContext};
 
 use crate::project::Project;
 
-use super::{shader::Shader, fb::Framebuffer, mesh::Mesh};
+use super::{shader::Shader, fb::Framebuffer};
 
 pub struct SceneRenderer {
     line_shader: Shader
@@ -45,12 +47,12 @@ impl SceneRenderer {
         cam_pos: glam::Vec2,
         cam_size: f32,
 
-        project: &Project,
+        project: &mut Project,
         gfx: u64,
         time: i32,
 
         gl: &Arc<Context>
-    ) {
+    ) -> Option<()> {
 
         fb.resize(w, h, gl);
         fb.render_to(gl);
@@ -66,20 +68,20 @@ impl SceneRenderer {
         self.line_shader.enable(gl);
         self.line_shader.set_mat4("uTrans", &(proj * view), gl);
 
-        let mut mesh = Mesh::new(vec![2], gl);
-        mesh.upload(&vec![
-            -1.0, -1.0,
-             1.0, -1.0,
-            -1.0,  1.0,
-             1.0,  1.0
-        ], &vec![
-            0, 1, 2,
-            1, 2, 3
-        ], gl);
-        mesh.render(gl);
-        mesh.delete(gl);
-        
+        let mut stroke_keys = Vec::new();
+        for layer in &project.graphics.get(&gfx)?.layers {
+            if let Some(frame) = project.get_frame_at(*layer, time) {
+                stroke_keys.append(&mut project.frames.get(&frame)?.strokes.clone());
+            }
+        }
+        for key in stroke_keys {
+            if let Some(mesh) = meshgen::get_mesh(project, key, gl) {
+                mesh.render(gl);
+            }
+        }
 
+        None
+        
     }
 
 }

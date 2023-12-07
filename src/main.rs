@@ -5,6 +5,7 @@ pub mod editor;
 pub mod panels;
 pub mod project;
 pub mod renderer;
+pub mod util;
 
 fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {

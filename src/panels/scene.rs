@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use glow::HasContext;
 
-use crate::{editor::{EditorState, Editor}, project::action::Action, renderer::{mesh::Mesh, shader::Shader, self, fb::Framebuffer}};
+use crate::{editor::EditorState, renderer::{mesh::Mesh, shader::Shader, fb::Framebuffer}};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct ScenePanel {
@@ -12,7 +12,17 @@ pub struct ScenePanel {
 
     #[serde(skip)]
     cam_pos: glam::Vec2,
+    #[serde(default)]
     cam_size: f32
+}
+
+impl Default for ScenePanel {
+
+    fn default() -> Self {
+        println!("HEY");
+        Self::new() 
+    }
+    
 }
 
 impl ScenePanel {
@@ -99,8 +109,20 @@ impl ScenePanel {
                         self.cam_pos -= (mouse_pos - self.cam_pos) * (zoom_fac - 1.0);
                         self.cam_size = next_cam_size; 
                     }
+
+                    let tool = state.curr_tool.clone();
+                    if response.drag_started() {
+                        tool.borrow_mut().mouse_click(mouse_pos, state);
+                    }
+                    if response.dragged() {
+                        tool.borrow_mut().mouse_down(mouse_pos, state);
+                    }
+                    if response.drag_released() {
+                        tool.borrow_mut().mouse_release(mouse_pos, state);
+                    }
                 }
 
+                let frame = state.frame();
                 state.renderer.use_renderer(|gl, renderer| {
                     let mut fb = self.fb.lock().unwrap(); 
                     if let None = fb.as_ref() {
@@ -110,13 +132,13 @@ impl ScenePanel {
 
                     renderer.render(
                         fb,
-                        rect.width() as u32,
-                        rect.height() as u32,
+                        (rect.width() as u32) * 4,
+                        (rect.height() as u32) * 4,
                         self.cam_pos, 
                         self.cam_size,
-                        &state.project,
+                        &mut state.project,
                         gfx_key,
-                        0,
+                        frame,
                         gl
                     );
 
