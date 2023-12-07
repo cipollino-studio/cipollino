@@ -71,6 +71,12 @@ impl Action {
         }
     }
 
+    pub fn from_list(acts: Vec<ObjAction>) -> Self {
+        Self {
+            actions: acts 
+        }
+    }
+
     pub fn redo(&self, project: &mut Project) {
         for action in &self.actions {
             action.redo(project);

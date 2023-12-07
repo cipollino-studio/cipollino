@@ -30,9 +30,9 @@ impl ObjData for GraphicData {
 
 impl Project {
 
-    pub fn add_graphic(&mut self, name: String, len: u32) -> ObjAction {
+    pub fn add_graphic(&mut self, name: String, len: u32) -> (u64, ObjAction) {
         let key = self.next_key();
-        self.add_graphic_with_key(key, name, len)
+        (key, self.add_graphic_with_key(key, name, len))
     }
 
     pub fn add_graphic_with_key(&mut self, key: u64, name: String, len: u32) -> ObjAction {
