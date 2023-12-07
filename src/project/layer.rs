@@ -48,13 +48,19 @@ impl Project {
         Some((key, ObjAction::addition(key, data)))
     }
 
-    pub fn delete_layer(&mut self, key: u64) -> Option<()> {
+    pub fn delete_layer(&mut self, key: u64) -> Option<Vec<ObjAction>> {
         let layer = self.layers.remove(&key)?;
+        let mut acts = Vec::new();
         for frame in layer.frames {
-            self.delete_frame(frame);
+            if let Some(mut frame_acts) = self.delete_frame(frame) {
+                acts.append(&mut frame_acts);
+            }
         }
-        self.graphics.get_mut(&layer.data.gfx)?.layers.retain(|layer| *layer != key);
-        None
+        if let Some(gfx) = self.graphics.get_mut(&layer.data.gfx) {
+            gfx.layers.retain(|layer| *layer != key);
+        }
+        acts.push(ObjAction::deletion(key, layer.data));
+        Some(acts) 
     }
     
     pub fn set_layer_data(&mut self, key: u64, data: LayerData) -> Option<ObjAction> {

@@ -220,6 +220,8 @@ impl TimelinePanel {
         let gfx = state.project.graphics.get(&state.open_graphic.unwrap()).unwrap();
         let mut i = 0;
 
+        let mut delete_layer = None;
+
         let (rect, _response) = ui.allocate_exact_size(Vec2::new(100.0, (gfx.layers.len() as f32) * frame_h), egui::Sense::click());
         let tl = rect.left_top(); 
         for layer_key in gfx.layers.iter() {
@@ -230,12 +232,23 @@ impl TimelinePanel {
                 if *layer_key == state.active_layer {
                     ui.painter().rect(rect, 0.0, highlight, egui::Stroke::NONE);
                 }
-                let layer_name_response = ui.put(rect, egui::Label::new(layer.data.name.clone()).sense(egui::Sense::click()));
+                let layer_name_response = ui.put(rect, egui::Label::new(layer.data.name.clone()).sense(egui::Sense::click()))
+                    .context_menu(|ui| {
+                        if ui.button("Delete").clicked() {
+                            delete_layer = Some(*layer_key); 
+                        }
+                    });
                 if layer_name_response.clicked() {
                     state.active_layer = *layer_key;
                 }
             }
             i += 1;
+        }
+        
+        if let Some(key) = delete_layer {
+            if let Some(acts) = state.project.delete_layer(key) {
+                state.actions.add(Action::from_list(acts));
+            }
         }
     }
 

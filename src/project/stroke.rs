@@ -51,13 +51,19 @@ impl Project {
         Some((key, ObjAction::addition(key, data)))
     }
 
-    pub fn delete_stroke(&mut self, key: u64) -> Option<()> {
+    pub fn delete_stroke(&mut self, key: u64) -> Option<Vec<ObjAction>> {
         let stroke = self.strokes.remove(&key)?;
-        for point in stroke.points {
-            self.delete_point(point);
+        let mut acts = Vec::new();
+        for point in stroke.points.iter().rev() {
+            if let Some(mut point_acts) = self.delete_point(*point) {
+                acts.append(&mut point_acts);
+            }
         }
-        self.frames.get_mut(&stroke.data.frame)?.strokes.retain(|stroke| *stroke != key);
-        None
+        if let Some(frame) = self.frames.get_mut(&stroke.data.frame) {
+            frame.strokes.retain(|stroke| *stroke != key);
+        }
+        acts.push(ObjAction::deletion(key, stroke.data));
+        Some(acts) 
     }
     
     pub fn set_stroke_data(&mut self, key: u64, data: StrokeData) -> Option<ObjAction> {
