@@ -44,7 +44,6 @@ impl ObjAction {
     }
 
     pub fn undo(&self, project: &mut Project) {
-        println!("{}", self.key);
         match &self.kind {
             ObjActionKind::Addition(data) => data.delete(self.key, project),
             ObjActionKind::Deletion(data) => data.add(self.key, project),

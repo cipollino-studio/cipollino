@@ -159,13 +159,15 @@ impl TimelinePanel {
             state.playing = false;
         }
         if ui.button("*<").clicked() {
-
+            prev_keyframe(state);
+            state.playing = false;
         }
         if ui.button(if state.playing { "||" } else { ">" }).clicked() {
             state.playing = !state.playing; 
         }
         if ui.button(">*").clicked() {
-
+            next_keyframe(state);
+            state.playing = false;
         }
         if ui.button(">>").clicked() {
             let gfx = state.project.graphics.get(&gfx).unwrap();
@@ -324,6 +326,24 @@ pub fn new_frame(state: &mut EditorState) -> Option<()> {
             if let Some((_key, act)) = state.project.add_frame(state.active_layer, state.frame()) {
                 state.actions.add(Action::from_single(act));
             }
+        }
+    }
+    None
+}
+
+pub fn prev_keyframe(state: &mut EditorState) -> Option<()> {
+    if let Some(_layer) = state.project.layers.get(&state.active_layer) {
+        if let Some(frame) = state.project.get_frame_before(state.active_layer, state.frame()) {
+            state.time = (state.project.frames.get(&frame).unwrap().data.time as f32) * state.frame_len();
+        }
+    }
+    None
+}
+
+pub fn next_keyframe(state: &mut EditorState) -> Option<()> {
+    if let Some(_layer) = state.project.layers.get(&state.active_layer) {
+        if let Some(frame) = state.project.get_frame_after(state.active_layer, state.frame()) {
+            state.time = (state.project.frames.get(&frame).unwrap().data.time as f32) * state.frame_len();
         }
     }
     None

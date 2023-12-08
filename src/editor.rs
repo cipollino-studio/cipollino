@@ -1,7 +1,7 @@
 
 use std::{sync::{Arc, Mutex}, rc::Rc, cell::RefCell};
 
-use crate::{panels::{self, timeline::new_frame, tools::{pencil::Pencil, Tool}}, project::{Project, graphic::Graphic, action::ActionManager}, renderer::scene::SceneRenderer};
+use crate::{panels::{self, timeline::{new_frame, prev_keyframe, next_keyframe}, tools::{pencil::Pencil, Tool}}, project::{Project, graphic::Graphic, action::ActionManager}, renderer::scene::SceneRenderer};
 use egui::Modifiers;
 
 pub struct EditorRenderer {
@@ -112,10 +112,13 @@ impl Editor {
             if let Some(gfx) = self.state.project.graphics.get(&open_gfx) {
                 if self.state.playing {
                     self.state.time += ctx.input(|i| i.stable_dt);
-                    if self.state.time > (gfx.data.len as f32) * self.state.frame_len() {
-                        self.state.time = 0.0;
-                    }
                     ctx.request_repaint();
+                }
+                if self.state.time >= (gfx.data.len as f32) * self.state.frame_len() {
+                    self.state.time = 0.0;
+                }
+                if self.state.time < 0.0 {
+                    self.state.time = ((gfx.data.len - 1) as f32) * self.state.frame_len();
                 }
             }
         }
@@ -126,18 +129,42 @@ impl Editor {
             let redo_shortcut = egui::KeyboardShortcut::new(Modifiers::COMMAND, egui::Key::Y);
             let play_shortcut = egui::KeyboardShortcut::new(Modifiers::NONE, egui::Key::Space);
             let frame_shortcut = egui::KeyboardShortcut::new(Modifiers::NONE, egui::Key::K);
+            
+            let prev_frame_shortcut = egui::KeyboardShortcut::new(Modifiers::NONE, egui::Key::Q);
+            let next_frame_shortcut = egui::KeyboardShortcut::new(Modifiers::NONE, egui::Key::W);
+            let prev_keyframe_shortcut = egui::KeyboardShortcut::new(Modifiers::SHIFT, egui::Key::Q);
+            let next_keyframe_shortcut = egui::KeyboardShortcut::new(Modifiers::SHIFT, egui::Key::W);
 
             if ui.input_mut(|i| i.consume_shortcut(&undo_shortcut)) {
+                self.state.playing = false;
                 self.state.actions.undo(&mut self.state.project);
             }
             if ui.input_mut(|i| i.consume_shortcut(&redo_shortcut)) {
+                self.state.playing = false;
                 self.state.actions.redo(&mut self.state.project);
             }
             if ui.input_mut(|i| i.consume_shortcut(&play_shortcut)) {
                 self.state.playing = !self.state.playing;
             }
             if ui.input_mut(|i| i.consume_shortcut(&frame_shortcut)) {
+                self.state.playing = false;
                 new_frame(&mut self.state);
+            }
+            if ui.input_mut(|i| i.consume_shortcut(&prev_frame_shortcut)) {
+                self.state.playing = false;
+                self.state.time = ((self.state.frame() - 1) as f32) * self.state.frame_len();
+            }
+            if ui.input_mut(|i| i.consume_shortcut(&next_frame_shortcut)) {
+                self.state.playing = false;
+                self.state.time = ((self.state.frame() + 1) as f32) * self.state.frame_len();
+            }
+            if ui.input_mut(|i| i.consume_shortcut(&prev_keyframe_shortcut)) {
+                self.state.playing = false;
+                prev_keyframe(&mut self.state); 
+            }
+            if ui.input_mut(|i| i.consume_shortcut(&next_keyframe_shortcut)) {
+                self.state.playing = false;
+                next_keyframe(&mut self.state); 
             }
 
             egui::menu::bar(ui, |ui| {

@@ -99,4 +99,40 @@ impl Project {
         None
     }
 
+    pub fn get_frame_before(&self, layer: u64, time: i32) -> Option<u64> {
+        let layer = self.layers.get(&layer)?;
+        let mut best_frame = 0;
+        let mut best_time = -1;
+        for frame_key in &layer.frames {
+            let frame = self.frames.get(frame_key)?;
+            if frame.data.time < time && frame.data.time > best_time {
+                best_frame = *frame_key;
+                best_time = frame.data.time;
+            }
+        }
+        if best_frame == 0 {
+            None
+        } else {
+            Some(best_frame)
+        } 
+    }
+    
+    pub fn get_frame_after(&self, layer: u64, time: i32) -> Option<u64> {
+        let layer = self.layers.get(&layer)?;
+        let mut best_frame = 0;
+        let mut best_time = i32::MAX;
+        for frame_key in &layer.frames {
+            let frame = self.frames.get(frame_key)?;
+            if frame.data.time > time && frame.data.time < best_time {
+                best_frame = *frame_key;
+                best_time = frame.data.time;
+            }
+        }
+        if best_frame == 0 {
+            None
+        } else {
+            Some(best_frame)
+        } 
+    }
+
 }
