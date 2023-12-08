@@ -61,6 +61,14 @@ impl Shader {
             }
         }
     }
+    
+    pub fn set_vec4(&mut self, name: &str, val: glam::Vec4, gl: &Arc<Context>) {
+        unsafe {
+            if let Some(uniform_loc) = gl.get_uniform_location(self.program, name) {
+                gl.uniform_4_f32_slice(Some(&uniform_loc), &[val.x, val.y, val.z, val.w]); 
+            }
+        }
+    }
 
     pub fn delete(&self, gl: &Arc<Context>) {
         unsafe {

@@ -37,6 +37,9 @@ pub struct EditorState {
     pub time: f32,
     pub playing: bool,
     pub renderer: EditorRenderer,
+
+    pub onion_before: i32,
+    pub onion_after: i32,
     
     pub pencil: Rc<RefCell<dyn Tool>>,
     pub curr_tool: Rc<RefCell<dyn Tool>>
@@ -54,6 +57,8 @@ impl EditorState {
             time: 0.0,
             playing: false,
             renderer: EditorRenderer::new(),
+            onion_before: 0,
+            onion_after: 0,
             pencil: pencil.clone(),
             curr_tool: pencil
         }

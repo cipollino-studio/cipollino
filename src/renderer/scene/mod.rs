@@ -30,8 +30,10 @@ impl SceneRenderer {
             ", "
                 #version 100\n 
 
+                uniform highp vec4 uColor;
+
                 void main() {
-                    gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+                    gl_FragColor = uColor;
                 }
             ", gl)
         }
@@ -51,6 +53,9 @@ impl SceneRenderer {
         gfx: u64,
         time: i32,
 
+        onion_before: i32,
+        onion_after: i32,
+
         gl: &Arc<Context>
     ) -> Option<()> {
 
@@ -68,14 +73,43 @@ impl SceneRenderer {
         self.line_shader.enable(gl);
         self.line_shader.set_mat4("uTrans", &(proj * view), gl);
 
+        let mut onion_strokes = Vec::new();
         let mut stroke_keys = Vec::new();
         for layer in &project.graphics.get(&gfx)?.layers {
             if let Some(frame) = project.get_frame_at(*layer, time) {
-                stroke_keys.append(&mut project.frames.get(&frame)?.strokes.clone());
+                let frame = project.frames.get(&frame)?;
+                let mut curr_time = frame.data.time;
+                let mut alpha = 0.75;
+                for _i in 0..onion_before {
+                    if let Some(frame) = project.get_frame_before(*layer, curr_time) {
+                        let frame = project.frames.get(&frame)?;
+                        onion_strokes.append(&mut (frame.strokes.clone().iter().map(|key| (glam::vec4(1.0, 0.3, 1.0, alpha), *key)).collect()));
+                        alpha *= 0.8;
+                        curr_time = frame.data.time;
+                    }
+                }
+                let mut curr_time = frame.data.time;
+                let mut alpha = 0.75;
+                for _i in 0..onion_after {
+                    if let Some(frame) = project.get_frame_after(*layer, curr_time) {
+                        let frame = project.frames.get(&frame)?;
+                        onion_strokes.append(&mut (frame.strokes.clone().iter().map(|key| (glam::vec4(0.3, 1.0, 1.0, alpha), *key)).collect()));
+                        alpha *= 0.8;
+                        curr_time = frame.data.time;
+                    }
+                }
+                stroke_keys.append(&mut frame.strokes.clone());
+            }
+        }
+        for (color, key) in onion_strokes {
+            if let Some(mesh) = meshgen::get_mesh(project, key, gl) {
+                self.line_shader.set_vec4("uColor", color, gl);
+                mesh.render(gl);
             }
         }
         for key in stroke_keys {
             if let Some(mesh) = meshgen::get_mesh(project, key, gl) {
+                self.line_shader.set_vec4("uColor", glam::vec4(0.0, 0.0, 0.0, 1.0), gl);
                 mesh.render(gl);
             }
         }

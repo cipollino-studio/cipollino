@@ -1,10 +1,6 @@
 
-- Timeline
-- Undo/Redo system
-- Line Drawing
 - Rendering
 - Color
-- Onion Skin
 - Fill
 - Cutting
 - Sound

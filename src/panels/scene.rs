@@ -139,6 +139,8 @@ impl ScenePanel {
                         &mut state.project,
                         gfx_key,
                         frame,
+                        if state.playing { 0 } else { state.onion_before },
+                        if state.playing { 0 } else { state.onion_after },
                         gl
                     );
 

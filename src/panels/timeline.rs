@@ -193,6 +193,10 @@ impl TimelinePanel {
             state.actions.add(std::mem::replace(&mut self.set_gfx_len_action, Action::new()));
         }
 
+        ui.label("Onion skin:");
+        ui.add(egui::DragValue::new(&mut state.onion_before).clamp_range(0..=10));
+        ui.add(egui::DragValue::new(&mut state.onion_after).clamp_range(0..=10));
+
     }
 
     pub fn frame_numbers(&mut self, ui: &mut egui::Ui, frame_w: f32, n_frames: i32, state: &mut EditorState, header_height: f32) {
