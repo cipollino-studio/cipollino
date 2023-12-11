@@ -1,5 +1,5 @@
 
-use std::sync::Arc;
+use std::{sync::Arc, f32::consts};
 
 use crate::{renderer::mesh::Mesh, project::Project, util::curve};
 
@@ -58,6 +58,38 @@ pub fn get_mesh<'a>(project: &'a mut Project, stroke_key: u64, gl: &Arc<glow::Co
 
                 curr_idx += 4;
             }
+        }
+
+        // Stroke caps
+        if top_pts.len() > 0 {
+
+            let mut add_cap = |p0: glam::Vec2, p1: glam::Vec2| {
+                let center = (p0 + p1) * 0.5;
+                let r = (p0 - center).length();
+                let up = (p0 - center).normalize();
+                let left = glam::vec2(-up.y, up.x);
+
+                verts.push(center.x);
+                verts.push(center.y);
+                curr_idx += 1;
+                let n = 20;
+                for i in 0..n {
+                    let a = consts::PI * (i as f32) / 19.0;
+                    let pt = center + r * (up * a.cos() + left * a.sin());
+                    verts.push(pt.x);
+                    verts.push(pt.y);
+                }
+                for i in 0..(n - 1) {
+                    idxs.push(curr_idx - 1);
+                    idxs.push(curr_idx + i);
+                    idxs.push(curr_idx + i + 1);
+                }
+                curr_idx += n;
+            };
+
+            add_cap(top_pts[0], btm_pts[0]);
+            add_cap(*btm_pts.last().unwrap(), *top_pts.last().unwrap());
+            
         }
 
         mesh.upload(&verts, &idxs, gl);
