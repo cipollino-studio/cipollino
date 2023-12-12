@@ -352,7 +352,12 @@ impl TimelinePanel {
 
         self.frame_drag += response.drag_delta();
         if self.frame_drag.x.abs() > frame_w {
-            let frame_shift_inc = (self.frame_drag.x.signum() * (self.frame_drag.x.abs() / frame_w).floor()) as i32; 
+            let mut frame_shift_inc = (self.frame_drag.x.signum() * (self.frame_drag.x.abs() / frame_w).floor()) as i32; 
+            for frame in &state.selected_frames {
+                if let Some(frame) = state.project.frames.get(frame) {
+                    frame_shift_inc = frame_shift_inc.max(-frame.data.time);
+                }
+            }
             self.frame_shift += frame_shift_inc;
             if let Some(action) = &self.frame_drag_action {
                 action.undo(&mut state.project);
