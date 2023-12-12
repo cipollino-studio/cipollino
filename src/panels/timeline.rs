@@ -1,7 +1,6 @@
 
 use egui::Vec2;
-
-use crate::{editor::EditorState, project::{action::Action, graphic::GraphicData}};
+use crate::{editor::EditorState, project::{action::Action, graphic::GraphicData, frame::FrameData}};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct TimelinePanel {
@@ -11,7 +10,13 @@ pub struct TimelinePanel {
     scroll_h: f32,
 
     #[serde(skip)]
-    set_gfx_len_action: Action
+    set_gfx_len_action: Action,
+    #[serde(skip)]
+    frame_drag: egui::Vec2,
+    #[serde(skip)]
+    frame_shift: i32,
+    #[serde(skip)]
+    frame_drag_action: Option<Action>
 }
 
 impl TimelinePanel {
@@ -22,7 +27,10 @@ impl TimelinePanel {
             scroll_w: 0.0,
             scroll_y: 0.0,
             scroll_h: 0.0,
-            set_gfx_len_action: Action::new()
+            set_gfx_len_action: Action::new(),
+            frame_drag: egui::vec2(0.0, 0.0),
+            frame_shift: 0,
+            frame_drag_action: None
         }
     }
 
@@ -264,7 +272,7 @@ impl TimelinePanel {
 
         let total_height = ui.available_height().max(frame_h * (gfx.layers.len() as f32));
 
-        let (rect, _response) = ui.allocate_exact_size(Vec2::new((n_frames as f32) * frame_w, ((gfx.layers.len() as f32) * frame_h).max(ui.available_height())), egui::Sense::click_and_drag());
+        let (rect, response) = ui.allocate_exact_size(Vec2::new((n_frames as f32) * frame_w, ((gfx.layers.len() as f32) * frame_h).max(ui.available_height())), egui::Sense::click_and_drag());
         let win_tl = rect.left_top(); 
         ui.painter().rect(
             egui::Rect::from_min_max(rect.left_top(), rect.right_bottom() + Vec2::new(0.0, ui.available_height())),
@@ -294,17 +302,35 @@ impl TimelinePanel {
                 egui::Stroke::NONE);
         }
 
+        if response.drag_started() {
+            if !ui.input(|i| i.modifiers.shift) {
+                state.selected_frames.clear();
+            }
+        }
+
         // Frame dots
         let mut y = 0.0;
         for layer_key in gfx.layers.iter() {
             let layer = state.project.layers.get(layer_key).unwrap();
             for frame_key in &layer.frames {
                 let frame = state.project.frames.get(frame_key).unwrap();
+                let dot_pos = win_tl + Vec2::new((frame.data.time as f32 + 0.5) * frame_w, (y + 0.5) * frame_h);
+                let frame_rect = egui::Rect::from_center_size(dot_pos, egui::Vec2::new(frame_w, frame_h));
                 ui.painter().circle(
-                    win_tl + Vec2::new((frame.data.time as f32 + 0.5) * frame_w, (y + 0.5) * frame_h),
+                    dot_pos, 
                     frame_w * 0.3,
                     ui.visuals().text_color(),
                     egui::Stroke::NONE);
+                if state.selected_frames.contains(&frame_key) {
+                    ui.painter().rect_stroke(frame_rect, 0.0, egui::Stroke::new(1.0, egui::Color32::from_rgb(125, 125, 255))); 
+                }
+                if let Some(hover_pos) = response.hover_pos() {
+                    if response.drag_started() && frame_rect.contains(hover_pos) {
+                        if !state.selected_frames.contains(&frame_key) {
+                            state.selected_frames.push(*frame_key);
+                        }
+                    } 
+                }
             }
             y += 1.0;
         }
@@ -319,6 +345,40 @@ impl TimelinePanel {
             0.0,
             darken,
             egui::Stroke::NONE);
+
+        if response.clicked_elsewhere() {
+            state.selected_frames.clear();
+        }
+
+        self.frame_drag += response.drag_delta();
+        if self.frame_drag.x.abs() > frame_w {
+            let frame_shift_inc = (self.frame_drag.x.signum() * (self.frame_drag.x.abs() / frame_w).floor()) as i32; 
+            self.frame_shift += frame_shift_inc;
+            if let Some(action) = &self.frame_drag_action {
+                action.undo(&mut state.project);
+            }
+            let mut new_action = Action::new();
+            for frame_key in &state.selected_frames {
+                if let Some(frame) = state.project.frames.get(frame_key) {
+                    if let Some(acts) = state.project.set_frame_data(*frame_key, FrameData {
+                        time: frame.data.time + self.frame_shift,
+                        ..frame.data
+                    }) {
+                        new_action.add_list(acts);
+                    }
+                } 
+            }
+            self.frame_drag_action = Some(new_action);
+            self.frame_drag.x -= (frame_shift_inc as f32) * frame_w;
+        }
+        if response.drag_released() {
+            let action = std::mem::replace(&mut self.frame_drag_action, None);
+            if let Some(action) = action {
+                state.actions.add(action);
+            }
+            self.frame_shift = 0;
+            self.frame_drag = egui::Vec2::ZERO;
+        }
 
     }
 

@@ -63,10 +63,26 @@ impl Project {
         Some(acts) 
     }
     
-    pub fn set_frame_data(&mut self, key: u64, data: FrameData) -> Option<ObjAction> {
+    pub fn set_frame_data(&mut self, key: u64, data: FrameData) -> Option<Vec<ObjAction>> {
         let frame = self.frames.get_mut(&key)?;
-        let res = ObjAction::modification(key, frame.data.clone(), data.clone());
-        frame.data = data;
+        let mut res = vec![ObjAction::modification(key, frame.data.clone(), data.clone())];
+        frame.data = data.clone();
+        let mut frames_to_delete = Vec::new();
+        if data.time != frame.data.time {
+            let layer = self.layers.get(&frame.data.layer)?;
+            for other_frame_key in &layer.frames {
+                if let Some(other_frame) = self.frames.get(other_frame_key) {
+                    if key != *other_frame_key && other_frame.data.time == data.time {
+                        frames_to_delete.push(*other_frame_key)
+                    }
+                }
+            }
+        }
+        for key in frames_to_delete {
+            if let Some(mut acts) = self.delete_frame(key) {
+                res.append(&mut acts);
+            }
+        }
         Some(res)
     }
 

@@ -1,7 +1,7 @@
 
 use std::{sync::{Arc, Mutex}, rc::Rc, cell::RefCell};
 
-use crate::{panels::{self, timeline::{new_frame, prev_keyframe, next_keyframe}, tools::{pencil::Pencil, Tool}}, project::{Project, graphic::Graphic, action::ActionManager}, renderer::scene::SceneRenderer};
+use crate::{panels::{self, timeline::{new_frame, prev_keyframe, next_keyframe}, tools::{pencil::Pencil, Tool}}, project::{Project, graphic::Graphic, action::{ActionManager, Action}}, renderer::scene::SceneRenderer};
 use egui::Modifiers;
 
 pub struct EditorRenderer {
@@ -30,19 +30,27 @@ impl EditorRenderer {
 }
 
 pub struct EditorState {
+    // Subsystems
     pub project: Project, 
     pub actions: ActionManager,
+    pub renderer: EditorRenderer,
+    
+    // Tools
+    pub pencil: Rc<RefCell<dyn Tool>>,
+    pub curr_tool: Rc<RefCell<dyn Tool>>,
+
+    // Selections
     pub open_graphic: Option<u64>,
     pub active_layer: u64,
+    pub selected_frames: Vec<u64>,
+
+    // Playback
     pub time: f32,
     pub playing: bool,
-    pub renderer: EditorRenderer,
 
+    // Display
     pub onion_before: i32,
     pub onion_after: i32,
-    
-    pub pencil: Rc<RefCell<dyn Tool>>,
-    pub curr_tool: Rc<RefCell<dyn Tool>>
 }
 
 impl EditorState {
@@ -54,6 +62,7 @@ impl EditorState {
             actions: ActionManager::new(),
             open_graphic: None,
             active_layer: 0,
+            selected_frames: Vec::new(),
             time: 0.0,
             playing: false,
             renderer: EditorRenderer::new(),
@@ -140,6 +149,8 @@ impl Editor {
             let prev_keyframe_shortcut = egui::KeyboardShortcut::new(Modifiers::SHIFT, egui::Key::Q);
             let next_keyframe_shortcut = egui::KeyboardShortcut::new(Modifiers::SHIFT, egui::Key::W);
 
+            let delete_shortcut = egui::KeyboardShortcut::new(Modifiers::NONE, egui::Key::X);
+
             if ui.input_mut(|i| i.consume_shortcut(&undo_shortcut)) {
                 self.state.playing = false;
                 self.state.actions.undo(&mut self.state.project);
@@ -170,6 +181,15 @@ impl Editor {
             if ui.input_mut(|i| i.consume_shortcut(&next_keyframe_shortcut)) {
                 self.state.playing = false;
                 next_keyframe(&mut self.state); 
+            }
+            if ui.input_mut(|i| i.consume_shortcut(&delete_shortcut)) {
+                let mut action = Action::new();
+                for frame in &self.state.selected_frames {
+                    if let Some(acts) = self.state.project.delete_frame(*frame) {
+                        action.add_list(acts);
+                    }
+                }
+                self.state.actions.add(action);
             }
 
             egui::menu::bar(ui, |ui| {

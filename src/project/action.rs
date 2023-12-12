@@ -93,6 +93,10 @@ impl Action {
         self.actions.push(act);
     }
 
+    pub fn add_list(&mut self, mut acts: Vec<ObjAction>) {
+        self.actions.append(&mut acts);
+    }
+
 }
 
 impl Default for Action {
