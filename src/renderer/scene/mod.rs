@@ -7,15 +7,26 @@ use glow::{Context, HasContext};
 
 use crate::project::Project;
 
-use super::{shader::Shader, fb::Framebuffer};
+use super::{shader::Shader, fb::Framebuffer, mesh::Mesh};
 
 pub struct SceneRenderer {
-    line_shader: Shader
+    pub line_shader: Shader,
+    pub quad: Mesh
 }
 
 impl SceneRenderer {
 
     pub fn new(gl: &Arc<Context>) -> Self {
+        let mut quad = Mesh::new(vec![2], gl);
+        quad.upload(&vec![
+            -0.5, -0.5,
+             0.5, -0.5,
+            -0.5,  0.5,
+             0.5,  0.5
+        ], &vec![
+            0, 1, 2,
+            1, 2, 3
+        ], gl);
         Self {
             line_shader: Shader::new("
                 #version 100\n 
@@ -35,7 +46,8 @@ impl SceneRenderer {
                 void main() {
                     gl_FragColor = uColor;
                 }
-            ", gl)
+            ", gl),
+            quad
         }
     }
 
@@ -57,7 +69,7 @@ impl SceneRenderer {
         onion_after: i32,
 
         gl: &Arc<Context>
-    ) -> Option<()> {
+    ) -> Option<glam::Mat4> {
 
         fb.resize(w, h, gl);
         fb.render_to(gl);
@@ -65,13 +77,15 @@ impl SceneRenderer {
         unsafe {
             gl.clear_color(1.0, 1.0, 1.0, 1.0);
             gl.clear(glow::COLOR_BUFFER_BIT);
+            gl.enable(glow::BLEND);
         }
 
         let aspect = (w as f32) / (h as f32);
         let proj = glam::Mat4::orthographic_rh_gl(-aspect * cam_size, aspect * cam_size, -cam_size, cam_size, -1.0, 1.0);
         let view = glam::Mat4::from_translation(-glam::vec3(cam_pos.x, cam_pos.y, 0.0));
+        let proj_view = proj * view;
         self.line_shader.enable(gl);
-        self.line_shader.set_mat4("uTrans", &(proj * view), gl);
+        self.line_shader.set_mat4("uTrans", &proj_view, gl);
 
         let mut onion_strokes = Vec::new();
         let mut stroke_keys = Vec::new();
@@ -88,6 +102,8 @@ impl SceneRenderer {
                         curr_time = frame.data.time;
                     }
                 }
+                // Ugly bug fix: make sure the oldest strokes are drawn at the back
+                onion_strokes.reverse();
                 let mut curr_time = frame.data.time;
                 let mut alpha = 0.75;
                 for _i in 0..onion_after {
@@ -114,7 +130,7 @@ impl SceneRenderer {
             }
         }
 
-        None
+        Some(proj_view) 
         
     }
 

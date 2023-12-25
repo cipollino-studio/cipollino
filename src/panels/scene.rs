@@ -130,7 +130,7 @@ impl ScenePanel {
                     }
                     let fb = fb.as_mut().unwrap();
 
-                    renderer.render(
+                    if let Some(proj_view) = renderer.render(
                         fb,
                         (rect.width() as u32) * 4,
                         (rect.height() as u32) * 4,
@@ -142,7 +142,35 @@ impl ScenePanel {
                         if state.playing { 0 } else { state.onion_before },
                         if state.playing { 0 } else { state.onion_after },
                         gl
-                    );
+                    ) {
+                        renderer.line_shader.enable(gl);
+                        renderer.line_shader.set_vec4("uColor", glam::vec4(0.0, 0.0, 0.0, 0.3), gl);
+                        let mut draw_quad = |left: f32, right: f32, top: f32, bottom: f32| {
+                            let center = glam::vec3((left + right) / 2.0, (top + bottom) / 2.0, 0.0);
+                            let scale = glam::vec3(right - left, top - bottom, 1.0);
+                            let model = glam::Mat4::from_translation(center) * glam::Mat4::from_scale(scale);
+                            let trans = proj_view * model;
+                            renderer.line_shader.set_mat4("uTrans", &trans, gl);
+                            renderer.quad.render(gl);
+                        };
+
+                        let gfx = state.project.graphics.get(&gfx_key).unwrap();
+                        if gfx.data.clip {
+                            let cam_top = 5.0;
+                            let cam_btm = -cam_top;
+                            let cam_right = cam_top * ((gfx.data.w as f32) / (gfx.data.h as f32));
+                            let cam_left = -cam_right;
+                            let huge = 100000.0;
+                            draw_quad(cam_left, cam_right, huge, cam_top);
+                            draw_quad(cam_left, cam_right, cam_btm, -huge);
+                            draw_quad(-huge, cam_left, cam_top, cam_btm);
+                            draw_quad(cam_right, huge, cam_top, cam_btm);
+                            draw_quad(-huge, cam_left, huge, cam_top);
+                            draw_quad(cam_right, huge, huge, cam_top);
+                            draw_quad(cam_right, huge, cam_btm, -huge);
+                            draw_quad(-huge, cam_left, cam_btm, -huge);
+                        }
+                    }
 
                     Framebuffer::render_to_win(ui.ctx().screen_rect().width() as u32, ui.ctx().screen_rect().height() as u32, gl);
                 });

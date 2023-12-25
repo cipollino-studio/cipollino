@@ -1,7 +1,7 @@
 
 use std::{sync::{Arc, Mutex}, rc::Rc, cell::RefCell};
 
-use crate::{panels::{self, timeline::{new_frame, prev_keyframe, next_keyframe}, tools::{pencil::Pencil, Tool}}, project::{Project, graphic::Graphic, action::{ActionManager, Action}}, renderer::scene::SceneRenderer};
+use crate::{panels::{self, timeline::{new_frame, prev_keyframe, next_keyframe}, tools::{pencil::Pencil, Tool}}, project::{Project, graphic::Graphic, action::{ActionManager, Action}}, renderer::scene::SceneRenderer, export::Export};
 use egui::Modifiers;
 
 pub struct EditorRenderer {
@@ -60,7 +60,7 @@ impl EditorState {
         Self {
             project: Project::new(),
             actions: ActionManager::new(),
-            open_graphic: None,
+            open_graphic: Some(1),
             active_layer: 0,
             selected_frames: Vec::new(),
             time: 0.0,
@@ -69,7 +69,7 @@ impl EditorState {
             onion_before: 0,
             onion_after: 0,
             pencil: pencil.clone(),
-            curr_tool: pencil
+            curr_tool: pencil,
         }
     }
 
@@ -97,6 +97,7 @@ pub struct Editor {
     state: EditorState,
     panels: panels::PanelManager,
     config_path: String,
+    pub export: Export,
 }
 
 impl Editor {
@@ -116,6 +117,7 @@ impl Editor {
             state: EditorState::new(),
             panels,
             config_path,
+            export: Export::new(), 
         };
         
         res
@@ -137,7 +139,10 @@ impl Editor {
             }
         }
 
+
         egui::TopBottomPanel::top("MenuBar").show(ctx, |ui| {
+
+            ui.set_enabled(self.export.exporting.is_none());
 
             let undo_shortcut = egui::KeyboardShortcut::new(Modifiers::COMMAND, egui::Key::Z);
             let redo_shortcut = egui::KeyboardShortcut::new(Modifiers::COMMAND, egui::Key::Y);
@@ -193,7 +198,10 @@ impl Editor {
             }
 
             egui::menu::bar(ui, |ui| {
-                ui.menu_button("File", |_ui| {
+                ui.menu_button("File", |ui| {
+                    if ui.button("Export").clicked() {
+                        self.export.dialog_open = true;
+                    }
                 });
                 ui.menu_button("Edit", |ui| {
                     if ui.add_enabled(
@@ -227,8 +235,10 @@ impl Editor {
         egui::CentralPanel::default()
             .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.))
             .show(ctx, |_ui| {
-                self.panels.render(ctx, &mut self.state);
+                self.panels.render(ctx, self.export.exporting.is_none(), &mut self.state);
             });
+
+        self.export.render(ctx, &mut self.state);
 
         let _ = std::fs::write(self.config_path.clone() + "/dock.json", serde_json::json!(self.panels).to_string());
 

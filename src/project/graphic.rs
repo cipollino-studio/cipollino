@@ -1,10 +1,13 @@
 
 use super::{Project, ObjData, action::ObjAction};
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct GraphicData {
     pub name: String,
     pub len: u32,
+    pub clip: bool,
+    pub w: u32,
+    pub h: u32
 }
 
 pub struct Graphic {
@@ -15,7 +18,7 @@ pub struct Graphic {
 impl ObjData for GraphicData {
 
     fn add(&self, key: u64, project: &mut Project) {
-        project.add_graphic_with_key(key, self.name.clone(), self.len);
+        project.add_graphic_with_key(key, self.clone());
     }
 
     fn delete(&self, key: u64, project: &mut Project) {
@@ -30,21 +33,17 @@ impl ObjData for GraphicData {
 
 impl Project {
 
-    pub fn add_graphic(&mut self, name: String, len: u32) -> (u64, ObjAction) {
+    pub fn add_graphic(&mut self, data: GraphicData) -> (u64, ObjAction) {
         let key = self.next_key();
-        (key, self.add_graphic_with_key(key, name, len))
+        (key, self.add_graphic_with_key(key, data))
     }
 
-    pub fn add_graphic_with_key(&mut self, key: u64, name: String, len: u32) -> ObjAction {
-        let graphic_data = GraphicData {
-            name,
-            len
-        };
+    pub fn add_graphic_with_key(&mut self, key: u64, data: GraphicData) -> ObjAction {
         self.graphics.insert(key, Graphic {
-            data: graphic_data.clone(),
+            data: data.clone(), 
             layers: Vec::new()
         });
-        ObjAction::addition(key, graphic_data)
+        ObjAction::addition(key, data)
     }
 
     pub fn delete_graphic(&mut self, key: u64) -> Option<()> {

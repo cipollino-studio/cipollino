@@ -8,7 +8,7 @@ pub mod point;
 pub mod action;
 
 use std::collections::HashMap;
-use self::{graphic::Graphic, layer::Layer, frame::Frame, stroke::Stroke, point::Point};
+use self::{graphic::{Graphic, GraphicData}, layer::Layer, frame::Frame, stroke::Stroke, point::Point};
 
 pub trait ObjData {
 
@@ -33,14 +33,23 @@ pub struct Project {
 impl Project {
 
     pub fn new() -> Self {
-        Self {
+        let mut res = Self {
             graphics: HashMap::new(),
             layers: HashMap::new(),
             frames: HashMap::new(),
             strokes: HashMap::new(),
             points: HashMap::new(),
             curr_key: 1
-        }
+        };
+        let (gfx, _act) = res.add_graphic(GraphicData {
+            name: "Clip".to_owned(),
+            len: 100,
+            clip: true,
+            w: 1920,
+            h: 1080
+        });
+        res.add_layer(gfx, "Layer".to_owned());
+        res
     }
 
     pub fn next_key(&mut self) -> u64 {
