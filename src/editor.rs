@@ -1,5 +1,5 @@
 
-use std::{sync::{Arc, Mutex}, rc::Rc, cell::RefCell};
+use std::{sync::{Arc, Mutex}, rc::Rc, cell::RefCell, io::Write, path::PathBuf};
 
 use crate::{panels::{self, timeline::{new_frame, prev_keyframe, next_keyframe}, tools::{pencil::Pencil, Tool, select::Select}}, project::{Project, graphic::Graphic, action::{ActionManager, Action}}, renderer::scene::SceneRenderer, export::Export};
 use egui::Modifiers;
@@ -57,14 +57,14 @@ pub struct EditorState {
 
 impl EditorState {
 
-    pub fn new() -> Self {
+    pub fn new_with_project(project: Project) -> Self {
         let select = Rc::new(RefCell::new(Select::new()));
         let pencil = Rc::new(RefCell::new(Pencil::new()));
         Self {
-            project: Project::new(),
+            project: project, 
             actions: ActionManager::new(),
-            open_graphic: 1,
-            active_layer: 2,
+            open_graphic: 0,
+            active_layer: 0,
             selected_frames: Vec::new(),
             selected_strokes: Vec::new(),
             time: 0.0,
@@ -76,6 +76,13 @@ impl EditorState {
             pencil: pencil.clone(),
             curr_tool: select,
         }
+    }
+
+    pub fn new() -> Self {
+        let mut res = EditorState::new_with_project(Project::new());
+        res.open_graphic = 1;
+        res.active_layer = 2;
+        res
     }
 
     pub fn open_graphic(&self) -> Option<&Graphic> {
@@ -98,6 +105,7 @@ pub struct Editor {
     state: EditorState,
     panels: panels::PanelManager,
     config_path: String,
+    save_path: Option<PathBuf>,
     pub export: Export,
 }
 
@@ -118,6 +126,7 @@ impl Editor {
             state: EditorState::new(),
             panels,
             config_path,
+            save_path: None,
             export: Export::new(), 
         };
         
@@ -154,6 +163,8 @@ impl Editor {
             let next_keyframe_shortcut = egui::KeyboardShortcut::new(Modifiers::SHIFT, egui::Key::W);
 
             let delete_shortcut = egui::KeyboardShortcut::new(Modifiers::NONE, egui::Key::X);
+
+            let save_shortcut = egui::KeyboardShortcut::new(Modifiers::COMMAND, egui::Key::S);
 
             if ui.input_mut(|i| i.consume_shortcut(&undo_shortcut)) {
                 self.state.playing = false;
@@ -203,10 +214,39 @@ impl Editor {
                 self.state.actions.add(action);
             }
 
+            if ui.input_mut(|i| i.consume_shortcut(&save_shortcut)) {
+                self.save_project(self.save_path.clone().unwrap());
+            }
+
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
+                    if ui.add_enabled(
+                        self.save_path.is_some(),
+                    egui::Button::new("Save").shortcut_text(ui.ctx().format_shortcut(&save_shortcut))).clicked() {
+                        self.save_project(self.save_path.clone().unwrap());
+                    }
+                    if ui.button("Save As").clicked() {
+                        if let Some(mut path) = rfd::FileDialog::new().save_file() {
+                            path.set_extension("cip");
+                            self.save_path = Some(path.clone());
+                            self.save_project(path);
+                        }
+                        ui.close_menu();
+                    }
+                    if ui.button("Open").clicked() {
+                        if let Some(path) = rfd::FileDialog::new().add_filter("Cipollino Project File", &["cip"]).pick_file() {
+                            if let Ok(file) = std::fs::File::open(path.clone()) {
+                                let reader = std::io::BufReader::new(file);
+                                let proj = serde_json::from_reader(reader).unwrap(); 
+                                self.state = EditorState::new_with_project(proj);
+                                self.save_path = Some(path);
+                            }
+                        }
+                        ui.close_menu();
+                    }
                     if ui.button("Export").clicked() {
                         self.export.dialog_open = true;
+                        ui.close_menu();
                     }
                 });
                 ui.menu_button("Edit", |ui| {
@@ -248,6 +288,14 @@ impl Editor {
 
         let _ = std::fs::write(self.config_path.clone() + "/dock.json", serde_json::json!(self.panels).to_string());
 
+    }
+
+    pub fn save_project(&self, path: PathBuf) {
+        if let Ok(file) = std::fs::File::create(path.clone()) {
+            let mut writer = std::io::BufWriter::new(file);
+            serde_json::to_writer(&mut writer, &self.state.project).expect("Could not save");
+            let _ = writer.flush();
+        }
     }
 
 }

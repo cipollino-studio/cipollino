@@ -3,7 +3,7 @@ use glam::Vec2;
 
 use super::{ObjData, Project, action::ObjAction};
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct PointData {
     pub pt: Vec2,
     pub a: Vec2,
@@ -26,6 +26,7 @@ impl ObjData for PointData {
     }
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Point {
     pub data: PointData 
 }

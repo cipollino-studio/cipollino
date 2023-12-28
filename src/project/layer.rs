@@ -1,7 +1,7 @@
 
 use super::{Project, action::ObjAction, ObjData};
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct LayerData {
     pub gfx: u64,
     pub name: String
@@ -23,6 +23,7 @@ impl ObjData for LayerData {
 
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Layer {
     pub data: LayerData,
     pub frames: Vec<u64>

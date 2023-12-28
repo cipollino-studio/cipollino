@@ -3,7 +3,7 @@ use crate::renderer::mesh::Mesh;
 
 use super::{ObjData, Project, action::ObjAction};
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct StrokeData {
     frame: u64
 }
@@ -23,10 +23,18 @@ impl ObjData for StrokeData {
     }
 }
 
+// Hack to get around Serde's weird default system
+pub fn ret_true() -> bool {
+    true
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Stroke {
     pub data: StrokeData,
     pub points: Vec<u64>,
+    #[serde(skip)]
     pub mesh: Option<Mesh>,
+    #[serde(skip, default = "ret_true")]
     pub need_remesh: bool
 }
 

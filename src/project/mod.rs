@@ -18,6 +18,7 @@ pub trait ObjData {
 
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Project {
 
     pub graphics: HashMap<u64, Graphic>,

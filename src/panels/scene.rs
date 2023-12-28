@@ -4,7 +4,7 @@ use glow::HasContext;
 
 use crate::{
     editor::EditorState,
-    renderer::{fb::Framebuffer, mesh::Mesh, shader::Shader, scene::SceneRenderer}, project::{Project, stroke::StrokeData}, util::curve,
+    renderer::{fb::Framebuffer, mesh::Mesh, shader::Shader, scene::SceneRenderer}, project::Project, util::curve,
 };
 
 use super::tools::Tool;

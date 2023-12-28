@@ -10,6 +10,7 @@ pub struct GraphicData {
     pub h: u32
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Graphic {
     pub data: GraphicData,
     pub layers: Vec<u64>

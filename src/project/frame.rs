@@ -1,7 +1,7 @@
 
 use super::{Project, action::ObjAction, ObjData};
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct FrameData {
     pub time: i32,
     pub layer: u64
@@ -23,6 +23,7 @@ impl ObjData for FrameData {
 
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Frame {
     pub data: FrameData,
     pub strokes: Vec<u64>
