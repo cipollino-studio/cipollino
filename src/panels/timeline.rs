@@ -35,19 +35,18 @@ impl TimelinePanel {
     }
 
     pub fn render(&mut self, ui: &mut egui::Ui, state: &mut EditorState) {
-        if let None = state.project.graphics.get(&state.open_graphic.unwrap_or(0)) {
+        if let None = state.project.graphics.get(&state.open_graphic) {
             ui.centered_and_justified(|ui| {
                 ui.label("No Graphic Open");
             });
             return;
         };
-        let gfx_key = state.open_graphic.unwrap();
 
         let frame_w = 10.0;
         let frame_h = 15.0;
         let sidebar_w = 100.0;
 
-        let n_frames = ((ui.available_width() - sidebar_w) / frame_w) as i32 + (state.project.graphics.get(&gfx_key).unwrap().data.len as i32) - 2;
+        let n_frames = ((ui.available_width() - sidebar_w) / frame_w) as i32 + (state.project.graphics.get(&state.open_graphic).unwrap().data.len as i32) - 2;
         let n_frames = 5 * (n_frames / 5) + 4;
 
         let no_margin = egui::Frame { inner_margin: egui::Margin::same(0.0), ..Default::default()};
@@ -59,7 +58,7 @@ impl TimelinePanel {
             .exact_height(22.)
             .show_inside(ui, |ui| {
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                    self.timeline_controls(ui, state, gfx_key);
+                    self.timeline_controls(ui, state, state.open_graphic);
                 });
             }); 
 
@@ -183,14 +182,13 @@ impl TimelinePanel {
             state.playing = false;
         }
 
-        let gfx_key = state.open_graphic.unwrap();
-        let gfx = state.project.graphics.get(&gfx_key).unwrap();
+        let gfx = state.project.graphics.get(&state.open_graphic).unwrap();
         let mut len = gfx.data.len; 
         ui.label("Graphic length: ");
         let gfx_len_drag = ui.add(egui::DragValue::new(&mut len).clamp_range(1..=1000000).update_while_editing(false));
         let len_changed = len != gfx.data.len;
         if len_changed {
-            if let Some(act) = state.project.set_graphic_data(gfx_key, GraphicData {
+            if let Some(act) = state.project.set_graphic_data(state.open_graphic, GraphicData {
                 len,
                 ..gfx.data.clone()
             }) {
@@ -231,7 +229,7 @@ impl TimelinePanel {
     }
 
     pub fn layers(&mut self, ui: &mut egui::Ui, frame_h: f32, state: &mut EditorState, highlight: egui::Color32) {
-        let gfx = state.project.graphics.get(&state.open_graphic.unwrap()).unwrap();
+        let gfx = state.project.graphics.get(&state.open_graphic).unwrap();
         let mut i = 0;
 
         let mut delete_layer = None;
@@ -268,7 +266,7 @@ impl TimelinePanel {
 
     pub fn frames(&mut self, ui: &mut egui::Ui, frame_w: f32, frame_h: f32, state: &mut EditorState, highlight: egui::Color32, n_frames: i32) {
 
-        let gfx = state.project.graphics.get(&state.open_graphic.unwrap()).unwrap();
+        let gfx = state.project.graphics.get(&state.open_graphic).unwrap();
 
         let total_height = ui.available_height().max(frame_h * (gfx.layers.len() as f32));
 

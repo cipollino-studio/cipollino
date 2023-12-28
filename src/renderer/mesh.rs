@@ -62,6 +62,14 @@ impl Mesh {
     }
 
     pub fn render(&self, gl: &Arc<Context>) {
+        self.render_with_mode(gl, glow::TRIANGLES); 
+    }
+
+    pub fn render_lines(&self, gl: &Arc<Context>) {
+        self.render_with_mode(gl, glow::LINES); 
+    }
+    
+    pub fn render_with_mode(&self, gl: &Arc<Context>, mode: u32) {
         if self.tris == 0 {
             return;
         }
@@ -70,7 +78,7 @@ impl Mesh {
             gl.bind_buffer(glow::ARRAY_BUFFER, Some(self.vbo));
             self.config_attribs(gl);
             gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(self.ebo));
-            gl.draw_elements(glow::TRIANGLES, (self.tris * 3) as i32, glow::UNSIGNED_INT, 0);
+            gl.draw_elements(mode, (self.tris * 3) as i32, glow::UNSIGNED_INT, 0);
         }
     }
 

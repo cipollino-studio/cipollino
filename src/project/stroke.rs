@@ -30,6 +30,14 @@ pub struct Stroke {
     pub need_remesh: bool
 }
 
+impl Stroke {
+
+    pub fn iter_point_pairs(&self) -> impl Iterator<Item = (u64, u64)> + '_ {
+        self.points.windows(2).map(|arr| (arr[0], arr[1]))
+    }
+
+}
+
 impl Project {
 
     pub fn add_stroke(&mut self, frame: u64) -> Option<(u64, ObjAction)> {

@@ -37,7 +37,7 @@ impl AssetsPanel {
                 graphic_data_editor(ui, &mut self.create_graphic_data);
                 if ui.button("Create").clicked() {
                     let (key, act) = state.project.add_graphic(self.create_graphic_data.clone());
-                    state.open_graphic = Some(key);
+                    state.open_graphic = key;
                     state.actions.add(Action::from_single(act));
                     close_create_graphic_dialog = true; 
                 } 
@@ -51,7 +51,7 @@ impl AssetsPanel {
                 egui::Label::new(gfx.data.name.as_str())
                 .sense(egui::Sense::click()));
             if label_response.double_clicked() {
-                state.open_graphic = Some(*key); 
+                state.open_graphic = *key; 
                 if gfx.layers.len() > 0 {
                     state.active_layer = gfx.layers[0];
                 }

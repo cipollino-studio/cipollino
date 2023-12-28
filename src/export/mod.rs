@@ -26,12 +26,12 @@ impl Export {
         egui::Window::new("Export")
             .open(&mut self.dialog_open)
             .show(ctx, |ui| {
-                let graphic_exists = state.open_graphic.map_or(false, |key| state.project.graphics.contains_key(&key));
+                let graphic_exists = state.open_graphic().is_some();
                 if ui.add_enabled(graphic_exists, egui::Button::new("Export"))
                     .clicked() {
                     if let Some(mut path) = rfd::FileDialog::new().save_file() {
                         path.set_extension("png");
-                        self.exporting = Some((path, 0, state.open_graphic.unwrap()));
+                        self.exporting = Some((path, 0, state.open_graphic));
                         close_dialog = true;
                     }
                 }
@@ -79,7 +79,7 @@ impl Export {
                     path_copy.set_extension("png");
                     let _ = image::save_buffer(path_copy, pixel_data.as_slice(), w, h, image::ColorType::Rgb8);
                     *frame += 1;
-                    if *frame as u32 == state.project.graphics.get(&state.open_graphic.unwrap()).unwrap().data.len { 
+                    if *frame as u32 == state.project.graphics.get(&state.open_graphic).unwrap().data.len { 
                         self.exporting = None;
                     }
                 }

@@ -78,7 +78,7 @@ impl Tool for Pencil {
         }
     }
 
-    fn mouse_release(&mut self, _mouse_pos: glam::Vec2, state: &mut crate::editor::EditorState) {
+    fn mouse_release(&mut self, _mouse_pos: glam::Vec2, state: &mut crate::editor::EditorState, _ui: &mut egui::Ui) {
         let mut action = Action::new();
         if let Some(act) = std::mem::replace(&mut self.frame_creation_act, None) {
             action.add(act);
@@ -87,6 +87,10 @@ impl Tool for Pencil {
             action.add(stroke_act);
         }
         state.actions.add(action);
+    }
+
+    fn mouse_cursor(&mut self, _mouse_pos: glam::Vec2, _state: &mut crate::editor::EditorState) -> egui::CursorIcon {
+        egui::CursorIcon::Crosshair
     }
 
 }

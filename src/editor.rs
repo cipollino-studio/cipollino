@@ -1,7 +1,7 @@
 
 use std::{sync::{Arc, Mutex}, rc::Rc, cell::RefCell};
 
-use crate::{panels::{self, timeline::{new_frame, prev_keyframe, next_keyframe}, tools::{pencil::Pencil, Tool}}, project::{Project, graphic::Graphic, action::{ActionManager, Action}}, renderer::scene::SceneRenderer, export::Export};
+use crate::{panels::{self, timeline::{new_frame, prev_keyframe, next_keyframe}, tools::{pencil::Pencil, Tool, select::Select}}, project::{Project, graphic::Graphic, action::{ActionManager, Action}}, renderer::scene::SceneRenderer, export::Export};
 use egui::Modifiers;
 
 pub struct EditorRenderer {
@@ -36,13 +36,15 @@ pub struct EditorState {
     pub renderer: EditorRenderer,
     
     // Tools
+    pub select: Rc<RefCell<dyn Tool>>,
     pub pencil: Rc<RefCell<dyn Tool>>,
     pub curr_tool: Rc<RefCell<dyn Tool>>,
 
     // Selections
-    pub open_graphic: Option<u64>,
+    pub open_graphic: u64, 
     pub active_layer: u64,
     pub selected_frames: Vec<u64>,
+    pub selected_strokes: Vec<u64>,
 
     // Playback
     pub time: f32,
@@ -56,29 +58,28 @@ pub struct EditorState {
 impl EditorState {
 
     pub fn new() -> Self {
+        let select = Rc::new(RefCell::new(Select::new()));
         let pencil = Rc::new(RefCell::new(Pencil::new()));
         Self {
             project: Project::new(),
             actions: ActionManager::new(),
-            open_graphic: Some(1),
-            active_layer: 0,
+            open_graphic: 1,
+            active_layer: 2,
             selected_frames: Vec::new(),
+            selected_strokes: Vec::new(),
             time: 0.0,
             playing: false,
             renderer: EditorRenderer::new(),
             onion_before: 0,
             onion_after: 0,
+            select: select.clone(),
             pencil: pencil.clone(),
-            curr_tool: pencil,
+            curr_tool: select,
         }
     }
 
     pub fn open_graphic(&self) -> Option<&Graphic> {
-        if let Some(key) = self.open_graphic {
-            self.project.graphics.get(&key)
-        } else {
-            None
-        }
+        self.project.graphics.get(&self.open_graphic)
     }
 
     pub fn frame_len(&self) -> f32 {
@@ -124,18 +125,16 @@ impl Editor {
     }
 
     pub fn render(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if let Some(open_gfx) = self.state.open_graphic {
-            if let Some(gfx) = self.state.project.graphics.get(&open_gfx) {
-                if self.state.playing {
-                    self.state.time += ctx.input(|i| i.stable_dt);
-                    ctx.request_repaint();
-                }
-                if self.state.time >= (gfx.data.len as f32) * self.state.frame_len() {
-                    self.state.time = 0.0;
-                }
-                if self.state.time < 0.0 {
-                    self.state.time = ((gfx.data.len - 1) as f32) * self.state.frame_len();
-                }
+        if let Some(gfx) = self.state.project.graphics.get(&self.state.open_graphic) {
+            if self.state.playing {
+                self.state.time += ctx.input(|i| i.stable_dt);
+                ctx.request_repaint();
+            }
+            if self.state.time >= (gfx.data.len as f32) * self.state.frame_len() {
+                self.state.time = 0.0;
+            }
+            if self.state.time < 0.0 {
+                self.state.time = ((gfx.data.len - 1) as f32) * self.state.frame_len();
             }
         }
 
@@ -194,6 +193,13 @@ impl Editor {
                         action.add_list(acts);
                     }
                 }
+                for stroke in &self.state.selected_strokes {
+                    if let Some(acts) = self.state.project.delete_stroke(*stroke) {
+                        action.add_list(acts);
+                    }
+                }
+                self.state.selected_frames.clear();
+                self.state.selected_strokes.clear();
                 self.state.actions.add(action);
             }
 

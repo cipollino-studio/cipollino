@@ -15,10 +15,11 @@ fn main() -> Result<(), eframe::Error> {
         renderer: eframe::Renderer::Glow,
         ..Default::default()
     };
+    
     eframe::run_native(
         "Cipollino",
         options,
-        Box::new(|_cc| Box::new(Cipollino::new())),
+        Box::new(|cc| Box::new(Cipollino::new(cc))),
     )
 }
 
@@ -28,7 +29,12 @@ struct Cipollino {
 
 impl Cipollino {
 
-    pub fn new() -> Self {
+    pub fn new(cc: &eframe::CreationContext) -> Self {
+        let mut fonts = egui::FontDefinitions::default();
+        egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+
+        cc.egui_ctx.set_fonts(fonts);
+        
         Self {
             editor: Editor::new()
         }
