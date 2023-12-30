@@ -1,18 +1,21 @@
 
-use std::{sync::{Arc, Mutex}, cell::RefCell, rc::Rc};
+use std::sync::{Arc, Mutex};
+use glam::Vec2;
 use glow::HasContext;
 
 use crate::{
-    editor::EditorState,
-    renderer::{fb::Framebuffer, mesh::Mesh, shader::Shader, scene::SceneRenderer}, project::Project, util::curve,
+    editor::{EditorState, EditorRenderer},
+    renderer::{fb::Framebuffer, mesh::Mesh, shader::Shader, scene::SceneRenderer}, util::curve,
 };
-
-use super::tools::Tool;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct ScenePanel {
     #[serde(skip)]
     fb: Arc<Mutex<Option<Framebuffer>>>,
+    #[serde(skip)]
+    fb_pick: Arc<Mutex<Option<Framebuffer>>>,
+    #[serde(skip)]
+    color_key_map: Vec<u64>, 
 
     #[serde(skip)]
     cam_pos: glam::Vec2,
@@ -30,12 +33,14 @@ impl ScenePanel {
     pub fn new() -> Self {
         Self {
             fb: Arc::new(Mutex::new(None)),
+            fb_pick: Arc::new(Mutex::new(None)),
+            color_key_map: Vec::new(),
             cam_pos: glam::vec2(0.0, 0.0),
             cam_size: 5.0,
         }
     }
 
-    pub fn render(&mut self, ui: &mut egui::Ui, state: &mut EditorState) {
+    pub fn render(&mut self, ui: &mut egui::Ui, state: &mut EditorState, renderer: &mut EditorRenderer) {
         let gfx = state.open_graphic();
         let no_margin = egui::Frame {
             inner_margin: egui::Margin::same(0.0),
@@ -54,6 +59,7 @@ impl ScenePanel {
                         )
                         .clicked()
                     {
+                        state.curr_tool.clone().borrow_mut().reset(state);
                         state.curr_tool = state.select.clone();
                     }
                     if ui
@@ -63,6 +69,7 @@ impl ScenePanel {
                         )
                         .clicked()
                     {
+                        state.curr_tool.clone().borrow_mut().reset(state);
                         state.curr_tool = state.pencil.clone();
                     }
                 });
@@ -75,7 +82,7 @@ impl ScenePanel {
                             egui::Sense::click_and_drag(),
                         );
 
-                        let gl_ctx_copy = state.renderer.gl_ctx.clone();
+                        let gl_ctx_copy = renderer.gl_ctx.clone();
                         let fb_copy = self.fb.clone();
 
                         let cb = egui_glow::CallbackFn::new(move |_info, painter| {
@@ -129,7 +136,7 @@ impl ScenePanel {
                             }
                         });
 
-                        self.render_scene(state, &rect, &response, ui, state.open_graphic);
+                        self.render_scene(state, &rect, &response, ui, state.open_graphic, renderer);
 
                         let callback = egui::PaintCallback {
                             rect,
@@ -145,7 +152,7 @@ impl ScenePanel {
         }
     }
 
-    fn render_scene(&mut self, state: &mut EditorState, rect: &egui::Rect, response: &egui::Response, ui: &mut egui::Ui, gfx_key: u64) {
+    fn render_scene(&mut self, state: &mut EditorState, rect: &egui::Rect, response: &egui::Response, ui: &mut egui::Ui, gfx_key: u64, renderer: &mut EditorRenderer) {
         if let Some(mouse_pos) = response.hover_pos() {
             let mouse_pos = self.cam_size * (mouse_pos - rect.center()) / (rect.height() * 0.5);
             let mouse_pos = glam::vec2(mouse_pos.x, -mouse_pos.y) + self.cam_pos;
@@ -159,33 +166,39 @@ impl ScenePanel {
             }
 
             let tool = state.curr_tool.clone();
-            if response.drag_started() {
-                tool.borrow_mut().mouse_click(mouse_pos, state);
-            }
-            if response.dragged() {
-                tool.borrow_mut().mouse_down(mouse_pos, state);
-            }
-            if response.drag_released() {
-                tool.borrow_mut().mouse_release(mouse_pos, state, ui);
-            }
-            if response.hovered() {
-                ui.ctx().output_mut(|o| {
-                    let tool = state.curr_tool.clone();
-                    o.cursor_icon = tool.borrow_mut().mouse_cursor(mouse_pos, state);
-                });
-            }
+            renderer.use_renderer(|gl, _rendererer| {
+                if response.drag_started() {
+                    tool.borrow_mut().mouse_click(mouse_pos, state, ui, self, gl);
+                }
+                if response.dragged() {
+                    tool.borrow_mut().mouse_down(mouse_pos, state);
+                }
+                if response.drag_released() {
+                    tool.borrow_mut().mouse_release(mouse_pos, state, ui);
+                }
+                if response.hovered() {
+                    ui.ctx().output_mut(|o| {
+                        let tool = state.curr_tool.clone();
+                        o.cursor_icon = tool.borrow_mut().mouse_cursor(mouse_pos, state, self, gl);
+                    });
+                }
+            });
         }
 
         let frame = state.frame();
-        state.renderer.use_renderer(|gl, renderer| {
+        renderer.use_renderer(|gl, renderer| {
             let mut fb = self.fb.lock().unwrap();
+            let mut fb_pick = self.fb_pick.lock().unwrap();
             if let None = fb.as_ref() {
                 *fb = Some(Framebuffer::new(100, 100, gl));
+                *fb_pick = Some(Framebuffer::new(100, 100, gl));
             }
             let fb = fb.as_mut().unwrap();
+            let fb_pick = fb_pick.as_mut().unwrap();
 
             if let Some(proj_view) = renderer.render(
                 fb,
+                Some((fb_pick, &mut self.color_key_map)),
                 (rect.width() as u32) * 4,
                 (rect.height() as u32) * 4,
                 self.cam_pos,
@@ -197,7 +210,7 @@ impl ScenePanel {
                 if state.playing { 0 } else { state.onion_after },
                 gl,
             ) {
-                self.render_overlays(&mut state.project, state.curr_tool.clone(), gfx_key, renderer, gl, proj_view, &state.selected_strokes);
+                self.render_overlays(gfx_key, renderer, gl, proj_view, state);
             }
 
             Framebuffer::render_to_win(
@@ -209,7 +222,7 @@ impl ScenePanel {
         
     }
 
-    fn render_overlays(&self, project: &mut Project, curr_tool: Rc<RefCell<dyn Tool>>, gfx_key: u64, renderer: &mut SceneRenderer, gl: &Arc<glow::Context>, proj_view: glam::Mat4, selected_strokes: &Vec<u64>) {
+    fn render_overlays(&self, gfx_key: u64, renderer: &mut SceneRenderer, gl: &Arc<glow::Context>, proj_view: glam::Mat4, state: &mut EditorState) {
         renderer.line_shader.enable(gl);
         renderer
             .line_shader
@@ -224,7 +237,7 @@ impl ScenePanel {
             renderer.quad.render(gl);
         };
 
-        let gfx = project.graphics.get(&gfx_key).unwrap();
+        let gfx = state.project.graphics.get(&gfx_key).unwrap();
         if gfx.data.clip {
             let cam_top = 5.0;
             let cam_btm = -cam_top;
@@ -242,17 +255,17 @@ impl ScenePanel {
         }
 
         let mut overlay = OverlayRenderer::new(renderer, gl, proj_view, self.cam_size);
-        curr_tool.borrow_mut().draw_overlay(&mut overlay); 
-        for stroke in selected_strokes {
-            if let Some(stroke) = project.strokes.get(stroke) {
+        state.curr_tool.clone().borrow_mut().draw_overlay(&mut overlay, state); 
+        for stroke in &state.selected_strokes {
+            if let Some(stroke) = state.project.strokes.get(stroke) {
                 for (p0, p1) in stroke.iter_point_pairs() {
-                    let p0 = project.points.get(&p0).unwrap(); 
-                    let p1 = project.points.get(&p1).unwrap(); 
+                    let p0 = state.project.points.get(&p0).unwrap(); 
+                    let p1 = state.project.points.get(&p1).unwrap(); 
                     for i in 0..100 {
                         let t = (i as f32) / 100.0;
                         overlay.line(
-                            curve::sample(t, p0.data.pt, p0.data.b, p1.data.a, p1.data.pt),
-                            curve::sample(t + 0.01, p0.data.pt, p0.data.b, p1.data.a, p1.data.pt),
+                            curve::bezier_sample(t, p0.data.pt, p0.data.b, p1.data.a, p1.data.pt),
+                            curve::bezier_sample(t + 0.01, p0.data.pt, p0.data.b, p1.data.a, p1.data.pt),
                             glam::vec4(0.0, 1.0, 1.0, 1.0) 
                         );
                     }
@@ -260,6 +273,38 @@ impl ScenePanel {
             }
         }
 
+    }
+
+    pub fn sample_pick(&mut self, pos: Vec2, gl: &Arc<glow::Context>) -> Option<u64> {
+        if let Some(fb_pick) = self.fb_pick.lock().unwrap().as_ref() {
+
+            let h_cam_size = self.cam_size * (fb_pick.w as f32) / (fb_pick.h as f32);
+            let left = self.cam_pos.x - h_cam_size;
+            let right = self.cam_pos.x + h_cam_size;
+            let top = self.cam_pos.y + self.cam_size;
+            let bottom = self.cam_pos.y - self.cam_size;
+
+            let x = (pos.x - left) / (right - left);
+            let y = (pos.y - bottom) / (top - bottom);
+
+            let px = (x * (fb_pick.w as f32)) as i32;
+            let py = (y * (fb_pick.h as f32)) as i32;
+
+            if px < 0 || py < 0 || px >= fb_pick.w as i32 || py >= fb_pick.h as i32 {
+                return None;
+            }
+
+            let mut pixel_data = [0; 4];
+            unsafe {
+                gl.bind_framebuffer(glow::READ_FRAMEBUFFER, Some(fb_pick.fbo));
+                gl.read_pixels(px, py, 1, 1, glow::RGB, glow::UNSIGNED_BYTE, glow::PixelPackData::Slice(&mut pixel_data[0..3]));
+            }
+            let color = u32::from_le_bytes(pixel_data);
+            if color > 0 && color <= self.color_key_map.len() as u32 {
+                return Some(self.color_key_map[color as usize - 1]);
+            }
+        }
+        None
     }
 
 }

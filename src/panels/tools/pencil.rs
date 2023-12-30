@@ -1,5 +1,7 @@
 
-use crate::{util::curve, project::{point::PointData, action::{ObjAction, Action}}};
+use std::sync::Arc;
+
+use crate::{util::curve, project::{point::PointData, action::{ObjAction, Action}}, panels::scene::ScenePanel};
 
 use super::Tool;
 
@@ -25,9 +27,24 @@ impl Pencil {
 
 }
 
+impl Pencil {
+
+    fn get_action(&mut self) -> Action {
+        let mut action = Action::new();
+        if let Some(act) = std::mem::replace(&mut self.frame_creation_act, None) {
+            action.add(act);
+        }
+        for stroke_act in std::mem::replace(&mut self.stroke_acts, Vec::new()) {
+            action.add(stroke_act);
+        }
+        action
+    }
+
+}
+
 impl Tool for Pencil {
 
-    fn mouse_click(&mut self, mouse_pos: glam::Vec2, state: &mut crate::editor::EditorState) {
+    fn mouse_click(&mut self, mouse_pos: glam::Vec2, state: &mut crate::editor::EditorState, _ui: &mut egui::Ui, _scene: &mut ScenePanel, _gl: &Arc<glow::Context>) {
         let (frame, act) = super::active_frame(state);
         if let Some((stroke_key, _act)) = state.project.add_stroke(frame) {
             self.curr_stroke = Some(stroke_key);
@@ -79,18 +96,19 @@ impl Tool for Pencil {
     }
 
     fn mouse_release(&mut self, _mouse_pos: glam::Vec2, state: &mut crate::editor::EditorState, _ui: &mut egui::Ui) {
-        let mut action = Action::new();
-        if let Some(act) = std::mem::replace(&mut self.frame_creation_act, None) {
-            action.add(act);
-        }
-        for stroke_act in std::mem::replace(&mut self.stroke_acts, Vec::new()) {
-            action.add(stroke_act);
-        }
-        state.actions.add(action);
+        self.reset(state); 
     }
 
-    fn mouse_cursor(&mut self, _mouse_pos: glam::Vec2, _state: &mut crate::editor::EditorState) -> egui::CursorIcon {
+    fn mouse_cursor(&mut self, _mouse_pos: glam::Vec2, _state: &mut crate::editor::EditorState, _scene: &mut ScenePanel, _gl: &Arc<glow::Context>) -> egui::CursorIcon {
         egui::CursorIcon::Crosshair
+    }
+
+    fn reset(&mut self, state: &mut crate::editor::EditorState) {
+        if let Some(_stroke) = self.curr_stroke {
+            state.actions.add(self.get_action());
+            self.points.clear();
+            self.curr_stroke = None;
+        }
     }
 
 }

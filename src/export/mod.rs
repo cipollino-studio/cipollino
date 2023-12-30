@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use glow::HasContext;
 
-use crate::{renderer::fb::Framebuffer, editor::EditorState};
+use crate::{renderer::fb::Framebuffer, editor::{EditorState, EditorRenderer}};
 
 pub struct Export {
     fb: Option<(Framebuffer, Framebuffer)>,
@@ -21,7 +21,7 @@ impl Export {
         }
     }
 
-    pub fn render(&mut self, ctx: &egui::Context, state: &mut EditorState) {
+    pub fn render(&mut self, ctx: &egui::Context, state: &mut EditorState, renderer: &mut EditorRenderer) {
         let mut close_dialog = false;
         egui::Window::new("Export")
             .open(&mut self.dialog_open)
@@ -40,7 +40,7 @@ impl Export {
             self.dialog_open = false;
         }
         
-        state.renderer.use_renderer(|gl, renderer| {
+        renderer.use_renderer(|gl, renderer| {
             if let Some((path, frame, gfx_key)) = &mut self.exporting {
                 let frame_copy = *frame;
                 if let None = self.fb {
@@ -55,7 +55,7 @@ impl Export {
                     let w = gfx.data.w;
                     let h = gfx.data.h;
                     println!("{} {}", w, h);
-                    renderer.render(fb, w * aa_scl, h * aa_scl, glam::Vec2::ZERO, 5.0, &mut state.project, *gfx_key, *frame, 0, 0, gl);
+                    renderer.render(fb, None, w * aa_scl, h * aa_scl, glam::Vec2::ZERO, 5.0, &mut state.project, *gfx_key, *frame, 0, 0, gl);
                     aa_fb.resize(w, h, gl);
                     unsafe {
                         gl.bind_framebuffer(glow::FRAMEBUFFER, Some(aa_fb.fbo));

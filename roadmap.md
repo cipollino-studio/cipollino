@@ -1,5 +1,4 @@
 
-- Rendering
 - Color
 - Fill
 - Cutting

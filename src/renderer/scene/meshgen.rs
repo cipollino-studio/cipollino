@@ -19,8 +19,8 @@ pub fn get_mesh<'a>(project: &'a mut Project, stroke_key: u64, gl: &Arc<glow::Co
                 
                 for j in 0..10 {
                     let t = (j as f32) / 9.0;
-                    let pt = curve::sample(t, p0.data.pt, p0.data.b, p1.data.a, p1.data.pt);
-                    let tang = curve::dsample(t, p0.data.pt, p0.data.b, p1.data.a, p1.data.pt).normalize();
+                    let pt = curve::bezier_sample(t, p0.data.pt, p0.data.b, p1.data.a, p1.data.pt);
+                    let tang = curve::bezier_dsample(t, p0.data.pt, p0.data.b, p1.data.a, p1.data.pt).normalize();
                     let norm = glam::vec2(-tang.y, tang.x); 
 
                     top_pts.push(pt + norm * r);

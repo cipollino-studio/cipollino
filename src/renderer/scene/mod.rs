@@ -55,6 +55,7 @@ impl SceneRenderer {
         &mut self,
 
         fb: &mut Framebuffer,
+        fb_pick: Option<(&mut Framebuffer, &mut Vec<u64>)>,
         w: u32,
         h: u32,
 
@@ -123,11 +124,46 @@ impl SceneRenderer {
                 mesh.render(gl);
             }
         }
-        for key in stroke_keys {
+        for key in &stroke_keys {
+            let key = *key;
             if let Some(mesh) = meshgen::get_mesh(project, key, gl) {
                 self.line_shader.set_vec4("uColor", glam::vec4(0.0, 0.0, 0.0, 1.0), gl);
                 mesh.render(gl);
             }
+        }
+
+        if let Some((fb_pick, color_key_map)) = fb_pick {
+            fb_pick.resize(w, h, gl);
+            fb_pick.render_to(gl);
+            color_key_map.clear();
+
+            unsafe {
+                gl.clear_color(0.0, 0.0, 0.0, 1.0);
+                gl.clear(glow::COLOR_BUFFER_BIT);
+            }
+            for key in &stroke_keys {
+                let key = *key;
+                if let Some(mesh) = meshgen::get_mesh(project, key, gl) {
+                    let mut color = 0 as u32;
+                    for i in 0..color_key_map.len() {
+                        if color_key_map[i] == key {
+                            color = i as u32;
+                            break;
+                        } 
+                    };
+                    if color == 0 {
+                        color_key_map.push(key);
+                        color = color_key_map.len() as u32;
+                    }
+                    let bytes = color.to_le_bytes();
+                    let r = (bytes[0] as f32) / 255.0;
+                    let g = (bytes[1] as f32) / 255.0;
+                    let b = (bytes[2] as f32) / 255.0;
+                    self.line_shader.set_vec4("uColor", glam::vec4(r, g, b, 1.0), gl);
+                    mesh.render(gl);
+                }
+            }
+            fb.render_to(gl);
         }
 
         Some(proj_view) 

@@ -33,7 +33,6 @@ pub struct EditorState {
     // Subsystems
     pub project: Project, 
     pub actions: ActionManager,
-    pub renderer: EditorRenderer,
     
     // Tools
     pub select: Rc<RefCell<dyn Tool>>,
@@ -69,7 +68,6 @@ impl EditorState {
             selected_strokes: Vec::new(),
             time: 0.0,
             playing: false,
-            renderer: EditorRenderer::new(),
             onion_before: 0,
             onion_after: 0,
             select: select.clone(),
@@ -106,6 +104,7 @@ pub struct Editor {
     panels: panels::PanelManager,
     config_path: String,
     save_path: Option<PathBuf>,
+    pub renderer: EditorRenderer,
     pub export: Export,
 }
 
@@ -128,6 +127,7 @@ impl Editor {
             config_path,
             save_path: None,
             export: Export::new(), 
+            renderer: EditorRenderer::new(),
         };
         
         res
@@ -168,10 +168,12 @@ impl Editor {
 
             if ui.input_mut(|i| i.consume_shortcut(&undo_shortcut)) {
                 self.state.playing = false;
+                self.state.curr_tool.clone().borrow_mut().reset(&mut self.state);
                 self.state.actions.undo(&mut self.state.project);
             }
             if ui.input_mut(|i| i.consume_shortcut(&redo_shortcut)) {
                 self.state.playing = false;
+                self.state.curr_tool.clone().borrow_mut().reset(&mut self.state);
                 self.state.actions.redo(&mut self.state.project);
             }
             if ui.input_mut(|i| i.consume_shortcut(&play_shortcut)) {
@@ -215,7 +217,9 @@ impl Editor {
             }
 
             if ui.input_mut(|i| i.consume_shortcut(&save_shortcut)) {
-                self.save_project(self.save_path.clone().unwrap());
+                if let Some(path) = self.save_path.clone() {
+                    self.save_project(path);
+                }
             }
 
             egui::menu::bar(ui, |ui| {
@@ -281,10 +285,10 @@ impl Editor {
         egui::CentralPanel::default()
             .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.))
             .show(ctx, |_ui| {
-                self.panels.render(ctx, self.export.exporting.is_none(), &mut self.state);
+                self.panels.render(ctx, self.export.exporting.is_none(), &mut self.state, &mut self.renderer);
             });
 
-        self.export.render(ctx, &mut self.state);
+        self.export.render(ctx, &mut self.state, &mut self.renderer);
 
         let _ = std::fs::write(self.config_path.clone() + "/dock.json", serde_json::json!(self.panels).to_string());
 
