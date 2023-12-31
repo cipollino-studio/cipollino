@@ -1,7 +1,7 @@
 
 use std::sync::Arc;
 
-use crate::{util::curve, project::{point::PointData, action::{ObjAction, Action}}, panels::scene::ScenePanel};
+use crate::{util::curve, project::{point::PointData, action::{ObjAction, Action}, stroke::StrokeData}, panels::scene::ScenePanel};
 
 use super::Tool;
 
@@ -46,7 +46,7 @@ impl Tool for Pencil {
 
     fn mouse_click(&mut self, mouse_pos: glam::Vec2, state: &mut crate::editor::EditorState, _ui: &mut egui::Ui, _scene: &mut ScenePanel, _gl: &Arc<glow::Context>) {
         let (frame, act) = super::active_frame(state);
-        if let Some((stroke_key, _act)) = state.project.add_stroke(frame) {
+        if let Some((stroke_key, _act)) = state.project.add_stroke(StrokeData { frame, color: state.color, r: state.stroke_r }) {
             self.curr_stroke = Some(stroke_key);
             self.points.clear(); 
             self.points.push(mouse_pos);
@@ -60,7 +60,7 @@ impl Tool for Pencil {
             let prev_pt = self.points.last().unwrap();
             if (*prev_pt - mouse_pos).length() > 0.001 {
                 self.points.push(mouse_pos);
-                if let Some((new_stroke_key, act)) = state.project.add_stroke(self.frame) {
+                if let Some((new_stroke_key, act)) = state.project.add_stroke(StrokeData { frame: self.frame, color: state.color, r: state.stroke_r }) {
                     self.stroke_acts.clear();
                     self.stroke_acts.push(act);
 
@@ -101,6 +101,14 @@ impl Tool for Pencil {
 
     fn mouse_cursor(&mut self, _mouse_pos: glam::Vec2, _state: &mut crate::editor::EditorState, _scene: &mut ScenePanel, _gl: &Arc<glow::Context>) -> egui::CursorIcon {
         egui::CursorIcon::Crosshair
+    }
+
+    fn tool_panel(&mut self, ui: &mut egui::Ui, state: &mut crate::editor::EditorState) {
+        let mut color = [state.color.x, state.color.y, state.color.z];
+        ui.color_edit_button_rgb(&mut color);
+        state.color = glam::Vec3::from_slice(&color);
+
+        ui.add(egui::Slider::new(&mut state.stroke_r, 0.01..=1.0));
     }
 
     fn reset(&mut self, state: &mut crate::editor::EditorState) {

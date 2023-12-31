@@ -3,15 +3,27 @@ use crate::renderer::mesh::Mesh;
 
 use super::{ObjData, Project, action::ObjAction};
 
+fn default_color() -> glam::Vec3 {
+    glam::Vec3::ZERO
+}
+
+fn default_stroke_r() -> f32 {
+    0.05
+}
+
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct StrokeData {
-    frame: u64
+    pub frame: u64,
+    #[serde(default = "default_color")]
+    pub color: glam::Vec3,
+    #[serde(default = "default_stroke_r")]
+    pub r: f32
 }
 
 impl ObjData for StrokeData {
 
     fn add(&self, key: u64, project: &mut super::Project) {
-        project.add_stroke_with_key(key, self.frame);
+        project.add_stroke_with_key(key, self.clone());
     }
 
     fn delete(&self, key: u64, project: &mut super::Project) {
@@ -48,16 +60,13 @@ impl Stroke {
 
 impl Project {
 
-    pub fn add_stroke(&mut self, frame: u64) -> Option<(u64, ObjAction)> {
+    pub fn add_stroke(&mut self, data: StrokeData) -> Option<(u64, ObjAction)> {
         let key = self.next_key();
-        self.add_stroke_with_key(key, frame)
+        self.add_stroke_with_key(key, data)
     }
     
-    pub fn add_stroke_with_key(&mut self, key: u64, frame: u64) -> Option<(u64, ObjAction)> {
-        self.frames.get_mut(&frame)?.strokes.push(key);
-        let data = StrokeData {
-            frame,
-        };
+    pub fn add_stroke_with_key(&mut self, key: u64, data: StrokeData) -> Option<(u64, ObjAction)> {
+        self.frames.get_mut(&data.frame)?.strokes.push(key);
         self.strokes.insert(key, Stroke {
             data: data.clone(), 
             points: Vec::new(),

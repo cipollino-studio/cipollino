@@ -52,6 +52,10 @@ pub struct EditorState {
     // Display
     pub onion_before: i32,
     pub onion_after: i32,
+
+    // Tool Options
+    pub color: glam::Vec3,
+    pub stroke_r: f32
 }
 
 impl EditorState {
@@ -73,6 +77,8 @@ impl EditorState {
             select: select.clone(),
             pencil: pencil.clone(),
             curr_tool: select,
+            color: glam::Vec3::ZERO,
+            stroke_r: 0.05
         }
     }
 
@@ -95,7 +101,13 @@ impl EditorState {
         (self.time / (1.0 / 24.0)).floor() as i32
     }
 
-    
+    pub fn copy_shortcut(&self) -> egui::KeyboardShortcut {
+        egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::C)
+    }
+
+    pub fn paste_shortcut(&self) -> egui::KeyboardShortcut {
+        egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::C)
+    }
 
 }
 
@@ -275,6 +287,9 @@ impl Editor {
                         }
                         if ui.button("Scene").clicked() {
                             self.panels.add_panel(panels::Panel::Scene(panels::scene::ScenePanel::new()));
+                        }
+                        if ui.button("Tool Options").clicked() {
+                            self.panels.add_panel(panels::Panel::Tool(panels::tool::ToolPanel::new()));
                         }
                     })
                 });

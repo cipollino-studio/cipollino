@@ -10,7 +10,7 @@ pub fn get_mesh<'a>(project: &'a mut Project, stroke_key: u64, gl: &Arc<glow::Co
 
         let mut top_pts = Vec::new();
         let mut btm_pts = Vec::new();
-        let r = 0.05;
+        let r = stroke.data.r;
         let pt_keys = stroke.points.clone();
         if pt_keys.len() > 0 {
             for i in 0..(pt_keys.len() - 1) {

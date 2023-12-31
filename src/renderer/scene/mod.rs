@@ -125,9 +125,10 @@ impl SceneRenderer {
             }
         }
         for key in &stroke_keys {
+            let color = project.strokes.get(key)?.data.color;
             let key = *key;
             if let Some(mesh) = meshgen::get_mesh(project, key, gl) {
-                self.line_shader.set_vec4("uColor", glam::vec4(0.0, 0.0, 0.0, 1.0), gl);
+                self.line_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, 1.0), gl);
                 mesh.render(gl);
             }
         }

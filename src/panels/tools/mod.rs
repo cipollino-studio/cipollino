@@ -18,6 +18,7 @@ pub trait Tool {
         egui::CursorIcon::Default
     }
     fn draw_overlay(&mut self, _overlay: &mut OverlayRenderer, _state: &mut EditorState) {}
+    fn tool_panel(&mut self, _ui: &mut egui::Ui, _state: &mut EditorState) {}
     fn reset(&mut self, _state: &mut EditorState) {}
 
 }
