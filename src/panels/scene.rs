@@ -20,7 +20,7 @@ pub struct ScenePanel {
     #[serde(skip)]
     cam_pos: glam::Vec2,
     #[serde(default)]
-    cam_size: f32,
+    pub cam_size: f32,
 }
 
 impl Default for ScenePanel {
@@ -223,9 +223,9 @@ impl ScenePanel {
     }
 
     fn render_overlays(&self, gfx_key: u64, renderer: &mut SceneRenderer, gl: &Arc<glow::Context>, proj_view: glam::Mat4, state: &mut EditorState) {
-        renderer.line_shader.enable(gl);
+        renderer.flat_color_shader.enable(gl);
         renderer
-            .line_shader
+            .flat_color_shader
             .set_vec4("uColor", glam::vec4(0.0, 0.0, 0.0, 0.3), gl);
         let mut draw_quad = |left: f32, right: f32, top: f32, bottom: f32| {
             let center = glam::vec3((left + right) / 2.0, (top + bottom) / 2.0, 0.0);
@@ -233,7 +233,7 @@ impl ScenePanel {
             let model =
                 glam::Mat4::from_translation(center) * glam::Mat4::from_scale(scale);
             let trans = proj_view * model;
-            renderer.line_shader.set_mat4("uTrans", &trans, gl);
+            renderer.flat_color_shader.set_mat4("uTrans", &trans, gl);
             renderer.quad.render(gl);
         };
 
@@ -313,7 +313,7 @@ pub struct OverlayRenderer<'a> {
     renderer: &'a mut SceneRenderer,
     gl: &'a Arc<glow::Context>,
     proj_view: glam::Mat4,
-    cam_size: f32
+    pub cam_size: f32
 }
 
 impl<'a> OverlayRenderer<'a> {
@@ -334,8 +334,18 @@ impl<'a> OverlayRenderer<'a> {
         let angle = glam::vec2(1.0, 0.0).angle_between(p1 - p0);
         let model = glam::Mat4::from_translation(glam::vec3(center.x, center.y, 0.0)) * glam::Mat4::from_axis_angle(glam::vec3(0.0, 0.0, 1.0), angle) * glam::Mat4::from_scale(scale);
         let trans = self.proj_view * model; 
-        self.renderer.line_shader.set_mat4("uTrans", &trans, self.gl);
-        self.renderer.line_shader.set_vec4("uColor", color, self.gl);
+        self.renderer.flat_color_shader.enable(self.gl);
+        self.renderer.flat_color_shader.set_mat4("uTrans", &trans, self.gl);
+        self.renderer.flat_color_shader.set_vec4("uColor", color, self.gl);
+        self.renderer.quad.render(self.gl);
+    }
+
+    pub fn circle(&mut self, pt: Vec2, color: glam::Vec4, r: f32) {
+        let model = glam::Mat4::from_translation(glam::vec3(pt.x, pt.y, 0.0)) * glam::Mat4::from_scale(glam::Vec3::splat(r * 2.0));
+        let trans = self.proj_view * model;
+        self.renderer.circle_shader.enable(self.gl);
+        self.renderer.flat_color_shader.set_mat4("uTrans", &trans, self.gl);
+        self.renderer.flat_color_shader.set_vec4("uColor", color, self.gl);
         self.renderer.quad.render(self.gl);
     }
 

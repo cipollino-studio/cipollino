@@ -10,7 +10,8 @@ use crate::project::Project;
 use super::{shader::Shader, fb::Framebuffer, mesh::Mesh};
 
 pub struct SceneRenderer {
-    pub line_shader: Shader,
+    pub flat_color_shader: Shader,
+    pub circle_shader: Shader,
     pub quad: Mesh
 }
 
@@ -28,7 +29,7 @@ impl SceneRenderer {
             1, 2, 3
         ], gl);
         Self {
-            line_shader: Shader::new("
+            flat_color_shader: Shader::new("
                 #version 100\n 
 
                 attribute vec2 aPos;
@@ -45,6 +46,33 @@ impl SceneRenderer {
 
                 void main() {
                     gl_FragColor = uColor;
+                }
+            ", gl),
+            circle_shader: Shader::new("
+                #version 100\n 
+
+                attribute vec2 aPos;
+
+                uniform mat4 uTrans;
+
+                varying vec2 pUv;
+        
+                void main() {
+                    gl_Position = uTrans * vec4(aPos, 0.0, 1.0);                
+                    pUv = aPos;
+                } 
+            ", "
+                #version 100\n 
+
+                uniform highp vec4 uColor;
+
+                varying mediump vec2 pUv;
+
+                void main() {
+                    gl_FragColor = uColor;
+                    if(length(pUv) > 0.5) {
+                        gl_FragColor = vec4(0.0);
+                    }
                 }
             ", gl),
             quad
@@ -85,8 +113,8 @@ impl SceneRenderer {
         let proj = glam::Mat4::orthographic_rh_gl(-aspect * cam_size, aspect * cam_size, -cam_size, cam_size, -1.0, 1.0);
         let view = glam::Mat4::from_translation(-glam::vec3(cam_pos.x, cam_pos.y, 0.0));
         let proj_view = proj * view;
-        self.line_shader.enable(gl);
-        self.line_shader.set_mat4("uTrans", &proj_view, gl);
+        self.flat_color_shader.enable(gl);
+        self.flat_color_shader.set_mat4("uTrans", &proj_view, gl);
 
         let mut onion_strokes = Vec::new();
         let mut stroke_keys = Vec::new();
@@ -120,7 +148,7 @@ impl SceneRenderer {
         }
         for (color, key) in onion_strokes {
             if let Some(mesh) = meshgen::get_mesh(project, key, gl) {
-                self.line_shader.set_vec4("uColor", color, gl);
+                self.flat_color_shader.set_vec4("uColor", color, gl);
                 mesh.render(gl);
             }
         }
@@ -128,7 +156,7 @@ impl SceneRenderer {
             let color = project.strokes.get(key)?.data.color;
             let key = *key;
             if let Some(mesh) = meshgen::get_mesh(project, key, gl) {
-                self.line_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, 1.0), gl);
+                self.flat_color_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, 1.0), gl);
                 mesh.render(gl);
             }
         }
@@ -160,7 +188,7 @@ impl SceneRenderer {
                     let r = (bytes[0] as f32) / 255.0;
                     let g = (bytes[1] as f32) / 255.0;
                     let b = (bytes[2] as f32) / 255.0;
-                    self.line_shader.set_vec4("uColor", glam::vec4(r, g, b, 1.0), gl);
+                    self.flat_color_shader.set_vec4("uColor", glam::vec4(r, g, b, 1.0), gl);
                     mesh.render(gl);
                 }
             }
