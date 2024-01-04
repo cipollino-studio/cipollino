@@ -46,7 +46,7 @@ impl Tool for Pencil {
 
     fn mouse_click(&mut self, mouse_pos: glam::Vec2, state: &mut crate::editor::EditorState, _ui: &mut egui::Ui, _scene: &mut ScenePanel, _gl: &Arc<glow::Context>) {
         let (frame, act) = super::active_frame(state);
-        if let Some((stroke_key, _act)) = state.project.add_stroke(StrokeData { frame, color: state.color, r: state.stroke_r }) {
+        if let Some((stroke_key, _act)) = state.project.add_stroke(StrokeData { frame, color: state.color, r: state.stroke_r, filled: state.stroke_filled }) {
             self.curr_stroke = Some(stroke_key);
             self.points.clear(); 
             self.points.push(mouse_pos);
@@ -60,7 +60,7 @@ impl Tool for Pencil {
             let prev_pt = self.points.last().unwrap();
             if (*prev_pt - mouse_pos).length() > 0.001 {
                 self.points.push(mouse_pos);
-                if let Some((new_stroke_key, act)) = state.project.add_stroke(StrokeData { frame: self.frame, color: state.color, r: state.stroke_r }) {
+                if let Some((new_stroke_key, act)) = state.project.add_stroke(StrokeData { frame: self.frame, color: state.color, r: state.stroke_r, filled: state.stroke_filled }) {
                     self.stroke_acts.clear();
                     self.stroke_acts.push(act);
 
@@ -109,6 +109,8 @@ impl Tool for Pencil {
         state.color = glam::Vec3::from_slice(&color);
 
         ui.add(egui::Slider::new(&mut state.stroke_r, 0.01..=1.0));
+
+        ui.checkbox(&mut state.stroke_filled, "Filled");
     }
 
     fn reset(&mut self, state: &mut crate::editor::EditorState) {

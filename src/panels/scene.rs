@@ -261,11 +261,12 @@ impl ScenePanel {
                 for (p0, p1) in stroke.iter_point_pairs() {
                     let p0 = state.project.points.get(&p0).unwrap(); 
                     let p1 = state.project.points.get(&p1).unwrap(); 
-                    for i in 0..100 {
-                        let t = (i as f32) / 100.0;
+                    let n = 20;
+                    for i in 0..n {
+                        let t = (i as f32) / (n as f32);
                         overlay.line(
                             curve::bezier_sample(t, p0.data.pt, p0.data.b, p1.data.a, p1.data.pt),
-                            curve::bezier_sample(t + 0.01, p0.data.pt, p0.data.b, p1.data.a, p1.data.pt),
+                            curve::bezier_sample(t + 1.0 / (n as f32), p0.data.pt, p0.data.b, p1.data.a, p1.data.pt),
                             glam::vec4(0.0, 1.0, 1.0, 1.0) 
                         );
                     }

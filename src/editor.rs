@@ -55,7 +55,8 @@ pub struct EditorState {
 
     // Tool Options
     pub color: glam::Vec3,
-    pub stroke_r: f32
+    pub stroke_r: f32,
+    pub stroke_filled: bool
 }
 
 impl EditorState {
@@ -78,7 +79,8 @@ impl EditorState {
             pencil: pencil.clone(),
             curr_tool: select,
             color: glam::Vec3::ZERO,
-            stroke_r: 0.05
+            stroke_r: 0.05,
+            stroke_filled: false
         }
     }
 

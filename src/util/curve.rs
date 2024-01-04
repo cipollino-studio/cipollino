@@ -111,3 +111,17 @@ pub fn bezier_bounding_box(p0: Vec2, b0: Vec2, a1: Vec2, p1: Vec2) -> (Vec2, Vec
     let (bottom, top) = bezier_min_max(p0.y, b0.y, a1.y, p1.y);
     (Vec2::new(left, bottom), Vec2::new(right, top))
 }
+
+// TODO: replace this with something more sophisticated to maximize detail and minimize number of points
+// Maybe use the curve's curvature for this?
+pub fn bezier_to_discrete_t_vals(_p0: Vec2, _b0: Vec2, _a1: Vec2, _p1: Vec2, max_pts: i32, include_first: bool) -> Vec<f32> {
+    let mut vals = Vec::new();
+    for i in 0..max_pts {
+        vals.push(if include_first { (i as f32) / ((max_pts - 1) as f32) } else { ((i + 1) as f32) / (max_pts as f32) });
+    }
+    vals
+}
+
+pub fn bezier_to_discrete(p0: Vec2, b0: Vec2, a1: Vec2, p1: Vec2, max_pts: i32, include_first: bool) -> Vec<Vec2> {
+    bezier_to_discrete_t_vals(p0, b0, a1, p1, max_pts, include_first).iter().map(|t| bezier_sample(*t, p0, b0, a1, p1)).collect()
+}

@@ -11,13 +11,19 @@ fn default_stroke_r() -> f32 {
     0.05
 }
 
+fn default_stroke_filled() -> bool {
+    false
+}
+
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct StrokeData {
     pub frame: u64,
     #[serde(default = "default_color")]
     pub color: glam::Vec3,
     #[serde(default = "default_stroke_r")]
-    pub r: f32
+    pub r: f32,
+    #[serde(default = "default_stroke_filled")]
+    pub filled: bool
 }
 
 impl ObjData for StrokeData {

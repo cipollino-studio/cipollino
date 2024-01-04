@@ -126,7 +126,10 @@ impl SceneRenderer {
                 for _i in 0..onion_before {
                     if let Some(frame) = project.get_frame_before(*layer, curr_time) {
                         let frame = project.frames.get(&frame)?;
-                        onion_strokes.append(&mut (frame.strokes.clone().iter().map(|key| (glam::vec4(1.0, 0.3, 1.0, alpha), *key)).collect()));
+                        onion_strokes.append(&mut (frame.strokes
+                            .clone().iter()
+                            .filter(|stroke_key| !project.strokes.get(&stroke_key).map(|stroke| !stroke.data.filled).unwrap_or(false))
+                            .map(|key| (glam::vec4(1.0, 0.3, 1.0, alpha), *key)).collect()));
                         alpha *= 0.8;
                         curr_time = frame.data.time;
                     }
@@ -138,7 +141,10 @@ impl SceneRenderer {
                 for _i in 0..onion_after {
                     if let Some(frame) = project.get_frame_after(*layer, curr_time) {
                         let frame = project.frames.get(&frame)?;
-                        onion_strokes.append(&mut (frame.strokes.clone().iter().map(|key| (glam::vec4(0.3, 1.0, 1.0, alpha), *key)).collect()));
+                        onion_strokes.append(&mut (frame.strokes
+                            .clone().iter()
+                            .filter(|stroke_key| !project.strokes.get(&stroke_key).map(|stroke| !stroke.data.filled).unwrap_or(false))
+                            .map(|key| (glam::vec4(0.3, 1.0, 1.0, alpha), *key)).collect()));
                         alpha *= 0.8;
                         curr_time = frame.data.time;
                     }
@@ -153,11 +159,37 @@ impl SceneRenderer {
             }
         }
         for key in &stroke_keys {
-            let color = project.strokes.get(key)?.data.color;
+            let stroke = project.strokes.get(key)?;
+            let color = stroke.data.color;
             let key = *key;
+            let filled = stroke.data.filled;
             if let Some(mesh) = meshgen::get_mesh(project, key, gl) {
-                self.flat_color_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, 1.0), gl);
-                mesh.render(gl);
+                if !filled {
+                    self.flat_color_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, 1.0), gl);
+                    mesh.render(gl);
+                } else {
+                    unsafe {
+                        gl.enable(glow::STENCIL_TEST);
+                        gl.stencil_mask(0xFF);
+                        gl.clear(glow::STENCIL_BUFFER_BIT);
+                        gl.stencil_func(glow::NEVER, 1, 0xFF);
+                        gl.stencil_op(glow::INVERT, glow::INVERT, glow::INVERT);
+                    }
+                    mesh.render(gl);
+                    unsafe {
+                        gl.stencil_func(glow::EQUAL, 0xFF, 0xFF);
+                        gl.stencil_op(glow::KEEP, glow::KEEP, glow::KEEP);
+                        gl.stencil_mask(0);
+                        gl.disable(glow::DEPTH_TEST);
+                    }
+                    self.flat_color_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, 1.0), gl);
+                    mesh.render(gl);
+                    unsafe {
+                        gl.disable(glow::STENCIL_TEST);
+                    }
+                }
+
+
             }
         }
 
