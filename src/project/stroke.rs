@@ -86,7 +86,7 @@ impl Project {
         let stroke = self.strokes.remove(&key)?;
         let mut acts = Vec::new();
         for chain in stroke.points.iter().rev() {
-            for point in chain {
+            for point in chain.iter().rev() {
                 if let Some(mut point_acts) = self.delete_point(*point) {
                     acts.append(&mut point_acts);
                 }
