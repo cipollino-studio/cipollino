@@ -8,11 +8,12 @@ use super::scene::{OverlayRenderer, ScenePanel};
 
 pub mod pencil;
 pub mod select;
+pub mod bucket;
 
 pub trait Tool {
 
     fn mouse_click(&mut self, _mouse_pos: Vec2, _state: &mut EditorState, _ui: &mut egui::Ui, _scene: &mut ScenePanel, _gl: &Arc<glow::Context>) {}
-    fn mouse_down(&mut self, _mouse_pos: Vec2, _state: &mut EditorState) {}
+    fn mouse_down(&mut self, _mouse_pos: Vec2, _state: &mut EditorState, _scene: &mut ScenePanel) {}
     fn mouse_release(&mut self, _mouse_pos: Vec2, _state: &mut EditorState, _ui: &mut egui::Ui) {}
     fn mouse_cursor(&mut self, _mouse_pos: Vec2, _state: &mut EditorState, _scene: &mut ScenePanel, _gl: &Arc<glow::Context>) -> egui::CursorIcon {
         egui::CursorIcon::Default

@@ -16,9 +16,9 @@ impl Lasso {
         select.lasso_pts.push(mouse_pos);
     }
 
-    fn mouse_down(mouse_pos: Vec2, select: &mut Select) {
+    fn mouse_down(mouse_pos: Vec2, select: &mut Select, scene: &mut ScenePanel) {
         if let Some(last_pt) = select.lasso_pts.last() {
-            if (mouse_pos - *last_pt).length() < 0.05 {
+            if (mouse_pos - *last_pt).length() < 0.005 * scene.cam_size {
                 return;
             }
         }
@@ -286,8 +286,10 @@ impl Select {
         let mut points = Vec::new();
         for stroke in &state.selected_strokes {
             if let Some(stroke) = state.project.strokes.get(stroke) {
-                for point_key in &stroke.points {
-                    points.push(*point_key);
+                for chain in &stroke.points {
+                    for point_key in chain {
+                        points.push(*point_key);
+                    }
                 }
             }
         }
@@ -373,9 +375,9 @@ impl Tool for Select {
         self.prev_mouse_pos = mouse_pos;
     }
 
-    fn mouse_down(&mut self, mouse_pos: Vec2, state: &mut EditorState) {
+    fn mouse_down(&mut self, mouse_pos: Vec2, state: &mut EditorState, scene: &mut ScenePanel) {
         match self.state {
-            SelectState::Lasso => Lasso::mouse_down(mouse_pos, self),
+            SelectState::Lasso => Lasso::mouse_down(mouse_pos, self, scene),
             SelectState::Translate => Translate::mouse_down(mouse_pos, state, self),
             SelectState::Rotate => Rotate::mouse_down(mouse_pos, state, self),
             _ => {}

@@ -97,30 +97,37 @@ fn filled_mesh(project: &Project, stroke_key: u64, gl: &Arc<glow::Context>) -> O
     let stroke = project.strokes.get(&stroke_key)?;
     let mut mesh = Mesh::new(vec![2], gl);
 
-    let mut polygon_pts = Vec::new();
-    let mut included_first = false;
-    for (p0_key, p1_key) in stroke.iter_point_pairs() { 
-        let p0 = project.points.get(&p0_key)?;
-        let p1 = project.points.get(&p1_key)?;
-        polygon_pts.append(&mut bezier_to_discrete(p0.data.pt, p0.data.b, p1.data.a, p1.data.pt, 20, !included_first)); 
-        included_first = true;
-    }
-    
     let mut verts = Vec::new();
-    for pt in &polygon_pts {
-        verts.push(pt.x);
-        verts.push(pt.y);
-    }
     // Triangle fan source
     verts.push(0.0);
     verts.push(0.0);
 
     let mut idxs = Vec::new();
-    for i in 0..polygon_pts.len() {
-        idxs.push(polygon_pts.len() as u32);
-        idxs.push(i as u32);
-        idxs.push(((i + 1) % polygon_pts.len()) as u32);
+
+    for chain in &stroke.points {
+        let mut polygon_pts = Vec::new();
+        let mut included_first = false;
+        for (p0_key, p1_key) in chain.windows(2).map(|arr| (arr[0], arr[1])) { 
+            let p0 = project.points.get(&p0_key)?;
+            let p1 = project.points.get(&p1_key)?;
+            polygon_pts.append(&mut bezier_to_discrete(p0.data.pt, p0.data.b, p1.data.a, p1.data.pt, 20, !included_first)); 
+            included_first = true;
+        }
+        
+        let first_pt_idx = verts.len() / 2;
+        
+        for pt in &polygon_pts {
+            verts.push(pt.x);
+            verts.push(pt.y);
+        }
+
+        for i in 0..polygon_pts.len() {
+            idxs.push(0);
+            idxs.push((first_pt_idx + i) as u32);
+            idxs.push(((first_pt_idx + (i + 1) % polygon_pts.len())) as u32);
+        }
     }
+
 
     mesh.upload(&verts, &idxs, gl);
     

@@ -1,7 +1,7 @@
 
 use std::{sync::{Arc, Mutex}, rc::Rc, cell::RefCell, io::Write, path::PathBuf};
 
-use crate::{panels::{self, timeline::{new_frame, prev_keyframe, next_keyframe}, tools::{pencil::Pencil, Tool, select::Select}}, project::{Project, graphic::Graphic, action::{ActionManager, Action}}, renderer::scene::SceneRenderer, export::Export};
+use crate::{panels::{self, timeline::{new_frame, prev_keyframe, next_keyframe}, tools::{pencil::Pencil, Tool, select::Select, bucket::Bucket}}, project::{Project, graphic::Graphic, action::{ActionManager, Action}}, renderer::scene::SceneRenderer, export::Export};
 use egui::Modifiers;
 
 pub struct EditorRenderer {
@@ -37,6 +37,7 @@ pub struct EditorState {
     // Tools
     pub select: Rc<RefCell<dyn Tool>>,
     pub pencil: Rc<RefCell<dyn Tool>>,
+    pub bucket: Rc<RefCell<dyn Tool>>,
     pub curr_tool: Rc<RefCell<dyn Tool>>,
 
     // Selections
@@ -64,6 +65,7 @@ impl EditorState {
     pub fn new_with_project(project: Project) -> Self {
         let select = Rc::new(RefCell::new(Select::new()));
         let pencil = Rc::new(RefCell::new(Pencil::new()));
+        let bucket = Rc::new(RefCell::new(Bucket::new()));
         Self {
             project: project, 
             actions: ActionManager::new(),
@@ -77,6 +79,7 @@ impl EditorState {
             onion_after: 0,
             select: select.clone(),
             pencil: pencil.clone(),
+            bucket: bucket.clone(),
             curr_tool: select,
             color: glam::Vec3::ZERO,
             stroke_r: 0.05,
@@ -93,6 +96,22 @@ impl EditorState {
 
     pub fn open_graphic(&self) -> Option<&Graphic> {
         self.project.graphics.get(&self.open_graphic)
+    }
+
+    pub fn visible_strokes(&self) -> Vec<u64> {
+        let mut res = Vec::new();
+        if let Some(graphic) = self.open_graphic() {
+            for layer_key in &graphic.layers {
+                if let Some(frame_key) = self.project.get_frame_at(*layer_key, self.frame()) {
+                    if let Some(frame) = self.project.frames.get(&frame_key) {
+                        for stroke in &frame.strokes {
+                            res.push(*stroke);
+                        }
+                    }
+                }
+            }
+        }
+        res
     }
 
     pub fn frame_len(&self) -> f32 {

@@ -49,7 +49,7 @@ pub fn ret_true() -> bool {
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Stroke {
     pub data: StrokeData,
-    pub points: Vec<u64>,
+    pub points: Vec<Vec<u64>>,
     #[serde(skip)]
     pub mesh: Option<Mesh>,
     #[serde(skip, default = "ret_true")]
@@ -59,7 +59,7 @@ pub struct Stroke {
 impl Stroke {
 
     pub fn iter_point_pairs(&self) -> impl Iterator<Item = (u64, u64)> + '_ {
-        self.points.windows(2).map(|arr| (arr[0], arr[1]))
+        self.points.iter().flat_map(|arr| arr.windows(2).map(|arr| (arr[0], arr[1])))
     }
 
 }
@@ -74,7 +74,7 @@ impl Project {
     pub fn add_stroke_with_key(&mut self, key: u64, data: StrokeData) -> Option<(u64, ObjAction)> {
         self.frames.get_mut(&data.frame)?.strokes.push(key);
         self.strokes.insert(key, Stroke {
-            data: data.clone(), 
+            data: data.clone(),
             points: Vec::new(),
             mesh: None,
             need_remesh: true
@@ -85,9 +85,11 @@ impl Project {
     pub fn delete_stroke(&mut self, key: u64) -> Option<Vec<ObjAction>> {
         let stroke = self.strokes.remove(&key)?;
         let mut acts = Vec::new();
-        for point in stroke.points.iter().rev() {
-            if let Some(mut point_acts) = self.delete_point(*point) {
-                acts.append(&mut point_acts);
+        for chain in stroke.points.iter().rev() {
+            for point in chain {
+                if let Some(mut point_acts) = self.delete_point(*point) {
+                    acts.append(&mut point_acts);
+                }
             }
         }
         if let Some(frame) = self.frames.get_mut(&stroke.data.frame) {

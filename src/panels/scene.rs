@@ -18,7 +18,7 @@ pub struct ScenePanel {
     color_key_map: Vec<u64>, 
 
     #[serde(skip)]
-    cam_pos: glam::Vec2,
+    pub cam_pos: glam::Vec2,
     #[serde(default)]
     pub cam_size: f32,
 }
@@ -71,6 +71,16 @@ impl ScenePanel {
                     {
                         state.curr_tool.clone().borrow_mut().reset(state);
                         state.curr_tool = state.pencil.clone();
+                    }
+                    if ui
+                        .button(
+                            egui::RichText::new(format!("{}", egui_phosphor::regular::PAINT_BUCKET))
+                                .size(20.0),
+                        )
+                        .clicked()
+                    {
+                        state.curr_tool.clone().borrow_mut().reset(state);
+                        state.curr_tool = state.bucket.clone();
                     }
                 });
             egui::CentralPanel::default()
@@ -171,7 +181,7 @@ impl ScenePanel {
                     tool.borrow_mut().mouse_click(mouse_pos, state, ui, self, gl);
                 }
                 if response.dragged() {
-                    tool.borrow_mut().mouse_down(mouse_pos, state);
+                    tool.borrow_mut().mouse_down(mouse_pos, state, self);
                 }
                 if response.drag_released() {
                     tool.borrow_mut().mouse_release(mouse_pos, state, ui);

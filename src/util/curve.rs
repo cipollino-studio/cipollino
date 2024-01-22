@@ -75,8 +75,9 @@ pub fn bezier_dsample<T>(t: f32, p0: T, b0: T, a1: T, p1: T) -> T
 }
 
 pub fn bezier_min_max(p0: f32, b0: f32, a1: f32, p1: f32) -> (f32, f32) {
-    let mut possible_vals = vec![p0, p1];
-
+    let mut min = p0.min(p1);
+    let mut max = p0.max(p1);
+    
     let x = b0 - p0;
     let y = a1 - b0;
     let z = p1 - a1;
@@ -88,19 +89,16 @@ pub fn bezier_min_max(p0: f32, b0: f32, a1: f32, p1: f32) -> (f32, f32) {
     if det > 0.0 {
         let t1 = (-b + det.sqrt()) / (2.0 * a);
         if 0.0 <= t1 && t1 <= 1.0 {
-            possible_vals.push(bezier_sample(t1, p0, b0, a1, p1));
+            let val = bezier_sample(t1, p0, b0, a1, p1);
+            min = min.min(val);
+            max = max.max(val);
         } 
         let t2 = (-b - det.sqrt()) / (2.0 * a);
         if 0.0 <= t2 && t2 <= 1.0 {
-            possible_vals.push(bezier_sample(t2, p0, b0, a1, p1));
+            let val = bezier_sample(t2, p0, b0, a1, p1);
+            min = min.min(val);
+            max = max.max(val);
         } 
-    }
-
-    let mut min = f32::INFINITY;
-    let mut max = -f32::INFINITY;
-    for val in possible_vals {
-        min = min.min(val);
-        max = max.max(val);
     }
 
     (min, max)
@@ -114,6 +112,7 @@ pub fn bezier_bounding_box(p0: Vec2, b0: Vec2, a1: Vec2, p1: Vec2) -> (Vec2, Vec
 
 // TODO: replace this with something more sophisticated to maximize detail and minimize number of points
 // Maybe use the curve's curvature for this?
+// TODO: make this an iterator
 pub fn bezier_to_discrete_t_vals(_p0: Vec2, _b0: Vec2, _a1: Vec2, _p1: Vec2, max_pts: i32, include_first: bool) -> Vec<f32> {
     let mut vals = Vec::new();
     for i in 0..max_pts {
@@ -124,4 +123,8 @@ pub fn bezier_to_discrete_t_vals(_p0: Vec2, _b0: Vec2, _a1: Vec2, _p1: Vec2, max
 
 pub fn bezier_to_discrete(p0: Vec2, b0: Vec2, a1: Vec2, p1: Vec2, max_pts: i32, include_first: bool) -> Vec<Vec2> {
     bezier_to_discrete_t_vals(p0, b0, a1, p1, max_pts, include_first).iter().map(|t| bezier_sample(*t, p0, b0, a1, p1)).collect()
+}
+
+pub fn bezier_to_discrete_segments(p0: Vec2, b0: Vec2, a1: Vec2, p1: Vec2, max_pts: i32, include_first: bool) -> Vec<(Vec2, Vec2)> {
+    bezier_to_discrete(p0, b0, a1, p1, max_pts, include_first).windows(2).map(|pts| (pts[0], pts[1])).collect()
 }

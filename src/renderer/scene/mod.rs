@@ -188,11 +188,9 @@ impl SceneRenderer {
                         gl.disable(glow::STENCIL_TEST);
                     }
                 }
-
-
             }
         }
-
+       
         if let Some((fb_pick, color_key_map)) = fb_pick {
             fb_pick.resize(w, h, gl);
             fb_pick.render_to(gl);

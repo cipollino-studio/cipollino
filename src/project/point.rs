@@ -8,7 +8,8 @@ pub struct PointData {
     pub pt: Vec2,
     pub a: Vec2,
     pub b: Vec2,
-    pub stroke: u64
+    pub stroke: u64,
+    pub chain: usize
 }
 
 impl ObjData for PointData {
@@ -40,7 +41,10 @@ impl Project {
     
     pub fn add_point_with_key(&mut self, key: u64, data: PointData) -> Option<(u64, ObjAction)> {
         let stroke = self.strokes.get_mut(&data.stroke)?;
-        stroke.points.push(key);
+        while stroke.points.len() <= data.chain {
+            stroke.points.push(Vec::new());
+        }
+        stroke.points[data.chain].push(key);
         stroke.need_remesh = true;
         
         self.points.insert(key, Point {
@@ -52,7 +56,7 @@ impl Project {
     pub fn delete_point(&mut self, key: u64) -> Option<Vec<ObjAction>> {
         let point = self.points.remove(&key)?;
         if let Some(stroke) = self.strokes.get_mut(&point.data.stroke) {
-            stroke.points.retain(|point| *point != key);
+            stroke.points[point.data.chain].retain(|point| *point != key);
             stroke.need_remesh = true;
         }
         Some(vec![ObjAction::deletion(key, point.data)]) 

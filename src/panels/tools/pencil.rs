@@ -55,7 +55,7 @@ impl Tool for Pencil {
         }
     }
 
-    fn mouse_down(&mut self, mouse_pos: glam::Vec2, state: &mut crate::editor::EditorState) {
+    fn mouse_down(&mut self, mouse_pos: glam::Vec2, state: &mut crate::editor::EditorState, _scene: &mut ScenePanel) {
         if let Some(stroke) = self.curr_stroke {
             let prev_pt = self.points.last().unwrap();
             if (*prev_pt - mouse_pos).length() > 0.001 {
@@ -84,7 +84,8 @@ impl Tool for Pencil {
                                 pt: p,
                                 a,
                                 b,
-                                stroke
+                                stroke,
+                                chain: 0
                             }) {
                                 self.stroke_acts.push(act);
                             }
