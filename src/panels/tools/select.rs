@@ -25,9 +25,13 @@ impl Lasso {
         select.lasso_pts.push(mouse_pos);
     }
 
-    fn mouse_release(state: &mut EditorState, select: &mut Select) {
+    fn mouse_release(state: &mut EditorState, select: &mut Select, scene: &mut ScenePanel, gl: &Arc<glow::Context>) {
 
-        if let Some(pt) = select.lasso_pts.first() {
+        if select.lasso_pts.len() == 1 {
+            if let Some(stroke_key) = scene.sample_pick(select.lasso_pts[0], gl) {
+                state.selected_strokes.push(stroke_key);
+            }
+        } else if let Some(pt) = select.lasso_pts.first() {
             select.lasso_pts.push(*pt);
             let inside_lasso = |pt: Vec2| {
                 let mut cnt = 0;
@@ -385,9 +389,9 @@ impl Tool for Select {
         self.prev_mouse_pos = mouse_pos;
     }
 
-    fn mouse_release(&mut self, _mouse_pos: Vec2, state: &mut EditorState, _ui: &mut egui::Ui) {
+    fn mouse_release(&mut self, _mouse_pos: Vec2, state: &mut EditorState, _ui: &mut egui::Ui, scene: &mut ScenePanel, gl: &Arc<glow::Context>) {
         match self.state {
-            SelectState::Lasso => Lasso::mouse_release(state, self),
+            SelectState::Lasso => Lasso::mouse_release(state, self, scene, gl),
             SelectState::Translate => Translate::mouse_release(self, state),
             SelectState::Rotate => Rotate::mouse_release(self, state),
             _ => {}

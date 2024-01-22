@@ -188,7 +188,7 @@ impl ScenePanel {
                     tool.borrow_mut().mouse_down(mouse_pos, state, self);
                 }
                 if response.drag_released() {
-                    tool.borrow_mut().mouse_release(mouse_pos, state, ui);
+                    tool.borrow_mut().mouse_release(mouse_pos, state, ui, self, gl);
                 }
                 if response.hovered() {
                     ui.ctx().output_mut(|o| {
