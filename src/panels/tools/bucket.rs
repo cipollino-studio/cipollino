@@ -33,9 +33,9 @@ impl Tool for Bucket {
                     ..stroke.data
                 }) {
                     state.actions.add(Action::from_single(act));
+                    return;
                 }
             }
-            return;
         }
         
         // This uses a standard bitmap floodfill algorithmn adapted to work with vector art
@@ -66,19 +66,19 @@ impl Tool for Bucket {
         let mut boundary = HashMap::new(); 
         while let Some(curr) = bfs.pop_front() {
             let curr_unsnapped = unsnap_coords(curr);
-            if curr_unsnapped.y > scene.cam_pos.y + scene.cam_size {
-                boundary.clear();
-                break;
-            }
             'offset: for [x_off, y_off] in offsets {
                 let next = (curr.0 + x_off, curr.1 + y_off);
                 if vis.contains(&next) {
                     continue;
                 }
                 let next_unsnapped = unsnap_coords(next);
+                if next_unsnapped.y > scene.cam_pos.y + scene.cam_size || next_unsnapped.y < scene.cam_pos.y - scene.cam_size || next_unsnapped.x < scene.cam_pos.x - scene.cam_size * scene.cam_aspect || next_unsnapped.x > scene.cam_pos.x + scene.cam_size * scene.cam_aspect {
+                    boundary.insert(next, next_unsnapped);
+                    continue 'offset;
+                }
                 for stroke in &visible_strokes {
                     if let Some(stroke) = state.project.strokes.get(stroke) {
-                        let r = if !stroke.data.filled { (stroke.data.r - 0.025).max(0.0) } else { 0.01 };
+                        let r = if !stroke.data.filled { (stroke.data.r - 0.025).max(0.0) } else { 0.0 };
                         'point_pairs: for (p0, p1) in stroke.iter_point_pairs() {
                             let p0 = state.project.points.get(&p0).unwrap();
                             let p1 = state.project.points.get(&p1).unwrap();

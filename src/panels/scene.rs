@@ -21,6 +21,8 @@ pub struct ScenePanel {
     pub cam_pos: glam::Vec2,
     #[serde(default)]
     pub cam_size: f32,
+    #[serde(skip)]
+    pub cam_aspect : f32
 }
 
 impl Default for ScenePanel {
@@ -37,6 +39,7 @@ impl ScenePanel {
             color_key_map: Vec::new(),
             cam_pos: glam::vec2(0.0, 0.0),
             cam_size: 5.0,
+            cam_aspect: 1.0
         }
     }
 
@@ -166,6 +169,7 @@ impl ScenePanel {
         if let Some(mouse_pos) = response.hover_pos() {
             let mouse_pos = self.cam_size * (mouse_pos - rect.center()) / (rect.height() * 0.5);
             let mouse_pos = glam::vec2(mouse_pos.x, -mouse_pos.y) + self.cam_pos;
+            self.cam_aspect = rect.aspect_ratio();
 
             let zoom_fac =
                 (1.05 as f32).powf(-ui.input(|i| i.scroll_delta.y.clamp(-6.0, 6.0) * 0.7));

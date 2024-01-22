@@ -3,6 +3,7 @@ mod meshgen;
 
 use std::sync::Arc;
 
+use glam::{Vec3, vec3};
 use glow::{Context, HasContext};
 
 use crate::project::Project;
@@ -158,36 +159,41 @@ impl SceneRenderer {
                 mesh.render(gl);
             }
         }
+
+        let mut render_stroke_mesh = |mesh: &Mesh, color: Vec3, filled: bool, gl: &Arc<glow::Context>| {
+            if !filled {
+                self.flat_color_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, 1.0), gl);
+                mesh.render(gl);
+            } else {
+                unsafe {
+                    gl.enable(glow::STENCIL_TEST);
+                    gl.stencil_mask(0xFF);
+                    gl.clear(glow::STENCIL_BUFFER_BIT);
+                    gl.stencil_func(glow::NEVER, 1, 0xFF);
+                    gl.stencil_op(glow::INVERT, glow::INVERT, glow::INVERT);
+                }
+                mesh.render(gl);
+                unsafe {
+                    gl.stencil_func(glow::EQUAL, 0xFF, 0xFF);
+                    gl.stencil_op(glow::KEEP, glow::KEEP, glow::KEEP);
+                    gl.stencil_mask(0);
+                    gl.disable(glow::DEPTH_TEST);
+                }
+                self.flat_color_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, 1.0), gl);
+                mesh.render(gl);
+                unsafe {
+                    gl.disable(glow::STENCIL_TEST);
+                }
+            }
+        };
+
         for key in &stroke_keys {
             let stroke = project.strokes.get(key)?;
             let color = stroke.data.color;
             let key = *key;
             let filled = stroke.data.filled;
             if let Some(mesh) = meshgen::get_mesh(project, key, gl) {
-                if !filled {
-                    self.flat_color_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, 1.0), gl);
-                    mesh.render(gl);
-                } else {
-                    unsafe {
-                        gl.enable(glow::STENCIL_TEST);
-                        gl.stencil_mask(0xFF);
-                        gl.clear(glow::STENCIL_BUFFER_BIT);
-                        gl.stencil_func(glow::NEVER, 1, 0xFF);
-                        gl.stencil_op(glow::INVERT, glow::INVERT, glow::INVERT);
-                    }
-                    mesh.render(gl);
-                    unsafe {
-                        gl.stencil_func(glow::EQUAL, 0xFF, 0xFF);
-                        gl.stencil_op(glow::KEEP, glow::KEEP, glow::KEEP);
-                        gl.stencil_mask(0);
-                        gl.disable(glow::DEPTH_TEST);
-                    }
-                    self.flat_color_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, 1.0), gl);
-                    mesh.render(gl);
-                    unsafe {
-                        gl.disable(glow::STENCIL_TEST);
-                    }
-                }
+                render_stroke_mesh(mesh, color, filled, gl); 
             }
         }
        
@@ -202,6 +208,8 @@ impl SceneRenderer {
             }
             for key in &stroke_keys {
                 let key = *key;
+                let stroke = project.strokes.get(&key)?;
+                let filled = stroke.data.filled;
                 if let Some(mesh) = meshgen::get_mesh(project, key, gl) {
                     let mut color = 0 as u32;
                     for i in 0..color_key_map.len() {
@@ -218,8 +226,8 @@ impl SceneRenderer {
                     let r = (bytes[0] as f32) / 255.0;
                     let g = (bytes[1] as f32) / 255.0;
                     let b = (bytes[2] as f32) / 255.0;
-                    self.flat_color_shader.set_vec4("uColor", glam::vec4(r, g, b, 1.0), gl);
-                    mesh.render(gl);
+
+                    render_stroke_mesh(mesh, vec3(r, g, b), filled, gl); 
                 }
             }
             fb.render_to(gl);
