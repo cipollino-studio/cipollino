@@ -129,8 +129,15 @@ impl FreeTransform {
             return;
         }
 
-        if let Some(_stroke) = scene.sample_pick(mouse_pos, gl) {
-            select.state = SelectState::Translate;
+        if let Some(stroke) = scene.sample_pick(mouse_pos, gl) {
+            if state.selected_strokes.contains(&stroke) {
+                select.state = SelectState::Translate;
+            } else {
+                select.state = SelectState::Lasso;
+                if !ui.input(|i| i.modifiers.shift) {
+                    state.selected_strokes.clear();
+                }
+            }
             return;
         }
 
