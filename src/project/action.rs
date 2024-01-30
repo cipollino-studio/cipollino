@@ -4,7 +4,8 @@ use super::{ObjData, Project};
 enum ObjActionKind {
     Addition(Box<dyn ObjData>),
     Deletion(Box<dyn ObjData>),
-    Modification(Box<dyn ObjData>, Box<dyn ObjData>) 
+    Modification(Box<dyn ObjData>, Box<dyn ObjData>),
+    Generic(Box<dyn Fn(&mut Project)>, Box<dyn Fn(&mut Project)>) 
 }
 
 pub struct ObjAction {
@@ -35,11 +36,19 @@ impl ObjAction {
         }
     }
 
+    pub fn generic<T, G>(redo: T, undo: G) -> Self where T: Fn(&mut Project) + 'static, G: Fn(&mut Project) + 'static {
+        Self {
+            kind: ObjActionKind::Generic(Box::new(redo), Box::new(undo)),
+            key: 0 
+        }
+    }
+
     pub fn redo(&self, project: &mut Project) {
         match &self.kind {
             ObjActionKind::Addition(data) => data.add(self.key, project),
             ObjActionKind::Deletion(data) => data.delete(self.key, project),
-            ObjActionKind::Modification(_old, new) => new.set(self.key, project)
+            ObjActionKind::Modification(_old, new) => new.set(self.key, project),
+            ObjActionKind::Generic(redo, _undo) => redo(project)
         }
     }
 
@@ -47,7 +56,8 @@ impl ObjAction {
         match &self.kind {
             ObjActionKind::Addition(data) => data.delete(self.key, project),
             ObjActionKind::Deletion(data) => data.add(self.key, project),
-            ObjActionKind::Modification(old, _new) => old.set(self.key, project)
+            ObjActionKind::Modification(old, _new) => old.set(self.key, project),
+            ObjActionKind::Generic(_redo, undo) => undo(project)
         }
     }
 

@@ -107,4 +107,17 @@ impl Project {
         Some(res)
     }
 
+    pub fn set_stroke_index(&mut self, key: u64, idx: usize) -> Option<ObjAction> {
+        let stroke = self.strokes.get(&key)?;
+        let frame = self.frames.get_mut(&stroke.data.frame)?;
+        let init_idx = frame.strokes.iter().position(|stroke_key| *stroke_key == key)?;
+        frame.strokes.remove(init_idx);
+        frame.strokes.insert(idx.min(frame.strokes.len()), key);
+        Some(ObjAction::generic(move |proj| {
+            proj.set_stroke_index(key, idx);
+        }, move |proj| {
+            proj.set_stroke_index(key, init_idx);
+        }))
+    }
+
 }

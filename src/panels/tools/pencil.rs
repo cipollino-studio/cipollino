@@ -1,6 +1,8 @@
 
 use std::sync::Arc;
 
+use glam::vec2;
+
 use crate::{util::curve, project::{point::PointData, action::{ObjAction, Action}, stroke::StrokeData}, panels::scene::ScenePanel};
 
 use super::Tool;
@@ -45,13 +47,34 @@ impl Pencil {
 impl Tool for Pencil {
 
     fn mouse_click(&mut self, mouse_pos: glam::Vec2, state: &mut crate::editor::EditorState, _ui: &mut egui::Ui, _scene: &mut ScenePanel, _gl: &Arc<glow::Context>) {
-        let (frame, act) = super::active_frame(state);
-        if let Some((stroke_key, _act)) = state.project.add_stroke(StrokeData { frame, color: state.color, r: state.stroke_r, filled: state.stroke_filled }) {
+        let (frame, frame_act) = super::active_frame(state);
+        if let Some((stroke_key, stroke_act)) = state.project.add_stroke(StrokeData { frame, color: state.color, r: state.stroke_r, filled: state.stroke_filled }) {
             self.curr_stroke = Some(stroke_key);
-            self.points.clear(); 
+            self.points.clear();
             self.points.push(mouse_pos);
-            self.frame_creation_act = act;
+            self.frame_creation_act = frame_act;
             self.frame = frame;
+
+            // If the user just taps the mouse, make a lil point
+            let offset = vec2(0.001, 0.0);
+            self.stroke_acts.push(stroke_act);
+            let (_, pt_act) = state.project.add_point(PointData {
+                stroke: stroke_key,
+                pt: mouse_pos,
+                a: mouse_pos - offset,
+                b: mouse_pos + offset,
+                chain: 0
+            }).unwrap();
+            self.stroke_acts.push(pt_act);
+            let (_, pt_act) = state.project.add_point(PointData {
+                stroke: stroke_key,
+                pt: mouse_pos + offset,
+                a: mouse_pos - offset,
+                b: mouse_pos + offset,
+                chain: 0
+            }).unwrap();
+            self.stroke_acts.push(pt_act);
+
         }
     }
 
@@ -74,21 +97,19 @@ impl Tool for Pencil {
                         pts.push(pt.y);
                     }
 
-                    if pts.len() > 4 {
-                        let curve_pts = curve::fit_curve(2, pts.as_slice(), 0.01);
-                        for i in 0..(curve_pts.len() / (2 * 3)) {
-                            let a = glam::vec2(curve_pts[i * 6 + 0], curve_pts[i * 6 + 1]);
-                            let p = glam::vec2(curve_pts[i * 6 + 2], curve_pts[i * 6 + 3]);
-                            let b = glam::vec2(curve_pts[i * 6 + 4], curve_pts[i * 6 + 5]);
-                            if let Some((_key, act)) = state.project.add_point(PointData {
-                                pt: p,
-                                a,
-                                b,
-                                stroke,
-                                chain: 0
-                            }) {
-                                self.stroke_acts.push(act);
-                            }
+                    let curve_pts = curve::fit_curve(2, pts.as_slice(), 0.01);
+                    for i in 0..(curve_pts.len() / (2 * 3)) {
+                        let a = glam::vec2(curve_pts[i * 6 + 0], curve_pts[i * 6 + 1]);
+                        let p = glam::vec2(curve_pts[i * 6 + 2], curve_pts[i * 6 + 3]);
+                        let b = glam::vec2(curve_pts[i * 6 + 4], curve_pts[i * 6 + 5]);
+                        if let Some((_key, act)) = state.project.add_point(PointData {
+                            pt: p,
+                            a,
+                            b,
+                            stroke,
+                            chain: 0
+                        }) {
+                            self.stroke_acts.push(act);
                         }
                     }
                 }

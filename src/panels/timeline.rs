@@ -306,10 +306,20 @@ impl TimelinePanel {
             }
         }
 
-        // Frame dots
+        // Frame area 
         let mut y = 0.0;
         for layer_key in gfx.layers.iter() {
             let layer = state.project.layers.get(layer_key).unwrap();
+
+            // If the user clicks anywhere in the layer, select the layer
+            let layer_rect = egui::Rect::from_min_size(win_tl + Vec2::new(0.0, y * frame_h), Vec2::new(rect.width(), frame_h));
+            if let Some(hover_pos) = response.hover_pos() {
+                if layer_rect.contains(hover_pos) && response.clicked() {
+                    state.active_layer = *layer_key;
+                } 
+            }
+
+            // Frame dots
             for frame_key in &layer.frames {
                 let frame = state.project.frames.get(frame_key).unwrap();
                 let dot_pos = win_tl + Vec2::new((frame.data.time as f32 + 0.5) * frame_w, (y + 0.5) * frame_h);

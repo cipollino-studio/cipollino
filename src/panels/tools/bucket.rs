@@ -283,6 +283,7 @@ impl Tool for Bucket {
             filled: true 
         }) {
             acts.push(stroke_act);
+            acts.push(state.project.set_stroke_index(stroke, 0).unwrap());
             for (chain_idx, chain) in chains.iter().enumerate() {
                 let mut pts_data = Vec::new();
                 for pt in chain {

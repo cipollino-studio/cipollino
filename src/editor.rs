@@ -232,7 +232,7 @@ impl Editor {
                 self.state.playing = false;
                 next_keyframe(&mut self.state); 
             }
-            if ui.input_mut(|i| i.consume_shortcut(&delete_shortcut)) {
+            if ui.input_mut(|i| i.consume_shortcut(&delete_shortcut)) && (self.state.selected_frames.len() > 0 || self.state.selected_strokes.len() > 0) {
                 let mut action = Action::new();
                 for frame in &self.state.selected_frames {
                     if let Some(acts) = self.state.project.delete_frame(*frame) {
@@ -247,6 +247,7 @@ impl Editor {
                 self.state.selected_frames.clear();
                 self.state.selected_strokes.clear();
                 self.state.actions.add(action);
+                self.state.curr_tool.clone().borrow_mut().reset(&mut self.state);
             }
 
             if ui.input_mut(|i| i.consume_shortcut(&save_shortcut)) {
