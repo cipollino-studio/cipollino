@@ -185,8 +185,8 @@ impl ScenePanel {
                     }
                 }
                 state.actions.add(action);
-                state.reset_tool();
                 state.selection.clear();
+                state.reset_tool();
             }
         }
 

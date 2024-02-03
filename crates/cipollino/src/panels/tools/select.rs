@@ -70,23 +70,8 @@ impl Lasso {
             }
         }
 
-        if let Selection::Scene(strokes) = &state.selection {
-            select.state = SelectState::FreeTransform;
-            select.bb_min = Vec2::INFINITY;
-            select.bb_max = -Vec2::INFINITY;
-            for stroke_ptr in strokes {
-                state.project.strokes.get_then(*stroke_ptr, |stroke| {
-                    for (p0, p1) in stroke.iter_point_pairs() {
-                        let (min, max) = curve::bezier_bounding_box(p0.pt, p0.b, p1.a, p1.pt);
-                        select.bb_min = select.bb_min.min(min);
-                        select.bb_max = select.bb_max.max(max);
-                    }
-                });
-            }
-            select.pivot = (select.bb_max + select.bb_min) * 0.5;
-            select.trans = glam::Mat4::IDENTITY;
-        }
-        
+        select.reset(state);
+
         select.lasso_pts.clear();
     }
 
@@ -387,11 +372,28 @@ impl Tool for Select {
     }
 
     fn reset(&mut self, state: &mut EditorState) {
-        if let Some(action) = std::mem::replace(&mut self.transform_action, None) {
-            state.actions.add(action);
-        } 
-        self.state = SelectState::Lasso; 
-        self.lasso_pts.clear();
+        if let Selection::Scene(strokes) = &state.selection {
+            self.state = SelectState::FreeTransform;
+            self.bb_min = Vec2::INFINITY;
+            self.bb_max = -Vec2::INFINITY;
+            for stroke_ptr in strokes {
+                state.project.strokes.get_then(*stroke_ptr, |stroke| {
+                    for (p0, p1) in stroke.iter_point_pairs() {
+                        let (min, max) = curve::bezier_bounding_box(p0.pt, p0.b, p1.a, p1.pt);
+                        self.bb_min = self.bb_min.min(min);
+                        self.bb_max = self.bb_max.max(max);
+                    }
+                });
+            }
+            self.pivot = (self.bb_max + self.bb_min) * 0.5;
+            self.trans = glam::Mat4::IDENTITY;
+        } else {
+            if let Some(action) = std::mem::replace(&mut self.transform_action, None) {
+                state.actions.add(action);
+            } 
+            self.state = SelectState::Lasso; 
+            self.lasso_pts.clear();
+        }
     }
 
 }
