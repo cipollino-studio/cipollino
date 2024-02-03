@@ -4,7 +4,10 @@ use std::{cell::RefCell, fs, io::Write, path::PathBuf, rc::Rc, sync::{Arc, Mutex
 use crate::{panels::{self, timeline::{new_frame, prev_keyframe, next_keyframe}, tools::{pencil::Pencil, Tool, select::Select, bucket::Bucket}}, project::{Project, graphic::Graphic, action::ActionManager, obj::ObjPtr, stroke::Stroke, layer::Layer}, renderer::scene::SceneRenderer, export::Export};
 use egui::Modifiers;
 
+use self::clipboard::Clipboard;
+
 pub mod selection;
+pub mod clipboard;
 
 pub struct EditorRenderer {
     pub gl_ctx: Arc<Mutex<Option<Arc<glow::Context>>>>,
@@ -47,6 +50,9 @@ pub struct EditorState {
     pub active_layer: ObjPtr<Layer>,
     pub selection: selection::Selection,
 
+    // Clipboard
+    pub clipboard: clipboard::Clipboard,
+
     // Playback
     pub time: f32,
     pub playing: bool,
@@ -73,6 +79,7 @@ impl EditorState {
             open_graphic: ObjPtr::null(),
             active_layer: ObjPtr::null(),
             selection: selection::Selection::None,
+            clipboard: clipboard::Clipboard::None,
             time: 0.0,
             playing: false,
             onion_before: 0,
@@ -122,7 +129,7 @@ impl EditorState {
     }
 
     pub fn paste_shortcut(&self) -> egui::KeyboardShortcut {
-        egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::C)
+        egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::V)
     }
 
     pub fn reset_tool(&mut self) {
@@ -236,6 +243,10 @@ impl Editor {
                 if let Some(path) = self.save_path.clone() {
                     self.save_project(path);
                 }
+            }
+            
+            if ui.input_mut(|i| i.consume_shortcut(&self.state.copy_shortcut())) {
+                self.state.clipboard = Clipboard::from_selection(&self.state.selection, &mut self.state.project);
             }
 
             egui::menu::bar(ui, |ui| {

@@ -4,9 +4,11 @@ use glam::Vec2;
 use glow::HasContext;
 
 use crate::{
-    editor::{selection::Selection, EditorRenderer, EditorState},
+    editor::{clipboard::Clipboard, selection::Selection, EditorRenderer, EditorState},
     renderer::{fb::Framebuffer, mesh::Mesh, shader::Shader, scene::SceneRenderer}, util::curve, project::{action::Action, graphic::Graphic, obj::{ChildObj, ObjPtr}, stroke::Stroke},
 };
+
+use super::tools::active_frame_proj_layer_frame;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct ScenePanel {
@@ -185,6 +187,32 @@ impl ScenePanel {
                 state.actions.add(action);
                 state.reset_tool();
                 state.selection.clear();
+            }
+        }
+
+        // Pasting strokes
+        let paste_shortcut = state.paste_shortcut();
+        if let Clipboard::Scene(strokes) = &state.clipboard {
+            if ui.input_mut(|i| i.consume_shortcut(&paste_shortcut)) {
+                let frame = state.frame();
+                if let Some((frame, act)) = active_frame_proj_layer_frame(&mut state.project, state.active_layer, frame) {
+                    state.selection.clear();
+                    let mut acts = Vec::new();
+                    if let Some(act) = act {
+                        acts.push(act);
+                    }
+                    for stroke in strokes {
+                        Stroke::transform(&mut state.project, stroke.make_ptr(), glam::Mat4::from_translation(glam::vec3(0.5, 0.0, 0.0)));
+                        if let Some(clone) = stroke.make_ptr().make_obj_clone(&mut state.project) {
+                            if let Some((stroke, act)) = Stroke::add(&mut state.project, frame, clone) {
+                                acts.push(act);
+                                state.selection.select_stroke(stroke);
+                            }
+                        }
+                    }
+                    state.actions.add(Action::from_list(acts));
+                    state.reset_tool();
+                }
             }
         }
 

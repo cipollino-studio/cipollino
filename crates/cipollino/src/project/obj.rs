@@ -60,6 +60,15 @@ impl<T: Obj> ObjPtr<T> {
         } 
     }
 
+    pub fn make_obj_clone(&self, project: &mut Project) -> Option<T> {
+        let obj = T::get_list(project).get(*self); 
+        if obj.is_none() {
+            return None;
+        }
+        let obj = obj.unwrap();
+        Some(obj.clone().obj_clone(project))
+    }
+
 }
 
 impl<T: Obj> Clone for ObjPtr<T> {
@@ -232,6 +241,16 @@ pub trait ChildObj: Obj + 'static {
             redo(project);
 
             return Some(ObjAction::new(redo, undo));
+        }
+        None
+    }
+
+    fn get_box(project: &mut Project, parent: ObjPtr<Self::Parent>, obj: ObjPtr<Self>) -> Option<&ObjBox<Self>> {
+        let siblings = Self::get_sibling_list(project, parent)?;
+        for sibling in siblings {
+            if sibling.make_ptr() == obj {
+                return Some(sibling);
+            }
         }
         None
     }

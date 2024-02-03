@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use glam::Vec2;
 
-use crate::{editor::EditorState, project::{action::ObjAction, obj::{ChildObj, ObjPtr}, frame::Frame}};
+use crate::{editor::EditorState, project::{action::ObjAction, frame::Frame, layer::Layer, obj::{ChildObj, ObjPtr}, Project}};
 
 use super::scene::{OverlayRenderer, ScenePanel};
 
@@ -25,17 +25,21 @@ pub trait Tool {
 
 }
 
-pub fn active_frame(state: &mut EditorState) -> Option<(ObjPtr<Frame>, Option<ObjAction>)> {
-    let frame = state.frame();
-    let layer = state.project.layers.get(state.active_layer)?;
-    if let Some(frame) = layer.get_frame_exactly_at(&state.project, frame) {
+pub fn active_frame_proj_layer_frame(project: &mut Project, active_layer: ObjPtr<Layer>, frame: i32) -> Option<(ObjPtr<Frame>, Option<ObjAction>)> {
+    let layer = project.layers.get(active_layer)?;
+    if let Some(frame) = layer.get_frame_exactly_at(project, frame) {
         Some((frame.make_ptr(), None))
     } else {
-        let (frame, act) = Frame::add(&mut state.project, state.active_layer, Frame {
-            layer: state.active_layer,
+        let (frame, act) = Frame::add(project, active_layer, Frame {
+            layer: active_layer,
             time: frame,
             strokes: Vec::new()
         }).unwrap();
         Some((frame, Some(act)))
     }
+}
+
+pub fn active_frame(state: &mut EditorState) -> Option<(ObjPtr<Frame>, Option<ObjAction>)> {
+    let frame = state.frame();
+    active_frame_proj_layer_frame(&mut state.project, state.active_layer, frame)
 }
