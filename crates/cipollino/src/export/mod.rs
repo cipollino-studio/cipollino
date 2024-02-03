@@ -3,12 +3,12 @@ use std::path::PathBuf;
 
 use glow::HasContext;
 
-use crate::{renderer::fb::Framebuffer, editor::{EditorState, EditorRenderer}};
+use crate::{renderer::fb::Framebuffer, editor::{EditorState, EditorRenderer}, project::{obj::ObjPtr, graphic::Graphic}};
 
 pub struct Export {
     fb: Option<(Framebuffer, Framebuffer)>,
     pub dialog_open: bool,
-    pub exporting: Option<(PathBuf, i32, u64)> 
+    pub exporting: Option<(PathBuf, i32, ObjPtr<Graphic>)> 
 }
 
 impl Export {
@@ -26,7 +26,7 @@ impl Export {
         egui::Window::new("Export")
             .open(&mut self.dialog_open)
             .show(ctx, |ui| {
-                let graphic_exists = state.open_graphic().is_some();
+                let graphic_exists = state.project.graphics.get(state.open_graphic).is_some();
                 if ui.add_enabled(graphic_exists, egui::Button::new("Export"))
                     .clicked() {
                     if let Some(mut path) = rfd::FileDialog::new().save_file() {
@@ -51,10 +51,9 @@ impl Export {
                 } 
                 if let Some((fb, aa_fb)) = self.fb.as_mut() {
                     let aa_scl = 2;
-                    let gfx = state.project.graphics.get(&gfx_key).unwrap();
-                    let w = gfx.data.w;
-                    let h = gfx.data.h;
-                    println!("{} {}", w, h);
+                    let gfx = state.project.graphics.get(*gfx_key).unwrap();
+                    let w = gfx.w;
+                    let h = gfx.h;
                     renderer.render(fb, None, w * aa_scl, h * aa_scl, glam::Vec2::ZERO, 5.0, &mut state.project, *gfx_key, *frame, 0, 0, gl);
                     aa_fb.resize(w, h, gl);
                     unsafe {
@@ -79,7 +78,7 @@ impl Export {
                     path_copy.set_extension("png");
                     let _ = image::save_buffer(path_copy, pixel_data.as_slice(), w, h, image::ColorType::Rgb8);
                     *frame += 1;
-                    if *frame as u32 == state.project.graphics.get(&state.open_graphic).unwrap().data.len { 
+                    if *frame as u32 == state.project.graphics.get(state.open_graphic).unwrap().len { 
                         self.exporting = None;
                     }
                 }

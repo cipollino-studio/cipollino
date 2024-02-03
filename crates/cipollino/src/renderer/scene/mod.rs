@@ -6,7 +6,7 @@ use std::sync::Arc;
 use glam::{Vec3, vec3};
 use glow::{Context, HasContext};
 
-use crate::project::Project;
+use crate::project::{Project, obj::ObjPtr, stroke::Stroke, graphic::Graphic};
 
 use super::{shader::Shader, fb::Framebuffer, mesh::Mesh};
 
@@ -84,7 +84,7 @@ impl SceneRenderer {
         &mut self,
 
         fb: &mut Framebuffer,
-        fb_pick: Option<(&mut Framebuffer, &mut Vec<u64>)>,
+        fb_pick: Option<(&mut Framebuffer, &mut Vec<ObjPtr<Stroke>>)>,
         w: u32,
         h: u32,
 
@@ -92,7 +92,7 @@ impl SceneRenderer {
         cam_size: f32,
 
         project: &mut Project,
-        gfx: u64,
+        gfx: ObjPtr<Graphic>,
         time: i32,
 
         onion_before: i32,
@@ -119,38 +119,35 @@ impl SceneRenderer {
 
         let mut onion_strokes = Vec::new();
         let mut stroke_keys = Vec::new();
-        for layer in project.graphics.get(&gfx)?.layers.iter().rev() {
-            if let Some(frame) = project.get_frame_at(*layer, time) {
-                let frame = project.frames.get(&frame)?;
-                let mut curr_time = frame.data.time;
+        for layer in project.graphics.get(gfx)?.layers.iter().rev() {
+            if let Some(frame) = layer.get(project).get_frame_at(project, time) {
+                let mut curr_time = frame.get(project).time;
                 let mut alpha = 0.75;
                 for _i in 0..onion_before {
-                    if let Some(frame) = project.get_frame_before(*layer, curr_time) {
-                        let frame = project.frames.get(&frame)?;
-                        onion_strokes.append(&mut (frame.strokes
-                            .clone().iter()
-                            .filter(|stroke_key| !project.strokes.get(&stroke_key).map(|stroke| !stroke.data.filled).unwrap_or(false))
-                            .map(|key| (glam::vec4(1.0, 0.3, 1.0, alpha), *key)).collect()));
+                    if let Some(frame) = layer.get(project).get_frame_before(project, curr_time) {
+                        onion_strokes.append(&mut (frame.get(project).strokes
+                            .iter()
+                            .filter(|stroke| !stroke.get(project).filled) 
+                            .map(|key| (glam::vec4(1.0, 0.3, 1.0, alpha), key.make_ptr())).collect()));
                         alpha *= 0.8;
-                        curr_time = frame.data.time;
+                        curr_time = frame.get(project).time;
                     }
                 }
                 // Ugly bug fix: make sure the oldest strokes are drawn at the back
                 onion_strokes.reverse();
-                let mut curr_time = frame.data.time;
+                let mut curr_time = frame.get(project).time;
                 let mut alpha = 0.75;
                 for _i in 0..onion_after {
-                    if let Some(frame) = project.get_frame_after(*layer, curr_time) {
-                        let frame = project.frames.get(&frame)?;
-                        onion_strokes.append(&mut (frame.strokes
-                            .clone().iter()
-                            .filter(|stroke_key| !project.strokes.get(&stroke_key).map(|stroke| !stroke.data.filled).unwrap_or(false))
-                            .map(|key| (glam::vec4(0.3, 1.0, 1.0, alpha), *key)).collect()));
+                    if let Some(frame) = layer.get(project).get_frame_after(project, curr_time) {
+                        onion_strokes.append(&mut (frame.get(project,).strokes
+                            .iter()
+                            .filter(|stroke| !stroke.get(project).filled) 
+                            .map(|key| (glam::vec4(0.3, 1.0, 1.0, alpha), key.make_ptr())).collect()));
                         alpha *= 0.8;
-                        curr_time = frame.data.time;
+                        curr_time = frame.get(project).time;
                     }
                 }
-                stroke_keys.append(&mut frame.strokes.clone());
+                stroke_keys.append(&mut frame.get(project).strokes.iter().map(|stroke| stroke.make_ptr()).collect());
             }
         }
         for (color, key) in onion_strokes {
@@ -187,12 +184,15 @@ impl SceneRenderer {
             }
         };
 
-        for key in &stroke_keys {
-            let stroke = project.strokes.get(key)?;
-            let color = stroke.data.color;
-            let key = *key;
-            let filled = stroke.data.filled;
-            if let Some(mesh) = meshgen::get_mesh(project, key, gl) {
+        for stroke_ptr in &stroke_keys {
+            let stroke = project.strokes.get(*stroke_ptr);
+            if stroke.is_none() {
+                continue;
+            }
+            let stroke = stroke.unwrap();
+            let color = stroke.color;
+            let filled = stroke.filled;
+            if let Some(mesh) = meshgen::get_mesh(project, *stroke_ptr, gl) {
                 render_stroke_mesh(mesh, color, filled, gl); 
             }
         }
@@ -206,20 +206,19 @@ impl SceneRenderer {
                 gl.clear_color(0.0, 0.0, 0.0, 1.0);
                 gl.clear(glow::COLOR_BUFFER_BIT);
             }
-            for key in &stroke_keys {
-                let key = *key;
-                let stroke = project.strokes.get(&key)?;
-                let filled = stroke.data.filled;
-                if let Some(mesh) = meshgen::get_mesh(project, key, gl) {
+            for stroke_ptr in &stroke_keys {
+                let stroke = project.strokes.get(*stroke_ptr)?;
+                let filled = stroke.filled;
+                if let Some(mesh) = meshgen::get_mesh(project, *stroke_ptr, gl) {
                     let mut color = 0 as u32;
                     for i in 0..color_key_map.len() {
-                        if color_key_map[i] == key {
+                        if color_key_map[i] == *stroke_ptr {
                             color = i as u32;
                             break;
                         } 
                     };
                     if color == 0 {
-                        color_key_map.push(key);
+                        color_key_map.push(*stroke_ptr);
                         color = color_key_map.len() as u32;
                     }
                     let bytes = color.to_le_bytes();

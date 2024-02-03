@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use glam::{Vec2, vec3, vec2, Mat4, Quat};
 
-use crate::{editor::EditorState, panels::scene::{OverlayRenderer, ScenePanel}, util::{curve::{bezier_sample, self}, geo::segment_intersect}, project::{point::PointData, action::Action}};
+use crate::{editor::EditorState, panels::scene::{OverlayRenderer, ScenePanel}, util::{curve::{bezier_sample, self}, geo::segment_intersect}, project::{action::Action, stroke::Stroke}};
 
 use super::Tool;
 
@@ -50,19 +50,16 @@ impl Lasso {
                 cnt % 2 == 1 
             };
 
-            if let Some(gfx) = state.project.graphics.get(&state.open_graphic) {
+            if let Some(gfx) = state.project.graphics.get(state.open_graphic) {
                 for layer in &gfx.layers {
-                    if let Some(Some(frame)) = state.project.get_frame_at(*layer, state.frame()).map(|key| state.project.frames.get(&key)) {
-                        for stroke_key in &frame.strokes {
-                            let stroke = state.project.strokes.get(&stroke_key).unwrap();
-                            'pt_loop: for (p0, p1) in stroke.iter_point_pairs() {
-                                let p0 = state.project.points.get(&p0).unwrap();
-                                let p1 = state.project.points.get(&p1).unwrap();
+                    if let Some(frame) = layer.get(&state.project).get_frame_at(&state.project, state.frame()) {
+                        for stroke in &frame.get(&state.project).strokes {
+                            'pt_loop: for (p0, p1) in stroke.get(&state.project).iter_point_pairs() {
                                 for i in 0..10 {
                                     let t = (i as f32) / 9.0;
-                                    let pt = bezier_sample(t, p0.data.pt, p0.data.b, p1.data.a, p1.data.pt);
+                                    let pt = bezier_sample(t, p0.pt, p0.b, p1.a, p1.pt);
                                     if inside_lasso(pt) {
-                                        state.selected_strokes.push(*stroke_key);
+                                        state.selected_strokes.push(stroke.make_ptr());
                                         break 'pt_loop;
                                     }
                                 }
@@ -77,16 +74,14 @@ impl Lasso {
             select.state = SelectState::FreeTransform;
             select.bb_min = Vec2::INFINITY;
             select.bb_max = -Vec2::INFINITY;
-            for stroke_key in &state.selected_strokes {
-                if let Some(stroke) = state.project.strokes.get(stroke_key) {
+            for stroke_ptr in &state.selected_strokes {
+                state.project.strokes.get_then(*stroke_ptr, |stroke| {
                     for (p0, p1) in stroke.iter_point_pairs() {
-                        let p0 = state.project.points.get(&p0).unwrap();
-                        let p1 = state.project.points.get(&p1).unwrap();
-                        let (min, max) = curve::bezier_bounding_box(p0.data.pt, p0.data.b, p1.data.a, p1.data.pt);
+                        let (min, max) = curve::bezier_bounding_box(p0.pt, p0.b, p1.a, p1.pt);
                         select.bb_min = select.bb_min.min(min);
                         select.bb_max = select.bb_max.max(max);
                     }
-                }
+                });
             }
             select.pivot = (select.bb_max + select.bb_min) * 0.5;
             select.trans = glam::Mat4::IDENTITY;
@@ -294,51 +289,20 @@ impl Select {
     }
 
     pub fn apply_transformation(&mut self, new_trans: glam::Mat4, state: &mut EditorState) {
-        let mut points = Vec::new();
-        for stroke in &state.selected_strokes {
-            if let Some(stroke) = state.project.strokes.get(stroke) {
-                for chain in &stroke.points {
-                    for point_key in chain {
-                        points.push(*point_key);
-                    }
-                }
-            }
-        }
-        let transform_vec2 = |pt: Vec2, mat: Mat4| {
-            let v3 = mat.transform_point3(vec3(pt.x, pt.y, 0.0));
-            vec2(v3.x, v3.y)
-        };
-
+        
         let trans_inv = self.trans.inverse();
-        for point_key in &points {
-            let point_key = *point_key;
-            if let Some(point) = state.project.points.get(&point_key) {
-                let data = point.data.clone();
-                state.project.set_point_data(point_key, PointData {
-                    a: transform_vec2(data.a, trans_inv),
-                    pt: transform_vec2(data.pt, trans_inv),
-                    b: transform_vec2(data.b, trans_inv),
-                    ..data
-                });
-            }
+        for stroke in &state.selected_strokes {
+            Stroke::transform(&mut state.project, *stroke, trans_inv);
         }
+        
         let mut action = Action::new();
-        for point_key in &points {
-            let point_key = *point_key;
-            if let Some(point) = state.project.points.get(&point_key) {
-                let data = point.data.clone();
-                if let Some(act) = state.project.set_point_data(point_key, PointData {
-                    a: transform_vec2(data.a, new_trans),
-                    pt: transform_vec2(data.pt, new_trans),
-                    b: transform_vec2(data.b, new_trans),
-                    ..data
-                }) {
-                    action.add(act);
-                }
+        for stroke in &state.selected_strokes {
+            if let Some(act) = Stroke::transform(&mut state.project, *stroke, new_trans) {
+                action.add(act);
             }
         }
+        
         self.trans = new_trans;
-
         self.transform_action = Some(action);
     }
 
@@ -414,7 +378,7 @@ impl Tool for Select {
         }
     }
 
-    fn draw_overlay(&mut self, overlay: &mut OverlayRenderer, _state: &mut EditorState) {
+    fn draw_overlay(&mut self, overlay: &mut OverlayRenderer, _state: &EditorState) {
         match self.state {
             SelectState::Lasso => Lasso::draw_overlay(overlay, self), 
             SelectState::FreeTransform | SelectState::Translate | SelectState::Rotate => FreeTransform::draw_overlay(overlay, self),

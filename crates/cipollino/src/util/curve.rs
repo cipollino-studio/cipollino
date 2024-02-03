@@ -2,7 +2,6 @@ use std::ops::{Mul, Add, Sub};
 
 use glam::Vec2;
 
-
 extern "C" {
 
     pub fn curve_fit_cubic_to_points_refit_fl(

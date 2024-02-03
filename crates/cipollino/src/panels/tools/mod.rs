@@ -1,8 +1,9 @@
+
 use std::sync::Arc;
 
 use glam::Vec2;
 
-use crate::{editor::EditorState, project::action::ObjAction};
+use crate::{editor::EditorState, project::{action::ObjAction, obj::{ChildObj, ObjPtr}, frame::Frame}};
 
 use super::scene::{OverlayRenderer, ScenePanel};
 
@@ -18,20 +19,22 @@ pub trait Tool {
     fn mouse_cursor(&mut self, _mouse_pos: Vec2, _state: &mut EditorState, _scene: &mut ScenePanel, _gl: &Arc<glow::Context>) -> egui::CursorIcon {
         egui::CursorIcon::Default
     }
-    fn draw_overlay(&mut self, _overlay: &mut OverlayRenderer, _state: &mut EditorState) {}
+    fn draw_overlay(&mut self, _overlay: &mut OverlayRenderer, _state: &EditorState) {}
     fn tool_panel(&mut self, _ui: &mut egui::Ui, _state: &mut EditorState) {}
     fn reset(&mut self, _state: &mut EditorState) {}
 
 }
 
-pub fn active_frame(state: &mut EditorState) -> (u64, Option<ObjAction>) {
-    if let Some(frame) = state.project.get_frame_exactly_at(state.active_layer, state.frame()) {
-        (frame, None) 
+pub fn active_frame(state: &mut EditorState) -> Option<(ObjPtr<Frame>, Option<ObjAction>)> {
+    let frame = state.frame();
+    let layer = state.project.layers.get(state.active_layer)?;
+    if let Some(frame) = layer.get_frame_exactly_at(&state.project, frame) {
+        Some((frame.make_ptr(), None))
     } else {
-        if let Some((frame, act)) = state.project.add_frame(state.active_layer, state.frame()) {
-            (frame, Some(act))
-        } else {
-            (0, None)
-        }
+        let (frame, act) = Frame::add(&mut state.project, state.active_layer, Frame {
+            time: frame,
+            strokes: Vec::new()
+        }).unwrap();
+        Some((frame, Some(act)))
     }
 }

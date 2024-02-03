@@ -1,6 +1,6 @@
 
 use egui::Vec2;
-use crate::{editor::EditorState, project::{action::Action, graphic::GraphicData, frame::FrameData}};
+use crate::{editor::EditorState, project::{action::Action, frame::Frame, layer::Layer, obj::ChildObj}};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct TimelinePanel {
@@ -35,18 +35,20 @@ impl TimelinePanel {
     }
 
     pub fn render(&mut self, ui: &mut egui::Ui, state: &mut EditorState) {
-        if let None = state.project.graphics.get(&state.open_graphic) {
+        if let None = state.project.graphics.get(state.open_graphic) {
             ui.centered_and_justified(|ui| {
                 ui.label("No Graphic Open");
             });
             return;
         };
 
+        let gfx = state.project.graphics.get(state.open_graphic).unwrap();
+
         let frame_w = 10.0;
         let frame_h = 15.0;
         let sidebar_w = 100.0;
 
-        let n_frames = ((ui.available_width() - sidebar_w) / frame_w) as i32 + (state.project.graphics.get(&state.open_graphic).unwrap().data.len as i32) - 2;
+        let n_frames = ((ui.available_width() - sidebar_w) / frame_w) as i32 + (gfx.len as i32) - 2;
         let n_frames = 5 * (n_frames / 5) + 4;
 
         let no_margin = egui::Frame { inner_margin: egui::Margin::same(0.0), ..Default::default()};
@@ -58,7 +60,7 @@ impl TimelinePanel {
             .exact_height(22.)
             .show_inside(ui, |ui| {
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                    self.timeline_controls(ui, state, state.open_graphic);
+                    self.timeline_controls(ui, state);
                 });
             }); 
 
@@ -152,12 +154,15 @@ impl TimelinePanel {
 
     } 
 
-    pub fn timeline_controls(&mut self, ui: &mut egui::Ui, state: &mut EditorState, gfx: u64) {
-        
+    pub fn timeline_controls(&mut self, ui: &mut egui::Ui, state: &mut EditorState) {
+
         if ui.button("+").clicked() {
-            if let Some((key, act)) = state.project.add_layer(gfx, "Layer".to_owned()) {
+            if let Some((layer, act)) = Layer::add(&mut state.project, state.open_graphic, Layer {
+                name: "Layer".to_owned(),
+                frames: Vec::new()
+            }) {
                 state.actions.add(Action::from_single(act));
-                state.active_layer = key;
+                state.active_layer = layer;
             }
         }
 
@@ -176,24 +181,25 @@ impl TimelinePanel {
             next_keyframe(state);
             state.playing = false;
         }
+
+        let gfx = state.project.graphics.get(state.open_graphic).unwrap();
         if ui.button(">>").clicked() {
-            let gfx = state.project.graphics.get(&gfx).unwrap();
-            state.time = (gfx.data.len as f32 - 1.0) * state.frame_len();
+            state.time = (gfx.len as f32 - 1.0) * state.frame_len();
             state.playing = false;
         }
 
-        let gfx = state.project.graphics.get(&state.open_graphic).unwrap();
-        let mut len = gfx.data.len; 
+        let mut len = gfx.len; 
         ui.label("Graphic length: ");
         let gfx_len_drag = ui.add(egui::DragValue::new(&mut len).clamp_range(1..=1000000).update_while_editing(false));
-        let len_changed = len != gfx.data.len;
+        let len_changed = len != gfx.len;
         if len_changed {
-            if let Some(act) = state.project.set_graphic_data(state.open_graphic, GraphicData {
-                len,
-                ..gfx.data.clone()
-            }) {
-                self.set_gfx_len_action.add(act);
-            }
+            // TODO!!!!
+            // if let Some(act) = state.project.set_graphic_data(state.open_graphic, GraphicData {
+            //     len,
+            //     ..gfx.data.clone()
+            // }) {
+            //     self.set_gfx_len_action.add(act);
+            // }
         }
         if gfx_len_drag.drag_released() || (!gfx_len_drag.dragged() && len_changed) {
             state.actions.add(std::mem::replace(&mut self.set_gfx_len_action, Action::new()));
@@ -229,44 +235,41 @@ impl TimelinePanel {
     }
 
     pub fn layers(&mut self, ui: &mut egui::Ui, frame_h: f32, state: &mut EditorState, highlight: egui::Color32) {
-        let gfx = state.project.graphics.get(&state.open_graphic).unwrap();
+        let gfx = state.project.graphics.get(state.open_graphic).unwrap();
         let mut i = 0;
 
         let mut delete_layer = None;
 
         let (rect, _response) = ui.allocate_exact_size(Vec2::new(100.0, (gfx.layers.len() as f32) * frame_h), egui::Sense::click());
         let tl = rect.left_top(); 
-        for layer_key in gfx.layers.iter() {
-            if let Some(layer) = state.project.layers.get(&layer_key) {
-                let layer_name_tl = tl + Vec2::new(0.0, frame_h * (i as f32)); 
-                let layer_name_br = layer_name_tl + Vec2::new(100.0, frame_h); 
-                let rect = egui::Rect::from_min_max(layer_name_tl, layer_name_br);
-                if *layer_key == state.active_layer {
-                    ui.painter().rect(rect, 0.0, highlight, egui::Stroke::NONE);
-                }
-                let layer_name_response = ui.put(rect, egui::Label::new(layer.data.name.clone()).sense(egui::Sense::click()))
-                    .context_menu(|ui| {
-                        if ui.button("Delete").clicked() {
-                            delete_layer = Some(*layer_key); 
-                        }
-                    });
-                if layer_name_response.clicked() {
-                    state.active_layer = *layer_key;
-                }
+        for layer in gfx.layers.iter() {
+            let layer_name_tl = tl + Vec2::new(0.0, frame_h * (i as f32)); 
+            let layer_name_br = layer_name_tl + Vec2::new(100.0, frame_h); 
+            let rect = egui::Rect::from_min_max(layer_name_tl, layer_name_br);
+            if layer.make_ptr() == state.active_layer {
+                ui.painter().rect(rect, 0.0, highlight, egui::Stroke::NONE);
+            }
+            let layer_name_response = ui.put(rect, egui::Label::new(layer.get(&state.project).name.clone()).sense(egui::Sense::click()))
+                .context_menu(|ui| {
+                    if ui.button("Delete").clicked() {
+                        delete_layer = Some(layer.make_ptr()); 
+                    }
+                });
+            if layer_name_response.clicked() {
+                state.active_layer = layer.make_ptr();
             }
             i += 1;
         }
-        
-        if let Some(key) = delete_layer {
-            if let Some(acts) = state.project.delete_layer(key) {
-                state.actions.add(Action::from_list(acts));
+        if let Some(layer) = delete_layer {
+            if let Some(act) = Layer::delete(&mut state.project, state.open_graphic, layer) {
+                state.actions.add(Action::from_single(act));
             }
         }
     }
 
     pub fn frames(&mut self, ui: &mut egui::Ui, frame_w: f32, frame_h: f32, state: &mut EditorState, highlight: egui::Color32, n_frames: i32) {
 
-        let gfx = state.project.graphics.get(&state.open_graphic).unwrap();
+        let gfx = state.project.graphics.get(state.open_graphic).unwrap();
 
         let total_height = ui.available_height().max(frame_h * (gfx.layers.len() as f32));
 
@@ -280,8 +283,8 @@ impl TimelinePanel {
 
         // Active layer highlight
         let mut y = 0.0;
-        for layer_key in gfx.layers.iter() {
-            if *layer_key == state.active_layer {
+        for layer in gfx.layers.iter() {
+            if layer.make_ptr() == state.active_layer {
                 ui.painter().rect(
                     egui::Rect::from_min_max(win_tl + Vec2::new(0.0, y * frame_h), win_tl + Vec2::new((n_frames as f32) * frame_w, (y + 1.0) * frame_h)),
                     0.0,
@@ -290,6 +293,7 @@ impl TimelinePanel {
             }
             y += 1.0;
         }
+
 
         // Frame interval highlight
         for x in (4..n_frames).step_by(5) {
@@ -308,34 +312,32 @@ impl TimelinePanel {
 
         // Frame area 
         let mut y = 0.0;
-        for layer_key in gfx.layers.iter() {
-            let layer = state.project.layers.get(layer_key).unwrap();
+        for layer in gfx.layers.iter() {
 
             // If the user clicks anywhere in the layer, select the layer
             let layer_rect = egui::Rect::from_min_size(win_tl + Vec2::new(0.0, y * frame_h), Vec2::new(rect.width(), frame_h));
             if let Some(hover_pos) = response.hover_pos() {
                 if layer_rect.contains(hover_pos) && response.clicked() {
-                    state.active_layer = *layer_key;
+                    state.active_layer = layer.make_ptr();
                 } 
             }
 
             // Frame dots
-            for frame_key in &layer.frames {
-                let frame = state.project.frames.get(frame_key).unwrap();
-                let dot_pos = win_tl + Vec2::new((frame.data.time as f32 + 0.5) * frame_w, (y + 0.5) * frame_h);
+            for frame in &layer.get(&state.project).frames {
+                let dot_pos = win_tl + Vec2::new((frame.get(&state.project).time as f32 + 0.5) * frame_w, (y + 0.5) * frame_h);
                 let frame_rect = egui::Rect::from_center_size(dot_pos, egui::Vec2::new(frame_w, frame_h));
                 ui.painter().circle(
                     dot_pos, 
                     frame_w * 0.3,
                     ui.visuals().text_color(),
                     egui::Stroke::NONE);
-                if state.selected_frames.contains(&frame_key) {
+                if state.selected_frames.contains(&frame.make_ptr()) {
                     ui.painter().rect_stroke(frame_rect, 0.0, egui::Stroke::new(1.0, egui::Color32::from_rgb(125, 125, 255))); 
                 }
                 if let Some(hover_pos) = response.hover_pos() {
                     if response.drag_started() && frame_rect.contains(hover_pos) {
-                        if !state.selected_frames.contains(&frame_key) {
-                            state.selected_frames.push(*frame_key);
+                        if !state.selected_frames.contains(&frame.make_ptr()) {
+                            state.selected_frames.push(frame.make_ptr());
                         }
                     } 
                 }
@@ -343,13 +345,14 @@ impl TimelinePanel {
             y += 1.0;
         }
 
+
         // Playhead
         ui.painter().vline(rect.left() + (state.frame() as f32 + 0.5) * frame_w, egui::Rangef::new(rect.top(), rect.top() + total_height), egui::Stroke::new(1.0, egui::Color32::from_rgb(125, 125, 255)));
 
         // After graphic end shadow realm
         let darken = egui::Color32::from_rgba_unmultiplied(0, 0, 0, 100);
         ui.painter().rect(
-            egui::Rect::from_min_max(win_tl + Vec2::new((gfx.data.len as f32) * frame_w, 0.0), rect.max),
+            egui::Rect::from_min_max(win_tl + Vec2::new((gfx.len as f32) * frame_w, 0.0), rect.max),
             0.0,
             darken,
             egui::Stroke::NONE);
@@ -362,24 +365,22 @@ impl TimelinePanel {
         if self.frame_drag.x.abs() > frame_w {
             let mut frame_shift_inc = (self.frame_drag.x.signum() * (self.frame_drag.x.abs() / frame_w).floor()) as i32; 
             for frame in &state.selected_frames {
-                if let Some(frame) = state.project.frames.get(frame) {
-                    frame_shift_inc = frame_shift_inc.max(-frame.data.time);
-                }
+                state.project.frames.get_then(*frame, |frame| {
+                    frame_shift_inc = frame_shift_inc.max(-frame.time);
+                });
             }
             self.frame_shift += frame_shift_inc;
             if let Some(action) = &self.frame_drag_action {
                 action.undo(&mut state.project);
             }
             let mut new_action = Action::new();
-            for frame_key in &state.selected_frames {
-                if let Some(frame) = state.project.frames.get(frame_key) {
-                    if let Some(acts) = state.project.set_frame_data(*frame_key, FrameData {
-                        time: frame.data.time + self.frame_shift,
-                        ..frame.data
-                    }) {
-                        new_action.add_list(acts);
+            for frame_ptr in &state.selected_frames {
+                if let Some(frame) = state.project.frames.get(*frame_ptr) {
+                    let time = frame.time;
+                    if let Some(act) = Frame::set_time(&mut state.project, *frame_ptr, time + self.frame_shift) {
+                        new_action.add(act);
                     }
-                } 
+                }
             }
             self.frame_drag_action = Some(new_action);
             self.frame_drag.x -= (frame_shift_inc as f32) * frame_w;
@@ -398,30 +399,31 @@ impl TimelinePanel {
 }
 
 pub fn new_frame(state: &mut EditorState) -> Option<()> {
-    if let Some(_layer) = state.project.layers.get(&state.active_layer) { 
-        if let None = state.project.get_frame_exactly_at(state.active_layer, state.frame()) {
-            if let Some((_key, act)) = state.project.add_frame(state.active_layer, state.frame()) {
-                state.actions.add(Action::from_single(act));
-            }
+    let layer = state.project.layers.get(state.active_layer)?;
+    let time = state.frame();
+    if let None = layer.get_frame_exactly_at(&state.project, time) {
+        if let Some((_, act)) = Frame::add(&mut state.project, state.active_layer, Frame {
+            time,
+            strokes: Vec::new()
+        }) {
+            state.actions.add(Action::from_single(act));
         }
     }
     None
 }
 
-pub fn prev_keyframe(state: &mut EditorState) -> Option<()> {
-    if let Some(_layer) = state.project.layers.get(&state.active_layer) {
-        if let Some(frame) = state.project.get_frame_before(state.active_layer, state.frame()) {
-            state.time = (state.project.frames.get(&frame).unwrap().data.time as f32) * state.frame_len();
+pub fn prev_keyframe(state: &mut EditorState) {
+    if let Some(layer) = state.project.layers.get(state.active_layer) {
+        if let Some(frame) = layer.get_frame_before(&state.project, state.frame()) {
+            state.time = (frame.get(&state.project).time as f32) * state.frame_len();
         }
     }
-    None
 }
 
-pub fn next_keyframe(state: &mut EditorState) -> Option<()> {
-    if let Some(_layer) = state.project.layers.get(&state.active_layer) {
-        if let Some(frame) = state.project.get_frame_after(state.active_layer, state.frame()) {
-            state.time = (state.project.frames.get(&frame).unwrap().data.time as f32) * state.frame_len();
+pub fn next_keyframe(state: &mut EditorState) {
+    if let Some(layer) = state.project.layers.get(state.active_layer) {
+        if let Some(frame) = layer.get_frame_after(&state.project, state.frame()) {
+            state.time = (frame.get(&state.project).time as f32) * state.frame_len();
         }
     }
-    None
 }

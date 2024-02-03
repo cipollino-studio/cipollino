@@ -5,7 +5,7 @@ use glow::HasContext;
 
 use crate::{
     editor::{EditorState, EditorRenderer},
-    renderer::{fb::Framebuffer, mesh::Mesh, shader::Shader, scene::SceneRenderer}, util::curve,
+    renderer::{fb::Framebuffer, mesh::Mesh, shader::Shader, scene::SceneRenderer}, util::curve, project::{action::Action, graphic::Graphic, obj::{ChildObj, ObjPtr}, stroke::Stroke},
 };
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -15,7 +15,7 @@ pub struct ScenePanel {
     #[serde(skip)]
     fb_pick: Arc<Mutex<Option<Framebuffer>>>,
     #[serde(skip)]
-    color_key_map: Vec<u64>, 
+    color_key_map: Vec<ObjPtr<Stroke>>, 
 
     #[serde(skip)]
     pub cam_pos: glam::Vec2,
@@ -44,12 +44,16 @@ impl ScenePanel {
     }
 
     pub fn render(&mut self, ui: &mut egui::Ui, state: &mut EditorState, renderer: &mut EditorRenderer) {
-        let gfx = state.open_graphic();
         let no_margin = egui::Frame {
             inner_margin: egui::Margin::same(0.0),
             ..Default::default()
         };
-        if let Some(_gfx) = gfx {
+        let no_gfx_open = state.project.graphics.get(state.open_graphic).is_none();
+        if no_gfx_open {
+            ui.centered_and_justified(|ui| {
+                ui.label("No Graphic Open");
+            });
+        } else {
             egui::SidePanel::new(egui::panel::Side::Left, "toolbar")
                 .resizable(false)
                 .exact_width(34.0)
@@ -158,14 +162,28 @@ impl ScenePanel {
                         ui.painter().add(callback);
                     });
                 });
-        } else {
-            ui.centered_and_justified(|ui| {
-                ui.label("No Graphic Open");
-            });
         }
+
+        // Deleting strokes
+        if ui.input_mut(|i| i.consume_shortcut(&state.delete_shortcut())) && !state.selected_strokes.is_empty() {
+            let mut action = Action::new();
+            for stroke_ptr in &state.selected_strokes {
+                if let Some(stroke) = state.project.strokes.get(*stroke_ptr) {
+                    let frame = stroke.frame;
+                    if let Some(act) = Stroke::delete(&mut state.project, frame, *stroke_ptr) {
+                        action.add(act);
+                    }
+                }
+            }
+            state.selected_strokes.clear();
+            state.actions.add(action);
+        }
+
     }
 
-    fn render_scene(&mut self, state: &mut EditorState, rect: &egui::Rect, response: &egui::Response, ui: &mut egui::Ui, gfx_key: u64, renderer: &mut EditorRenderer) {
+    fn render_scene(&mut self, state: &mut EditorState, rect: &egui::Rect, response: &egui::Response, ui: &mut egui::Ui, gfx: ObjPtr<Graphic>, renderer: &mut EditorRenderer) {
+
+        // Tool interaction
         if let Some(mouse_pos) = response.hover_pos() {
             let mouse_pos = self.cam_size * (mouse_pos - rect.center()) / (rect.height() * 0.5);
             let mouse_pos = glam::vec2(mouse_pos.x, -mouse_pos.y) + self.cam_pos;
@@ -199,6 +217,7 @@ impl ScenePanel {
             });
         }
 
+        // Render scene to framebuffer
         let frame = state.frame();
         renderer.use_renderer(|gl, renderer| {
             let mut fb = self.fb.lock().unwrap();
@@ -218,13 +237,13 @@ impl ScenePanel {
                 self.cam_pos,
                 self.cam_size,
                 &mut state.project,
-                gfx_key,
+                gfx,
                 frame,
                 if state.playing { 0 } else { state.onion_before },
                 if state.playing { 0 } else { state.onion_after },
                 gl,
             ) {
-                self.render_overlays(gfx_key, renderer, gl, proj_view, state);
+                self.render_overlays(gfx, renderer, gl, proj_view, state);
             }
 
             Framebuffer::render_to_win(
@@ -233,10 +252,10 @@ impl ScenePanel {
                 gl,
             );
         });
-        
+
     }
 
-    fn render_overlays(&self, gfx_key: u64, renderer: &mut SceneRenderer, gl: &Arc<glow::Context>, proj_view: glam::Mat4, state: &mut EditorState) {
+    fn render_overlays(&self, gfx: ObjPtr<Graphic>, renderer: &mut SceneRenderer, gl: &Arc<glow::Context>, proj_view: glam::Mat4, state: &mut EditorState) {
         renderer.flat_color_shader.enable(gl);
         renderer
             .flat_color_shader
@@ -251,46 +270,46 @@ impl ScenePanel {
             renderer.quad.render(gl);
         };
 
-        let gfx = state.project.graphics.get(&gfx_key).unwrap();
-        if gfx.data.clip {
-            let cam_top = 5.0;
-            let cam_btm = -cam_top;
-            let cam_right = cam_top * ((gfx.data.w as f32) / (gfx.data.h as f32));
-            let cam_left = -cam_right;
-            let huge = 100000.0;
-            draw_quad(cam_left, cam_right, huge, cam_top);
-            draw_quad(cam_left, cam_right, cam_btm, -huge);
-            draw_quad(-huge, cam_left, cam_top, cam_btm);
-            draw_quad(cam_right, huge, cam_top, cam_btm);
-            draw_quad(-huge, cam_left, huge, cam_top);
-            draw_quad(cam_right, huge, huge, cam_top);
-            draw_quad(cam_right, huge, cam_btm, -huge);
-            draw_quad(-huge, cam_left, cam_btm, -huge);
-        }
+        if let Some(gfx) = state.project.graphics.get(gfx) { 
 
-        let mut overlay = OverlayRenderer::new(renderer, gl, proj_view, self.cam_size);
-        state.curr_tool.clone().borrow_mut().draw_overlay(&mut overlay, state); 
-        for stroke in &state.selected_strokes {
-            if let Some(stroke) = state.project.strokes.get(stroke) {
-                for (p0, p1) in stroke.iter_point_pairs() {
-                    let p0 = state.project.points.get(&p0).unwrap(); 
-                    let p1 = state.project.points.get(&p1).unwrap(); 
-                    let n = 20;
-                    for i in 0..n {
-                        let t = (i as f32) / (n as f32);
-                        overlay.line(
-                            curve::bezier_sample(t, p0.data.pt, p0.data.b, p1.data.a, p1.data.pt),
-                            curve::bezier_sample(t + 1.0 / (n as f32), p0.data.pt, p0.data.b, p1.data.a, p1.data.pt),
-                            glam::vec4(0.0, 1.0, 1.0, 1.0) 
-                        );
+            if gfx.clip {
+                let cam_top = 5.0;
+                let cam_btm = -cam_top;
+                let cam_right = cam_top * ((gfx.w as f32) / (gfx.h as f32));
+                let cam_left = -cam_right;
+                let huge = 100000.0;
+                draw_quad(cam_left, cam_right, huge, cam_top);
+                draw_quad(cam_left, cam_right, cam_btm, -huge);
+                draw_quad(-huge, cam_left, cam_top, cam_btm);
+                draw_quad(cam_right, huge, cam_top, cam_btm);
+                draw_quad(-huge, cam_left, huge, cam_top);
+                draw_quad(cam_right, huge, huge, cam_top);
+                draw_quad(cam_right, huge, cam_btm, -huge);
+                draw_quad(-huge, cam_left, cam_btm, -huge);
+            }
+
+            let mut overlay = OverlayRenderer::new(renderer, gl, proj_view, self.cam_size);
+            state.curr_tool.clone().borrow_mut().draw_overlay(&mut overlay, state); 
+            for stroke in &state.selected_strokes {
+                if let Some(stroke) = state.project.strokes.get(*stroke) {
+                    for (p0, p1) in stroke.iter_point_pairs() {
+                        let n = 20;
+                        for i in 0..n {
+                            let t = (i as f32) / (n as f32);
+                            overlay.line(
+                                curve::bezier_sample(t, p0.pt, p0.b, p1.a, p1.pt),
+                                curve::bezier_sample(t + 1.0 / (n as f32), p0.pt, p0.b, p1.a, p1.pt),
+                                glam::vec4(0.0, 1.0, 1.0, 1.0) 
+                            );
+                        }
                     }
                 }
             }
-        }
 
+        }
     }
 
-    pub fn sample_pick(&mut self, pos: Vec2, gl: &Arc<glow::Context>) -> Option<u64> {
+    pub fn sample_pick(&mut self, pos: Vec2, gl: &Arc<glow::Context>) -> Option<ObjPtr<Stroke>> {
         if let Some(fb_pick) = self.fb_pick.lock().unwrap().as_ref() {
 
             let h_cam_size = self.cam_size * (fb_pick.w as f32) / (fb_pick.h as f32);

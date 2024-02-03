@@ -1,23 +1,21 @@
 
 use std::{sync::Arc, f32::consts};
 
-use crate::{renderer::mesh::Mesh, project::Project, util::curve::{self, bezier_to_discrete_t_vals, bezier_to_discrete}};
+use crate::{renderer::mesh::Mesh, project::{Project, obj::ObjPtr, stroke::Stroke}, util::curve::{self, bezier_to_discrete_t_vals, bezier_to_discrete}};
 
-fn unfilled_mesh(project: &Project, stroke_key: u64, gl: &Arc<glow::Context>) -> Option<Mesh> {
-    let stroke = project.strokes.get(&stroke_key)?;
+fn unfilled_mesh(project: &Project, stroke_ptr: ObjPtr<Stroke>, gl: &Arc<glow::Context>) -> Option<Mesh> {
+    let stroke = project.strokes.get(stroke_ptr)?;
     let mut mesh = Mesh::new(vec![2], gl);
 
     let mut top_pts = Vec::new();
     let mut btm_pts = Vec::new();
-    let r = stroke.data.r;
+    let r = stroke.r;
     let mut included_first = false;
-    for (p0_key, p1_key) in stroke.iter_point_pairs() { 
-        let p0 = project.points.get(&p0_key)?;
-        let p1 = project.points.get(&p1_key)?;
+    for (p0, p1) in stroke.iter_point_pairs() { 
         
-        for t in bezier_to_discrete_t_vals(p0.data.pt, p0.data.b, p1.data.a, p1.data.pt, 10, !included_first) {
-            let pt = curve::bezier_sample(t, p0.data.pt, p0.data.b, p1.data.a, p1.data.pt);
-            let tang = curve::bezier_dsample(t, p0.data.pt, p0.data.b, p1.data.a, p1.data.pt).normalize();
+        for t in bezier_to_discrete_t_vals(p0.pt, p0.b, p1.a, p1.pt, 10, !included_first) {
+            let pt = curve::bezier_sample(t, p0.pt, p0.b, p1.a, p1.pt);
+            let tang = curve::bezier_dsample(t, p0.pt, p0.b, p1.a, p1.pt).normalize();
             let norm = glam::vec2(-tang.y, tang.x); 
 
             top_pts.push(pt + norm * r);
@@ -93,8 +91,8 @@ fn unfilled_mesh(project: &Project, stroke_key: u64, gl: &Arc<glow::Context>) ->
     Some(mesh)
 }
 
-fn filled_mesh(project: &Project, stroke_key: u64, gl: &Arc<glow::Context>) -> Option<Mesh> {
-    let stroke = project.strokes.get(&stroke_key)?;
+fn filled_mesh(project: &Project, stroke_ptr: ObjPtr<Stroke>, gl: &Arc<glow::Context>) -> Option<Mesh> {
+    let stroke = project.strokes.get(stroke_ptr)?;
     let mut mesh = Mesh::new(vec![2], gl);
 
     let mut verts = Vec::new();
@@ -107,10 +105,8 @@ fn filled_mesh(project: &Project, stroke_key: u64, gl: &Arc<glow::Context>) -> O
     for chain in &stroke.points {
         let mut polygon_pts = Vec::new();
         let mut included_first = false;
-        for (p0_key, p1_key) in chain.windows(2).map(|arr| (arr[0], arr[1])) { 
-            let p0 = project.points.get(&p0_key)?;
-            let p1 = project.points.get(&p1_key)?;
-            polygon_pts.append(&mut bezier_to_discrete(p0.data.pt, p0.data.b, p1.data.a, p1.data.pt, 20, !included_first)); 
+        for (p0, p1) in chain.windows(2).map(|arr| (arr[0], arr[1])) { 
+            polygon_pts.append(&mut bezier_to_discrete(p0.pt, p0.b, p1.a, p1.pt, 20, !included_first)); 
             included_first = true;
         }
         
@@ -134,17 +130,18 @@ fn filled_mesh(project: &Project, stroke_key: u64, gl: &Arc<glow::Context>) -> O
     Some(mesh)
 }
 
-pub fn get_mesh<'a>(project: &'a mut Project, stroke_key: u64, gl: &Arc<glow::Context>) -> Option<&'a Mesh> {
-    let stroke = project.strokes.get(&stroke_key)?;
-    if stroke.need_remesh {
-        let mesh = if stroke.data.filled { filled_mesh(project, stroke_key, gl) } else { unfilled_mesh(project, stroke_key, gl) };
-        let stroke = project.strokes.get_mut(&stroke_key)?;
-        if let Some(prev_mesh) = stroke.mesh.as_ref() {
+pub fn get_mesh<'a>(project: &'a mut Project, stroke_ptr: ObjPtr<Stroke>, gl: &Arc<glow::Context>) -> Option<&'a Mesh> {
+    let stroke = project.strokes.get_mut(stroke_ptr)?;
+    if stroke.mesh.need_remesh {
+        let stroke_filled = stroke.filled;
+        let mesh = if stroke_filled { filled_mesh(project, stroke_ptr, gl) } else { unfilled_mesh(project, stroke_ptr, gl) };
+        let stroke = project.strokes.get_mut(stroke_ptr)?;
+        if let Some(prev_mesh) = stroke.mesh.mesh.as_ref() {
             prev_mesh.delete(gl);
         }
-        stroke.mesh = mesh;
-        stroke.need_remesh = false;
+        stroke.mesh.mesh = mesh;
+        stroke.mesh.need_remesh = false;
     }
-    let stroke = project.strokes.get(&stroke_key)?;
-    stroke.mesh.as_ref()
+    let stroke = project.strokes.get(stroke_ptr)?;
+    stroke.mesh.mesh.as_ref()
 }

@@ -1,64 +1,28 @@
 
-use super::{ObjData, Project};
-
-enum ObjActionKind {
-    Addition(Box<dyn ObjData>),
-    Deletion(Box<dyn ObjData>),
-    Modification(Box<dyn ObjData>, Box<dyn ObjData>),
-    Generic(Box<dyn Fn(&mut Project)>, Box<dyn Fn(&mut Project)>) 
-}
+use super::Project;
 
 pub struct ObjAction {
-    kind: ObjActionKind,
-    key: u64
+    redo_func: Box<dyn Fn(&mut Project)>,
+    undo_func: Box<dyn Fn(&mut Project)>
 }
 
 impl ObjAction {
 
-    pub fn addition<T>(key: u64, data: T) -> Self where T: ObjData + 'static {
+    pub fn new<T, G>(redo: T, undo: G) -> Self where T: Fn(&mut Project) + 'static, G: Fn(&mut Project) + 'static {
         Self {
-            kind: ObjActionKind::Addition(Box::new(data)),
-            key
-        }
-    }
-
-    pub fn deletion<T>(key: u64, data: T) -> Self where T: ObjData + 'static {
-        Self {
-            kind: ObjActionKind::Deletion(Box::new(data)),
-            key
-        }
-    }
-
-    pub fn modification<T>(key: u64, old_data: T, new_data: T) -> Self where T: ObjData + 'static {
-        Self {
-            kind: ObjActionKind::Modification(Box::new(old_data), Box::new(new_data)),
-            key
-        }
-    }
-
-    pub fn generic<T, G>(redo: T, undo: G) -> Self where T: Fn(&mut Project) + 'static, G: Fn(&mut Project) + 'static {
-        Self {
-            kind: ObjActionKind::Generic(Box::new(redo), Box::new(undo)),
-            key: 0 
+            redo_func: Box::new(redo),
+            undo_func: Box::new(undo)
         }
     }
 
     pub fn redo(&self, project: &mut Project) {
-        match &self.kind {
-            ObjActionKind::Addition(data) => data.add(self.key, project),
-            ObjActionKind::Deletion(data) => data.delete(self.key, project),
-            ObjActionKind::Modification(_old, new) => new.set(self.key, project),
-            ObjActionKind::Generic(redo, _undo) => redo(project)
-        }
+        let func = &self.redo_func;
+        func(project) 
     }
 
     pub fn undo(&self, project: &mut Project) {
-        match &self.kind {
-            ObjActionKind::Addition(data) => data.delete(self.key, project),
-            ObjActionKind::Deletion(data) => data.add(self.key, project),
-            ObjActionKind::Modification(old, _new) => old.set(self.key, project),
-            ObjActionKind::Generic(_redo, undo) => undo(project)
-        }
+        let func = &self.undo_func;
+        func(project); 
     }
 
 }

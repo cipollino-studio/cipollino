@@ -2,7 +2,7 @@
 use std::{sync::Arc, collections::{VecDeque, HashSet, HashMap}};
 
 use glam::{Vec2, vec2};
-use crate::{editor::EditorState, panels::scene::ScenePanel, util::{curve::{fit_curve, bezier_bounding_box, bezier_to_discrete_t_vals, bezier_sample, bezier_dsample}, geo::{segment_intersect, segment_aabb_intersect}}, project::{stroke::StrokeData, point::PointData, action::Action}};
+use crate::{editor::EditorState, panels::scene::ScenePanel, util::{curve::{fit_curve, bezier_bounding_box, bezier_to_discrete_t_vals, bezier_sample, bezier_dsample}, geo::{segment_intersect, segment_aabb_intersect}}, project::{stroke::{Stroke, StrokeMesh, StrokePoint}, action::Action, obj::ChildObj}};
 
 use super::{Tool, active_frame};
 
@@ -26,17 +26,18 @@ impl Tool for Bucket {
     fn mouse_click(&mut self, mouse_pos: Vec2, state: &mut EditorState, _ui: &mut egui::Ui, scene: &mut ScenePanel, gl: &Arc<glow::Context>) {
 
         // If we click on an existing stroke, let's just change its color
-        if let Some(stroke_key) = scene.sample_pick(mouse_pos, gl) {
-            if let Some(stroke) = state.project.strokes.get(&stroke_key) {
-                if let Some(act) = state.project.set_stroke_data(stroke_key, StrokeData {
-                    color: state.color,
-                    ..stroke.data
-                }) {
-                    state.actions.add(Action::from_single(act));
-                    return;
-                }
+        if let Some(stroke) = scene.sample_pick(mouse_pos, gl) {
+            if let Some(act) = Stroke::set_color(&mut state.project, stroke, state.color) {
+                state.actions.add(Action::from_single(act));
             }
         }
+
+        // Figure out the active frame in advance in case it doesn't exist
+        let active_frame = active_frame(state);
+        if active_frame.is_none() {
+            return;
+        }
+        let (frame, frame_act) = active_frame.unwrap();
         
         // This uses a standard bitmap floodfill algorithmn adapted to work with vector art
         // Is this the best approach? Probably not.
@@ -77,13 +78,11 @@ impl Tool for Bucket {
                     continue 'offset;
                 }
                 for stroke in &visible_strokes {
-                    if let Some(stroke) = state.project.strokes.get(stroke) {
-                        let r = if !stroke.data.filled { (stroke.data.r - 0.025).max(0.0) } else { 0.0 };
+                    if let Some(stroke) = state.project.strokes.get(*stroke) {
+                        let r = if !stroke.filled { (stroke.r - 0.025).max(0.0) } else { 0.0 };
                         'point_pairs: for (p0, p1) in stroke.iter_point_pairs() {
-                            let p0 = state.project.points.get(&p0).unwrap();
-                            let p1 = state.project.points.get(&p1).unwrap();
 
-                            let (mut bb_min, mut bb_max) = bezier_bounding_box(p0.data.pt, p0.data.b, p1.data.a, p1.data.pt);
+                            let (mut bb_min, mut bb_max) = bezier_bounding_box(p0.pt, p0.b, p1.a, p1.pt);
                             bb_min -= Vec2::splat(r * 2.0);
                             bb_max += Vec2::splat(r * 2.0);
                             if !segment_aabb_intersect(curr_unsnapped, next_unsnapped, bb_min, bb_max) {
@@ -92,9 +91,9 @@ impl Tool for Bucket {
 
                             let mut top_pts = vec![];
                             let mut btm_pts = vec![];
-                            for t in bezier_to_discrete_t_vals(p0.data.pt, p0.data.b, p1.data.a, p1.data.pt, 10, true) {
-                                let pt = bezier_sample(t, p0.data.pt, p0.data.b, p1.data.a, p1.data.pt);
-                                let tang = bezier_dsample(t, p0.data.pt, p0.data.b, p1.data.a, p1.data.pt).normalize();
+                            for t in bezier_to_discrete_t_vals(p0.pt, p0.b, p1.a, p1.pt, 10, true) {
+                                let pt = bezier_sample(t, p0.pt, p0.b, p1.a, p1.pt);
+                                let tang = bezier_dsample(t, p0.pt, p0.b, p1.a, p1.pt).normalize();
                                 let norm = vec2(tang.y, -tang.x);
                                 top_pts.push(pt + norm * r); 
                                 btm_pts.push(pt - norm * r); 
@@ -114,7 +113,7 @@ impl Tool for Bucket {
                             }
                         }
 
-                        if !stroke.data.filled {
+                        if !stroke.filled {
                             let mut collide_with_end_cap = |p0: Vec2, p1: Vec2| {
                                 let tang = (p1 - p0).normalize() * r;
                                 let norm = vec2(-tang.y, tang.x);
@@ -132,15 +131,13 @@ impl Tool for Bucket {
                             };
 
                             if !stroke.points.is_empty() {
-                                if let Some(pt) = state.project.points.get(&stroke.points[0].first().unwrap()) {
-                                    if collide_with_end_cap(pt.data.a, pt.data.pt) {
-                                        continue 'offset;
-                                    }
+                                let pt = stroke.points[0].first().unwrap(); 
+                                if collide_with_end_cap(pt.a, pt.pt) {
+                                    continue 'offset;
                                 }
-                                if let Some(pt) = state.project.points.get(&stroke.points[0].last().unwrap()) {
-                                    if collide_with_end_cap(pt.data.b, pt.data.pt) {
-                                        continue 'offset;
-                                    }
+                                let pt = stroke.points[0].last().unwrap(); 
+                                if collide_with_end_cap(pt.b, pt.pt) {
+                                    continue 'offset;
                                 }
                             }
                         }
@@ -271,41 +268,42 @@ impl Tool for Bucket {
         }
 
         // Step 4: Convert to the final bezier form
-        let (frame, frame_act) = active_frame(state);
         let mut acts = Vec::new();
         if let Some(frame_act) = frame_act {
             acts.push(frame_act);
         }
-        if let Some((stroke, stroke_act)) = state.project.add_stroke(StrokeData {
+
+        let mut all_pts = Vec::new();
+        for (_chain_idx, chain) in chains.iter().enumerate() {
+            let mut pts_data = Vec::new();
+            for pt in chain {
+                pts_data.push(pt.x);
+                pts_data.push(pt.y);
+            }
+            let curve_pts = fit_curve(2, &pts_data.as_slice(), grid_size * 0.5);
+            let mut pts = Vec::new();
+            for i in 0..(curve_pts.len() / (2 * 3)) {
+                let a = glam::vec2(curve_pts[i * 6 + 0], curve_pts[i * 6 + 1]);
+                let p = glam::vec2(curve_pts[i * 6 + 2], curve_pts[i * 6 + 3]);
+                let b = glam::vec2(curve_pts[i * 6 + 4], curve_pts[i * 6 + 5]);
+                pts.push(StrokePoint {
+                    a,
+                    pt: p,
+                    b
+                }); 
+            }
+            all_pts.push(pts);
+        }
+
+        if let Some((_, act)) = Stroke::add(&mut state.project, frame, Stroke {
             frame: frame,
             color: state.color,
             r: 0.05,
-            filled: true 
+            filled: true,
+            points: all_pts,
+            mesh: StrokeMesh::new()
         }) {
-            acts.push(stroke_act);
-            acts.push(state.project.set_stroke_index(stroke, 0).unwrap());
-            for (chain_idx, chain) in chains.iter().enumerate() {
-                let mut pts_data = Vec::new();
-                for pt in chain {
-                    pts_data.push(pt.x);
-                    pts_data.push(pt.y);
-                }
-                let curve_pts = fit_curve(2, &pts_data.as_slice(), grid_size * 0.5);
-                for i in 0..(curve_pts.len() / (2 * 3)) {
-                    let a = glam::vec2(curve_pts[i * 6 + 0], curve_pts[i * 6 + 1]);
-                    let p = glam::vec2(curve_pts[i * 6 + 2], curve_pts[i * 6 + 3]);
-                    let b = glam::vec2(curve_pts[i * 6 + 4], curve_pts[i * 6 + 5]);
-                    if let Some((_key, act)) = state.project.add_point(PointData {
-                        pt: p,
-                        a,
-                        b,
-                        stroke,
-                        chain: chain_idx
-                    }) {
-                        acts.push(act);
-                    }
-                }
-            }
+            acts.push(act);
         }
 
         state.actions.add(Action::from_list(acts));

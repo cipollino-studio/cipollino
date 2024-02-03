@@ -1,7 +1,7 @@
 
-use std::{sync::{Arc, Mutex}, rc::Rc, cell::RefCell, io::Write, path::PathBuf};
+use std::{cell::RefCell, fs, io::Write, path::PathBuf, rc::Rc, sync::{Arc, Mutex}};
 
-use crate::{panels::{self, timeline::{new_frame, prev_keyframe, next_keyframe}, tools::{pencil::Pencil, Tool, select::Select, bucket::Bucket}}, project::{Project, graphic::Graphic, action::{ActionManager, Action}}, renderer::scene::SceneRenderer, export::Export};
+use crate::{panels::{self, timeline::{new_frame, prev_keyframe, next_keyframe}, tools::{pencil::Pencil, Tool, select::Select, bucket::Bucket}}, project::{Project, graphic::Graphic, action::ActionManager, obj::ObjPtr, stroke::Stroke, layer::Layer, frame::Frame}, renderer::scene::SceneRenderer, export::Export};
 use egui::Modifiers;
 
 pub struct EditorRenderer {
@@ -41,10 +41,10 @@ pub struct EditorState {
     pub curr_tool: Rc<RefCell<dyn Tool>>,
 
     // Selections
-    pub open_graphic: u64, 
-    pub active_layer: u64,
-    pub selected_frames: Vec<u64>,
-    pub selected_strokes: Vec<u64>,
+    pub open_graphic: ObjPtr<Graphic>,
+    pub active_layer: ObjPtr<Layer>,
+    pub selected_frames: Vec<ObjPtr<Frame>>,
+    pub selected_strokes: Vec<ObjPtr<Stroke>>,
 
     // Playback
     pub time: f32,
@@ -69,8 +69,8 @@ impl EditorState {
         Self {
             project: project, 
             actions: ActionManager::new(),
-            open_graphic: 0,
-            active_layer: 0,
+            open_graphic: ObjPtr::null(),
+            active_layer: ObjPtr::null(),
             selected_frames: Vec::new(),
             selected_strokes: Vec::new(),
             time: 0.0,
@@ -88,25 +88,16 @@ impl EditorState {
     }
 
     pub fn new() -> Self {
-        let mut res = EditorState::new_with_project(Project::new());
-        res.open_graphic = 1;
-        res.active_layer = 2;
-        res
+        EditorState::new_with_project(Project::new())
     }
 
-    pub fn open_graphic(&self) -> Option<&Graphic> {
-        self.project.graphics.get(&self.open_graphic)
-    }
-
-    pub fn visible_strokes(&self) -> Vec<u64> {
+    pub fn visible_strokes(&self) -> Vec<ObjPtr<Stroke>> {
         let mut res = Vec::new();
-        if let Some(graphic) = self.open_graphic() {
-            for layer_key in &graphic.layers {
-                if let Some(frame_key) = self.project.get_frame_at(*layer_key, self.frame()) {
-                    if let Some(frame) = self.project.frames.get(&frame_key) {
-                        for stroke in &frame.strokes {
-                            res.push(*stroke);
-                        }
+        if let Some(graphic) = self.project.graphics.get(self.open_graphic) {
+            for layer in &graphic.layers {
+                if let Some(frame) = layer.get(&self.project).get_frame_at(&self.project, self.frame()) {
+                    for stroke in &frame.get(&self.project).strokes {
+                        res.push(stroke.make_ptr());
                     }
                 }
             }
@@ -120,6 +111,10 @@ impl EditorState {
 
     pub fn frame(&self) -> i32 {
         (self.time / (1.0 / 24.0)).floor() as i32
+    }  
+
+    pub fn delete_shortcut(&self) -> egui::KeyboardShortcut {
+        egui::KeyboardShortcut::new(egui::Modifiers::NONE, egui::Key::X)
     }
 
     pub fn copy_shortcut(&self) -> egui::KeyboardShortcut {
@@ -145,6 +140,8 @@ impl Editor {
     
     pub fn new() -> Self {
         let config_path = directories::ProjectDirs::from("com", "Cipollino", "Cipollino").unwrap().config_dir().to_str().unwrap().to_owned();
+        let _ = fs::create_dir(config_path.clone());
+        println!("{}", config_path);
         let panels = if let Ok(data) = std::fs::read(config_path.clone() + "/dock.json") {
             if let Ok(panels) = serde_json::from_slice::<panels::PanelManager>(data.as_slice()) {
                 panels
@@ -167,16 +164,16 @@ impl Editor {
     }
 
     pub fn render(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if let Some(gfx) = self.state.project.graphics.get(&self.state.open_graphic) {
+        if let Some(gfx) = self.state.project.graphics.get(self.state.open_graphic) {
             if self.state.playing {
                 self.state.time += ctx.input(|i| i.stable_dt);
                 ctx.request_repaint();
             }
-            if self.state.time >= (gfx.data.len as f32) * self.state.frame_len() {
+            if self.state.time >= (gfx.len as f32) * self.state.frame_len() {
                 self.state.time = 0.0;
             }
             if self.state.time < 0.0 {
-                self.state.time = ((gfx.data.len - 1) as f32) * self.state.frame_len();
+                self.state.time = ((gfx.len - 1) as f32) * self.state.frame_len();
             }
         }
 
@@ -194,8 +191,6 @@ impl Editor {
             let next_frame_shortcut = egui::KeyboardShortcut::new(Modifiers::NONE, egui::Key::W);
             let prev_keyframe_shortcut = egui::KeyboardShortcut::new(Modifiers::SHIFT, egui::Key::Q);
             let next_keyframe_shortcut = egui::KeyboardShortcut::new(Modifiers::SHIFT, egui::Key::W);
-
-            let delete_shortcut = egui::KeyboardShortcut::new(Modifiers::NONE, egui::Key::X);
 
             let save_shortcut = egui::KeyboardShortcut::new(Modifiers::COMMAND, egui::Key::S);
 
@@ -232,23 +227,6 @@ impl Editor {
                 self.state.playing = false;
                 next_keyframe(&mut self.state); 
             }
-            if ui.input_mut(|i| i.consume_shortcut(&delete_shortcut)) && (self.state.selected_frames.len() > 0 || self.state.selected_strokes.len() > 0) {
-                let mut action = Action::new();
-                for frame in &self.state.selected_frames {
-                    if let Some(acts) = self.state.project.delete_frame(*frame) {
-                        action.add_list(acts);
-                    }
-                }
-                for stroke in &self.state.selected_strokes {
-                    if let Some(acts) = self.state.project.delete_stroke(*stroke) {
-                        action.add_list(acts);
-                    }
-                }
-                self.state.selected_frames.clear();
-                self.state.selected_strokes.clear();
-                self.state.actions.add(action);
-                self.state.curr_tool.clone().borrow_mut().reset(&mut self.state);
-            }
 
             if ui.input_mut(|i| i.consume_shortcut(&save_shortcut)) {
                 if let Some(path) = self.save_path.clone() {
@@ -274,10 +252,11 @@ impl Editor {
                     if ui.button("Open").clicked() {
                         if let Some(path) = rfd::FileDialog::new().add_filter("Cipollino Project File", &["cip"]).pick_file() {
                             if let Ok(file) = std::fs::File::open(path.clone()) {
-                                let reader = std::io::BufReader::new(file);
-                                let proj = serde_json::from_reader(reader).unwrap(); 
-                                self.state = EditorState::new_with_project(proj);
-                                self.save_path = Some(path);
+                                // TODO!!!!!!!
+                                // let reader = std::io::BufReader::new(file);
+                                // let proj = serde_json::from_reader(reader).unwrap(); 
+                                // self.state = EditorState::new_with_project(proj);
+                                // self.save_path = Some(path);
                             }
                         }
                         ui.close_menu();
@@ -334,7 +313,8 @@ impl Editor {
     pub fn save_project(&self, path: PathBuf) {
         if let Ok(file) = std::fs::File::create(path.clone()) {
             let mut writer = std::io::BufWriter::new(file);
-            serde_json::to_writer(&mut writer, &self.state.project).expect("Could not save");
+            // TODO!!!!!!
+            // serde_json::to_writer(&mut writer, &self.state.project).expect("Could not save");
             let _ = writer.flush();
         }
     }
