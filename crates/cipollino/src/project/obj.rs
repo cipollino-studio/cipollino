@@ -163,7 +163,7 @@ pub trait ChildObj: Obj + 'static {
 
     fn get_sibling_list(project: &mut Project, parent: ObjPtr<Self::Parent>) -> Option<&mut Vec<ObjBox<Self>>>;
 
-    fn add(project: &mut Project, parent: ObjPtr<Self::Parent>, obj: Self) -> Option<(ObjPtr<Self>, ObjAction)> {
+    fn add_at_idx(project: &mut Project, parent: ObjPtr<Self::Parent>, obj: Self, idx: i32) -> Option<(ObjPtr<Self>, ObjAction)> {
         if let None = Self::get_sibling_list(project, parent) {
             return None;
         }
@@ -175,7 +175,14 @@ pub trait ChildObj: Obj + 'static {
         let redo = move |proj: &'_ mut Project| {
             if let Some(siblings) = Self::get_sibling_list(proj, parent) {
                 let obj = obj_store.replace(None).unwrap(); 
-                siblings.push(obj);
+                let idx = if siblings.len() == 0 {
+                    0
+                } else if idx < 0 {
+                    siblings.len() - ((-idx as usize) % siblings.len())
+                } else {
+                    (idx as usize) % siblings.len()
+                };
+                siblings.insert(idx, obj);
             }
         };
 
@@ -191,6 +198,10 @@ pub trait ChildObj: Obj + 'static {
         redo(project);
 
         return Some((obj_ptr, ObjAction::new(redo, undo)));
+    }
+
+    fn add(project: &mut Project, parent: ObjPtr<Self::Parent>, obj: Self) -> Option<(ObjPtr<Self>, ObjAction)> {
+        Self::add_at_idx(project, parent, obj, -1)
     }
 
     fn delete(project: &mut Project, parent: ObjPtr<Self::Parent>, obj: ObjPtr<Self>) -> Option<ObjAction> {

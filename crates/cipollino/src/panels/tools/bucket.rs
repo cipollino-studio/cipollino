@@ -295,14 +295,14 @@ impl Tool for Bucket {
             all_pts.push(pts);
         }
 
-        if let Some((_, act)) = Stroke::add(&mut state.project, frame, Stroke {
+        if let Some((_, act)) = Stroke::add_at_idx(&mut state.project, frame, Stroke {
             frame: frame,
             color: state.color,
             r: 0.05,
             filled: true,
             points: all_pts,
             mesh: StrokeMesh::new()
-        }) {
+        }, 0) {
             acts.push(act);
         }
 
