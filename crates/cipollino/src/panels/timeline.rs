@@ -1,6 +1,6 @@
 
 use egui::Vec2;
-use crate::{editor::EditorState, project::{action::Action, frame::Frame, layer::Layer, obj::ChildObj}};
+use crate::{editor::{selection::Selection, EditorState}, project::{action::Action, frame::Frame, layer::Layer, obj::ChildObj}};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct TimelinePanel {
@@ -35,6 +35,7 @@ impl TimelinePanel {
     }
 
     pub fn render(&mut self, ui: &mut egui::Ui, state: &mut EditorState) {
+
         if let None = state.project.graphics.get(state.open_graphic) {
             ui.centered_and_justified(|ui| {
                 ui.label("No Graphic Open");
@@ -64,7 +65,7 @@ impl TimelinePanel {
                 });
             }); 
 
-        egui::CentralPanel::default()
+        let response = egui::CentralPanel::default()
             .frame(no_margin)
             .show_inside(ui, |ui| {
             let header_height = 24.0;
@@ -150,7 +151,30 @@ impl TimelinePanel {
                     });
 
                 });
-        });
+        }).response;
+
+        if response.clicked_elsewhere() && state.selection.is_frames() {
+            state.selection.clear();
+        }
+
+        // Deleting frames
+        let delete_shortcut = state.delete_shortcut();
+        if let Selection::Frames(frames) = &mut state.selection {
+            if ui.input_mut(|i| i.consume_shortcut(&delete_shortcut)) {
+                let mut action = Action::new();
+                for frame_ptr in frames {
+                    if let Some(frame) = state.project.frames.get(*frame_ptr) {
+                        let layer = frame.layer;
+                        if let Some(act) = Frame::delete(&mut state.project, layer, *frame_ptr) {
+                            action.add(act);
+                        }
+                    }
+                }
+                state.selection.clear();
+                state.actions.add(action);
+                state.reset_tool();
+            }
+        }
 
     } 
 
@@ -305,8 +329,8 @@ impl TimelinePanel {
         }
 
         if response.drag_started() {
-            if !ui.input(|i| i.modifiers.shift) {
-                state.selected_frames.clear();
+            if !ui.input(|i| i.modifiers.shift) && state.selection.is_frames() {
+                state.selection.clear();
             }
         }
 
@@ -331,14 +355,12 @@ impl TimelinePanel {
                     frame_w * 0.3,
                     ui.visuals().text_color(),
                     egui::Stroke::NONE);
-                if state.selected_frames.contains(&frame.make_ptr()) {
+                if state.selection.frame_selected(frame.make_ptr()) {
                     ui.painter().rect_stroke(frame_rect, 0.0, egui::Stroke::new(1.0, egui::Color32::from_rgb(125, 125, 255))); 
                 }
                 if let Some(hover_pos) = response.hover_pos() {
                     if response.drag_started() && frame_rect.contains(hover_pos) {
-                        if !state.selected_frames.contains(&frame.make_ptr()) {
-                            state.selected_frames.push(frame.make_ptr());
-                        }
+                        state.selection.select_frame(frame.make_ptr());
                     } 
                 }
             }
@@ -357,33 +379,31 @@ impl TimelinePanel {
             darken,
             egui::Stroke::NONE);
 
-        if response.clicked_elsewhere() {
-            state.selected_frames.clear();
-        }
-
         self.frame_drag += response.drag_delta();
         if self.frame_drag.x.abs() > frame_w {
-            let mut frame_shift_inc = (self.frame_drag.x.signum() * (self.frame_drag.x.abs() / frame_w).floor()) as i32; 
-            for frame in &state.selected_frames {
-                state.project.frames.get_then(*frame, |frame| {
-                    frame_shift_inc = frame_shift_inc.max(-frame.time);
-                });
-            }
-            self.frame_shift += frame_shift_inc;
-            if let Some(action) = &self.frame_drag_action {
-                action.undo(&mut state.project);
-            }
-            let mut new_action = Action::new();
-            for frame_ptr in &state.selected_frames {
-                if let Some(frame) = state.project.frames.get(*frame_ptr) {
-                    let time = frame.time;
-                    if let Some(act) = Frame::set_time(&mut state.project, *frame_ptr, time + self.frame_shift) {
-                        new_action.add(act);
+            if let Selection::Frames(frames) = &state.selection {
+                let mut frame_shift_inc = (self.frame_drag.x.signum() * (self.frame_drag.x.abs() / frame_w).floor()) as i32; 
+                    for frame in frames {
+                        state.project.frames.get_then(*frame, |frame| {
+                            frame_shift_inc = frame_shift_inc.max(-frame.time);
+                        });
+                    }
+                self.frame_shift += frame_shift_inc;
+                if let Some(action) = &self.frame_drag_action {
+                    action.undo(&mut state.project);
+                }
+                let mut new_action = Action::new();
+                for frame_ptr in frames {
+                    if let Some(frame) = state.project.frames.get(*frame_ptr) {
+                        let time = frame.time;
+                        if let Some(act) = Frame::set_time(&mut state.project, *frame_ptr, time + self.frame_shift) {
+                            new_action.add(act);
+                        }
                     }
                 }
+                self.frame_drag_action = Some(new_action);
+                self.frame_drag.x -= (frame_shift_inc as f32) * frame_w;
             }
-            self.frame_drag_action = Some(new_action);
-            self.frame_drag.x -= (frame_shift_inc as f32) * frame_w;
         }
         if response.drag_released() {
             let action = std::mem::replace(&mut self.frame_drag_action, None);
@@ -403,6 +423,7 @@ pub fn new_frame(state: &mut EditorState) -> Option<()> {
     let time = state.frame();
     if let None = layer.get_frame_exactly_at(&state.project, time) {
         if let Some((_, act)) = Frame::add(&mut state.project, state.active_layer, Frame {
+            layer: state.active_layer,
             time,
             strokes: Vec::new()
         }) {

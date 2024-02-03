@@ -5,6 +5,7 @@ use super::{Project, action::ObjAction, stroke::Stroke, obj::Obj, obj::{ObjBox, 
 
 #[derive(Object, Clone)]
 pub struct Frame {
+    pub layer: ObjPtr<Layer>,
     #[field]
     pub time: i32,
     pub strokes: Vec<ObjBox<Stroke>>

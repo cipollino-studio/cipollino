@@ -1,8 +1,10 @@
 
 use std::{cell::RefCell, fs, io::Write, path::PathBuf, rc::Rc, sync::{Arc, Mutex}};
 
-use crate::{panels::{self, timeline::{new_frame, prev_keyframe, next_keyframe}, tools::{pencil::Pencil, Tool, select::Select, bucket::Bucket}}, project::{Project, graphic::Graphic, action::ActionManager, obj::ObjPtr, stroke::Stroke, layer::Layer, frame::Frame}, renderer::scene::SceneRenderer, export::Export};
+use crate::{panels::{self, timeline::{new_frame, prev_keyframe, next_keyframe}, tools::{pencil::Pencil, Tool, select::Select, bucket::Bucket}}, project::{Project, graphic::Graphic, action::ActionManager, obj::ObjPtr, stroke::Stroke, layer::Layer}, renderer::scene::SceneRenderer, export::Export};
 use egui::Modifiers;
+
+pub mod selection;
 
 pub struct EditorRenderer {
     pub gl_ctx: Arc<Mutex<Option<Arc<glow::Context>>>>,
@@ -43,8 +45,7 @@ pub struct EditorState {
     // Selections
     pub open_graphic: ObjPtr<Graphic>,
     pub active_layer: ObjPtr<Layer>,
-    pub selected_frames: Vec<ObjPtr<Frame>>,
-    pub selected_strokes: Vec<ObjPtr<Stroke>>,
+    pub selection: selection::Selection,
 
     // Playback
     pub time: f32,
@@ -71,8 +72,7 @@ impl EditorState {
             actions: ActionManager::new(),
             open_graphic: ObjPtr::null(),
             active_layer: ObjPtr::null(),
-            selected_frames: Vec::new(),
-            selected_strokes: Vec::new(),
+            selection: selection::Selection::None,
             time: 0.0,
             playing: false,
             onion_before: 0,
@@ -123,6 +123,10 @@ impl EditorState {
 
     pub fn paste_shortcut(&self) -> egui::KeyboardShortcut {
         egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::C)
+    }
+
+    pub fn reset_tool(&mut self) {
+        self.curr_tool.clone().borrow_mut().reset(self);
     }
 
 }
@@ -196,12 +200,12 @@ impl Editor {
 
             if ui.input_mut(|i| i.consume_shortcut(&undo_shortcut)) {
                 self.state.playing = false;
-                self.state.curr_tool.clone().borrow_mut().reset(&mut self.state);
+                self.state.reset_tool();
                 self.state.actions.undo(&mut self.state.project);
             }
             if ui.input_mut(|i| i.consume_shortcut(&redo_shortcut)) {
                 self.state.playing = false;
-                self.state.curr_tool.clone().borrow_mut().reset(&mut self.state);
+                self.state.reset_tool();
                 self.state.actions.redo(&mut self.state.project);
             }
             if ui.input_mut(|i| i.consume_shortcut(&play_shortcut)) {

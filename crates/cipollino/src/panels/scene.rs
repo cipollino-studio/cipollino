@@ -4,7 +4,7 @@ use glam::Vec2;
 use glow::HasContext;
 
 use crate::{
-    editor::{EditorState, EditorRenderer},
+    editor::{selection::Selection, EditorRenderer, EditorState},
     renderer::{fb::Framebuffer, mesh::Mesh, shader::Shader, scene::SceneRenderer}, util::curve, project::{action::Action, graphic::Graphic, obj::{ChildObj, ObjPtr}, stroke::Stroke},
 };
 
@@ -66,7 +66,7 @@ impl ScenePanel {
                         )
                         .clicked()
                     {
-                        state.curr_tool.clone().borrow_mut().reset(state);
+                        state.reset_tool();
                         state.curr_tool = state.select.clone();
                     }
                     if ui
@@ -76,7 +76,7 @@ impl ScenePanel {
                         )
                         .clicked()
                     {
-                        state.curr_tool.clone().borrow_mut().reset(state);
+                        state.reset_tool();
                         state.curr_tool = state.pencil.clone();
                     }
                     if ui
@@ -86,11 +86,11 @@ impl ScenePanel {
                         )
                         .clicked()
                     {
-                        state.curr_tool.clone().borrow_mut().reset(state);
+                        state.reset_tool();
                         state.curr_tool = state.bucket.clone();
                     }
                 });
-            egui::CentralPanel::default()
+            let response = egui::CentralPanel::default()
                 .frame(no_margin)
                 .show_inside(ui, |ui| {
                     egui::Frame::canvas(ui.style()).show(ui, |ui| {
@@ -161,22 +161,31 @@ impl ScenePanel {
                         };
                         ui.painter().add(callback);
                     });
-                });
+                }).response;
+
+            if response.clicked_elsewhere() && state.selection.is_scene() {
+                state.selection.clear();
+                state.reset_tool();
+            }
         }
 
         // Deleting strokes
-        if ui.input_mut(|i| i.consume_shortcut(&state.delete_shortcut())) && !state.selected_strokes.is_empty() {
-            let mut action = Action::new();
-            for stroke_ptr in &state.selected_strokes {
-                if let Some(stroke) = state.project.strokes.get(*stroke_ptr) {
-                    let frame = stroke.frame;
-                    if let Some(act) = Stroke::delete(&mut state.project, frame, *stroke_ptr) {
-                        action.add(act);
+        let delete_shortcut = state.delete_shortcut();
+        if let Selection::Scene(strokes) = &mut state.selection {
+            if ui.input_mut(|i| i.consume_shortcut(&delete_shortcut)) {
+                let mut action = Action::new();
+                for stroke_ptr in strokes {
+                    if let Some(stroke) = state.project.strokes.get(*stroke_ptr) {
+                        let frame = stroke.frame;
+                        if let Some(act) = Stroke::delete(&mut state.project, frame, *stroke_ptr) {
+                            action.add(act);
+                        }
                     }
                 }
+                state.actions.add(action);
+                state.reset_tool();
+                state.selection.clear();
             }
-            state.selected_strokes.clear();
-            state.actions.add(action);
         }
 
     }
@@ -290,22 +299,23 @@ impl ScenePanel {
 
             let mut overlay = OverlayRenderer::new(renderer, gl, proj_view, self.cam_size);
             state.curr_tool.clone().borrow_mut().draw_overlay(&mut overlay, state); 
-            for stroke in &state.selected_strokes {
-                if let Some(stroke) = state.project.strokes.get(*stroke) {
-                    for (p0, p1) in stroke.iter_point_pairs() {
-                        let n = 20;
-                        for i in 0..n {
-                            let t = (i as f32) / (n as f32);
-                            overlay.line(
-                                curve::bezier_sample(t, p0.pt, p0.b, p1.a, p1.pt),
-                                curve::bezier_sample(t + 1.0 / (n as f32), p0.pt, p0.b, p1.a, p1.pt),
-                                glam::vec4(0.0, 1.0, 1.0, 1.0) 
-                            );
+            if let Selection::Scene(strokes) = &state.selection {
+                for stroke in strokes {
+                    if let Some(stroke) = state.project.strokes.get(*stroke) {
+                        for (p0, p1) in stroke.iter_point_pairs() {
+                            let n = 20;
+                            for i in 0..n {
+                                let t = (i as f32) / (n as f32);
+                                overlay.line(
+                                    curve::bezier_sample(t, p0.pt, p0.b, p1.a, p1.pt),
+                                    curve::bezier_sample(t + 1.0 / (n as f32), p0.pt, p0.b, p1.a, p1.pt),
+                                    glam::vec4(0.0, 1.0, 1.0, 1.0) 
+                                );
+                            }
                         }
                     }
                 }
             }
-
         }
     }
 

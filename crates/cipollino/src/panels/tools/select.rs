@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use glam::{Vec2, vec3, vec2, Mat4, Quat};
 
-use crate::{editor::EditorState, panels::scene::{OverlayRenderer, ScenePanel}, util::{curve::{bezier_sample, self}, geo::segment_intersect}, project::{action::Action, stroke::Stroke}};
+use crate::{editor::{selection::Selection, EditorState}, panels::scene::{OverlayRenderer, ScenePanel}, util::{curve::{bezier_sample, self}, geo::segment_intersect}, project::{action::Action, stroke::Stroke}};
 
 use super::Tool;
 
@@ -29,7 +29,7 @@ impl Lasso {
 
         if select.lasso_pts.len() == 1 {
             if let Some(stroke_key) = scene.sample_pick(select.lasso_pts[0], gl) {
-                state.selected_strokes.push(stroke_key);
+                state.selection.select_stroke(stroke_key);
             }
         } else if let Some(pt) = select.lasso_pts.first() {
             select.lasso_pts.push(*pt);
@@ -59,7 +59,7 @@ impl Lasso {
                                     let t = (i as f32) / 9.0;
                                     let pt = bezier_sample(t, p0.pt, p0.b, p1.a, p1.pt);
                                     if inside_lasso(pt) {
-                                        state.selected_strokes.push(stroke.make_ptr());
+                                        state.selection.select_stroke(stroke.make_ptr());
                                         break 'pt_loop;
                                     }
                                 }
@@ -70,11 +70,11 @@ impl Lasso {
             }
         }
 
-        if state.selected_strokes.len() > 0 {
+        if let Selection::Scene(strokes) = &state.selection {
             select.state = SelectState::FreeTransform;
             select.bb_min = Vec2::INFINITY;
             select.bb_max = -Vec2::INFINITY;
-            for stroke_ptr in &state.selected_strokes {
+            for stroke_ptr in strokes {
                 state.project.strokes.get_then(*stroke_ptr, |stroke| {
                     for (p0, p1) in stroke.iter_point_pairs() {
                         let (min, max) = curve::bezier_bounding_box(p0.pt, p0.b, p1.a, p1.pt);
@@ -125,12 +125,12 @@ impl FreeTransform {
         }
 
         if let Some(stroke) = scene.sample_pick(mouse_pos, gl) {
-            if state.selected_strokes.contains(&stroke) {
+            if state.selection.stroke_selected(stroke) {
                 select.state = SelectState::Translate;
             } else {
                 select.state = SelectState::Lasso;
                 if !ui.input(|i| i.modifiers.shift) {
-                    state.selected_strokes.clear();
+                    state.selection.clear();
                 }
             }
             return;
@@ -138,7 +138,7 @@ impl FreeTransform {
 
         select.state = SelectState::Lasso;
         if !ui.input(|i| i.modifiers.shift) {
-            state.selected_strokes.clear();
+            state.selection.clear();
         }
     }
 
@@ -289,21 +289,22 @@ impl Select {
     }
 
     pub fn apply_transformation(&mut self, new_trans: glam::Mat4, state: &mut EditorState) {
-        
-        let trans_inv = self.trans.inverse();
-        for stroke in &state.selected_strokes {
-            Stroke::transform(&mut state.project, *stroke, trans_inv);
-        }
-        
-        let mut action = Action::new();
-        for stroke in &state.selected_strokes {
-            if let Some(act) = Stroke::transform(&mut state.project, *stroke, new_trans) {
-                action.add(act);
+        if let Selection::Scene(strokes) = &state.selection { 
+            let trans_inv = self.trans.inverse();
+            for stroke in strokes {
+                Stroke::transform(&mut state.project, *stroke, trans_inv);
             }
+            
+            let mut action = Action::new();
+            for stroke in strokes {
+                if let Some(act) = Stroke::transform(&mut state.project, *stroke, new_trans) {
+                    action.add(act);
+                }
+            }
+            
+            self.trans = new_trans;
+            self.transform_action = Some(action);
         }
-        
-        self.trans = new_trans;
-        self.transform_action = Some(action);
     }
 
     pub fn transform(&self, pt: Vec2) -> Vec2 {
@@ -386,7 +387,7 @@ impl Tool for Select {
     }
 
     fn reset(&mut self, state: &mut EditorState) {
-        if let Some(action) = std::mem::replace(&mut self.transform_action, None){
+        if let Some(action) = std::mem::replace(&mut self.transform_action, None) {
             state.actions.add(action);
         } 
         self.state = SelectState::Lasso; 

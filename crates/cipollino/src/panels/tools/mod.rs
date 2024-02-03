@@ -32,6 +32,7 @@ pub fn active_frame(state: &mut EditorState) -> Option<(ObjPtr<Frame>, Option<Ob
         Some((frame.make_ptr(), None))
     } else {
         let (frame, act) = Frame::add(&mut state.project, state.active_layer, Frame {
+            layer: state.active_layer,
             time: frame,
             strokes: Vec::new()
         }).unwrap();
