@@ -3,6 +3,7 @@ use std::{cell::RefCell, fs, path::PathBuf, rc::Rc, sync::{Arc, Mutex}};
 
 use crate::{panels::{self, timeline::{new_frame, prev_keyframe, next_keyframe}, tools::{pencil::Pencil, Tool, select::Select, bucket::Bucket}}, project::{Project, graphic::Graphic, action::ActionManager, obj::ObjPtr, stroke::Stroke, layer::Layer}, renderer::scene::SceneRenderer, export::Export};
 use egui::Modifiers;
+use egui_toast::ToastOptions;
 
 use self::clipboard::Clipboard;
 
@@ -38,6 +39,7 @@ pub struct EditorState {
     // Subsystems
     pub project: Project, 
     pub actions: ActionManager,
+    pub toasts: egui_toast::Toasts,
    
     // Tools
     pub select: Rc<RefCell<dyn Tool>>,
@@ -76,6 +78,7 @@ impl EditorState {
         Self {
             project: project, 
             actions: ActionManager::new(),
+            toasts: egui_toast::Toasts::default().anchor(egui::Align2::RIGHT_BOTTOM, egui::pos2(-10.0, -10.0)),
             open_graphic: ObjPtr::null(),
             active_layer: ObjPtr::null(),
             selection: selection::Selection::None,
@@ -309,6 +312,8 @@ impl Editor {
 
         let _ = std::fs::write(self.config_path.clone() + "/dock.json", serde_json::json!(self.panels).to_string());
 
+        self.state.toasts.show(ctx);
+
     }
 
     pub fn save(&mut self) {
@@ -325,7 +330,11 @@ impl Editor {
                 if dir.count() == 0 {
                     self.save_project(path);
                 } else {
-                    // TODO: make some user-visible error message
+                    self.state.toasts.add(egui_toast::Toast {
+                        kind: egui_toast::ToastKind::Error,
+                        text: "Cannot save project to non-empty directory".into(),
+                        options: ToastOptions::default().show_progress(false),
+                    });
                 }
             }
         }

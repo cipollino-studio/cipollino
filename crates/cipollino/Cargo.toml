@@ -21,6 +21,7 @@ intersection_detection = "0.1.3"
 rgeometry = "0.9.0"
 rand = "0.8.5"
 project_macros = { path = "../project_macros" }
+egui-toast = "0.9.0"
 
 [build-dependencies]
 cc = "1.0"
