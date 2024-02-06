@@ -1,9 +1,9 @@
 
-use project_macros::Object;
+use project_macros::{ObjClone, Object};
 
 use super::{Project, ObjBox, action::ObjAction, frame::Frame, obj::{Obj, ObjPtr, ChildObj, ObjList, ObjClone}, graphic::Graphic};
 
-#[derive(Object, Clone)]
+#[derive(Object, Clone, ObjClone)]
 pub struct Layer {
     #[field]
     pub name: String,
@@ -67,6 +67,17 @@ impl ChildObj for Layer {
             Some(&mut graphic.layers)
         } else {
             None
+        }
+    }
+
+}
+
+impl Default for Layer {
+
+    fn default() -> Self {
+        Self {
+            name: "Layer".to_owned(),
+            frames: Vec::new()
         }
     }
 

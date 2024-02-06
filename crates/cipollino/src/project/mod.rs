@@ -5,9 +5,10 @@ pub mod frame;
 pub mod stroke;
 pub mod obj;
 pub mod action;
+pub mod saveload;
+use std::path::PathBuf;
 
 use self::{frame::Frame, graphic::Graphic, layer::Layer, obj::{ObjBox, ObjList}, stroke::Stroke};
-
 
 pub struct Project {
     pub graphics: ObjList<Graphic>,
@@ -15,33 +16,22 @@ pub struct Project {
     pub frames: ObjList<Frame>,
     pub strokes: ObjList<Stroke>,
 
-    pub root_graphics: Vec<ObjBox<Graphic>>
+    pub root_graphics: Vec<ObjBox<Graphic>>,
+
+    pub save_path: Option<PathBuf>
 }
 
 impl Project {
 
     pub fn new() -> Self {
-        let mut res = Self {
+        Self {
             graphics: ObjList::new(),
             layers: ObjList::new(),
             frames: ObjList::new(),
             strokes: ObjList::new(),
-            root_graphics: Vec::new()
-        };
-
-        res.root_graphics.push(res.graphics.add(Graphic {
-            name: "Clip".to_owned(),
-            len: 100,
-            clip: true,
-            w: 1920,
-            h: 1080,
-            layers: vec![res.layers.add(Layer {
-                name: "Layer".to_owned(),
-                frames: Vec::new()
-            })]
-        }));
-
-        res
+            root_graphics: Vec::new(),
+            save_path: None
+        }
     }
 
 }

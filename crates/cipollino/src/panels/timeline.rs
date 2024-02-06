@@ -1,6 +1,6 @@
 
 use egui::Vec2;
-use crate::{editor::{selection::Selection, EditorState}, project::{action::Action, frame::Frame, layer::Layer, obj::ChildObj}};
+use crate::{editor::{selection::Selection, EditorState}, project::{action::Action, frame::Frame, graphic::Graphic, layer::Layer, obj::ChildObj}};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct TimelinePanel {
@@ -217,13 +217,9 @@ impl TimelinePanel {
         let gfx_len_drag = ui.add(egui::DragValue::new(&mut len).clamp_range(1..=1000000).update_while_editing(false));
         let len_changed = len != gfx.len;
         if len_changed {
-            // TODO!!!!
-            // if let Some(act) = state.project.set_graphic_data(state.open_graphic, GraphicData {
-            //     len,
-            //     ..gfx.data.clone()
-            // }) {
-            //     self.set_gfx_len_action.add(act);
-            // }
+            if let Some(act) = Graphic::set_len(&mut state.project, state.open_graphic, len) {
+                state.actions.add(Action::from_single(act));
+            } 
         }
         if gfx_len_drag.drag_released() || (!gfx_len_drag.dragged() && len_changed) {
             state.actions.add(std::mem::replace(&mut self.set_gfx_len_action, Action::new()));

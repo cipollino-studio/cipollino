@@ -1,5 +1,5 @@
 
-use std::{cell::RefCell, fs, io::Write, path::PathBuf, rc::Rc, sync::{Arc, Mutex}};
+use std::{cell::RefCell, fs, path::PathBuf, rc::Rc, sync::{Arc, Mutex}};
 
 use crate::{panels::{self, timeline::{new_frame, prev_keyframe, next_keyframe}, tools::{pencil::Pencil, Tool, select::Select, bucket::Bucket}}, project::{Project, graphic::Graphic, action::ActionManager, obj::ObjPtr, stroke::Stroke, layer::Layer}, renderer::scene::SceneRenderer, export::Export};
 use egui::Modifiers;
@@ -142,7 +142,6 @@ pub struct Editor {
     state: EditorState,
     panels: panels::PanelManager,
     config_path: String,
-    save_path: Option<PathBuf>,
     pub renderer: EditorRenderer,
     pub export: Export,
 }
@@ -166,7 +165,6 @@ impl Editor {
             state: EditorState::new(),
             panels,
             config_path,
-            save_path: None,
             export: Export::new(), 
             renderer: EditorRenderer::new(),
         };
@@ -240,9 +238,7 @@ impl Editor {
             }
 
             if ui.input_mut(|i| i.consume_shortcut(&save_shortcut)) {
-                if let Some(path) = self.save_path.clone() {
-                    self.save_project(path);
-                }
+                self.save();
             }
             
             if ui.input_mut(|i| i.consume_shortcut(&self.state.copy_shortcut())) {
@@ -251,28 +247,18 @@ impl Editor {
 
             egui::menu::bar(ui, |ui| {
                 ui.menu_button("File", |ui| {
-                    if ui.add_enabled(
-                        self.save_path.is_some(),
-                    egui::Button::new("Save").shortcut_text(ui.ctx().format_shortcut(&save_shortcut))).clicked() {
-                        self.save_project(self.save_path.clone().unwrap());
+                    if ui.add(egui::Button::new("Save").shortcut_text(ui.ctx().format_shortcut(&save_shortcut))).clicked() {
+                        self.save();
+                        ui.close_menu();
                     }
                     if ui.button("Save As").clicked() {
-                        if let Some(mut path) = rfd::FileDialog::new().save_file() {
-                            path.set_extension("cip");
-                            self.save_path = Some(path.clone());
-                            self.save_project(path);
-                        }
+                        self.save_as();
                         ui.close_menu();
                     }
                     if ui.button("Open").clicked() {
                         if let Some(path) = rfd::FileDialog::new().add_filter("Cipollino Project File", &["cip"]).pick_file() {
-                            if let Ok(file) = std::fs::File::open(path.clone()) {
-                                // TODO!!!!!!!
-                                // let reader = std::io::BufReader::new(file);
-                                // let proj = serde_json::from_reader(reader).unwrap(); 
-                                // self.state = EditorState::new_with_project(proj);
-                                // self.save_path = Some(path);
-                            }
+                            self.state = EditorState::new_with_project(Project::load(path));
+                            return;
                         }
                         ui.close_menu();
                     }
@@ -325,13 +311,22 @@ impl Editor {
 
     }
 
-    pub fn save_project(&self, path: PathBuf) {
-        if let Ok(file) = std::fs::File::create(path.clone()) {
-            let mut writer = std::io::BufWriter::new(file);
-            // TODO!!!!!!
-            // serde_json::to_writer(&mut writer, &self.state.project).expect("Could not save");
-            let _ = writer.flush();
+    pub fn save(&mut self) {
+        if let Some(path) = &self.state.project.save_path {
+            self.save_project(path.clone());
+        } else {
+            self.save_as();
         }
+    }
+
+    pub fn save_as(&mut self) {
+        if let Some(path) = rfd::FileDialog::new().pick_folder() {
+            self.save_project(path);
+        }
+    }
+
+    pub fn save_project(&mut self, path: PathBuf) {
+        self.state.project.save(path); 
     }
 
 }

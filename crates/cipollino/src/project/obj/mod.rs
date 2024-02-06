@@ -3,9 +3,11 @@ use std::{cell::RefCell, collections::HashMap, marker::PhantomData, rc::Rc};
 
 use super::{action::ObjAction, Project};
 
+mod obj_clone_impls;
+
 pub struct ObjList<T: Obj> {
     objs: HashMap<u64, T>, 
-    curr_key: u64
+    pub curr_key: u64
 }
 
 impl<T: Obj> ObjList<T> {
@@ -28,6 +30,13 @@ impl<T: Obj> ObjList<T> {
         }
     }
 
+    pub fn add_with_ptr(&mut self, obj: T, ptr: ObjPtr<T>) -> ObjBox<T> {
+        self.objs.insert(ptr.key, obj);
+        ObjBox {
+            ptr
+        }
+    }
+
     pub fn get(&self, ptr: ObjPtr<T>) -> Option<&T> {
         self.objs.get(&ptr.key)
     }
@@ -47,7 +56,7 @@ impl<T: Obj> ObjList<T> {
 }
 
 pub struct ObjPtr<T: Obj> {
-    key: u64,
+    pub key: u64,
     _marker: PhantomData<T>
 }
 
@@ -121,42 +130,9 @@ pub trait ObjClone : Clone {
         self.clone()
     }
 
-}
+    fn obj_serialize(&self, project: &Project) -> serde_json::Value;
 
-impl ObjClone for bool {}
-impl ObjClone for u8 {}
-impl ObjClone for u16 {}
-impl ObjClone for u32 {}
-impl ObjClone for u64 {}
-impl ObjClone for i8 {}
-impl ObjClone for i16 {}
-impl ObjClone for i32 {}
-impl ObjClone for i64 {}
-impl ObjClone for f32 {}
-impl ObjClone for f64 {}
-impl ObjClone for glam::Vec2 {}
-impl ObjClone for glam::Vec3 {}
-impl ObjClone for glam::Vec4 {}
-impl ObjClone for String {}
-impl<T: Obj> ObjClone for ObjPtr<T> {}
-
-impl<T: ObjClone> ObjClone for Vec<T> {
-
-    fn obj_clone(&self, project: &mut Project) -> Self {
-        self.iter().map(|elem| elem.obj_clone(project)).collect()
-    }
-
-}
-
-impl<T: Obj> ObjClone for ObjBox<T> {
-
-    fn obj_clone(&self, project: &mut Project) -> Self {
-        let list = T::get_list(project);
-        let obj = list.get(self.ptr).unwrap();
-        let obj_clone = obj.clone(); // Hack to get around the borrow checker
-        let obj_clone = obj_clone.obj_clone(project);
-        T::get_list_mut(project).add(obj_clone)
-    }
+    fn obj_deserialize(project: &mut Project, data: &serde_json::Value) -> Option<Self>;
 
 }
 

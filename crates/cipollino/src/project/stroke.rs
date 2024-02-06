@@ -1,19 +1,18 @@
 
 use glam::{Vec2, Mat4, vec3, vec2};
-use project_macros::Object;
+use project_macros::{ObjClone, Object};
+use serde_json::json;
 
 use crate::renderer::mesh::Mesh;
 
 use super::{obj::{Obj, ObjList, ObjClone}, action::ObjAction, Project, obj::{ObjBox, ObjPtr}, obj::ChildObj, frame::Frame};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, ObjClone, Default)]
 pub struct StrokePoint {
     pub a: Vec2,
     pub pt: Vec2,
     pub b: Vec2
 }
-
-impl ObjClone for StrokePoint {}
 
 // Needs to be a separate struct to be able to derive from Object easily
 pub struct StrokeMesh {
@@ -34,16 +33,30 @@ impl StrokeMesh {
 }
 
 impl Clone for StrokeMesh {
-
     fn clone(&self) -> Self {
         Self::new()
     }
-
 }
 
-impl ObjClone for StrokeMesh {}
+impl Default for StrokeMesh {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
-#[derive(Object, Clone)]
+impl ObjClone for StrokeMesh {
+    fn obj_serialize(&self, _project: &Project) -> serde_json::Value {
+        json! {
+            null
+        }
+    }
+
+    fn obj_deserialize(_project: &mut Project, _data: &serde_json::Value) -> Option<Self> {
+        Some(Self::new())
+    }
+}
+
+#[derive(Object, Clone, ObjClone)]
 pub struct Stroke {
     pub frame: ObjPtr<Frame>,
     #[field]
@@ -95,6 +108,21 @@ impl ChildObj for Stroke {
             Some(&mut frame.strokes)
         } else {
             None
+        }
+    }
+
+}
+
+impl Default for Stroke {
+
+    fn default() -> Self {
+        Self {
+            frame: ObjPtr::null(),
+            color: glam::Vec3::ZERO,
+            r: 0.05,
+            filled: false,
+            points: Vec::new(),
+            mesh: StrokeMesh::new() 
         }
     }
 

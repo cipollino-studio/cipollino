@@ -1,9 +1,9 @@
 
-use project_macros::Object;
+use project_macros::{ObjClone, Object};
 
-use super::{Project, action::ObjAction, obj::{Obj, ObjPtr, ObjBox, ObjList, ObjClone}, layer::Layer};
+use super::{action::ObjAction, layer::Layer, obj::{Obj, ObjPtr, ObjBox, ObjList, ObjClone}, saveload::Asset, Project};
 
-#[derive(Object, Clone)]
+#[derive(Object, Clone, ObjClone)]
 pub struct Graphic {
     #[field]
     pub name: String,
@@ -30,4 +30,12 @@ impl Default for Graphic {
             layers: Vec::new()
         }
     }
+}
+
+impl Asset for Graphic {
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
 }

@@ -1,9 +1,9 @@
 
-use project_macros::Object;
+use project_macros::{ObjClone, Object};
 
 use super::{Project, action::ObjAction, stroke::Stroke, obj::Obj, obj::{ObjBox, ObjList, ObjClone}, obj::ChildObj, obj::ObjPtr, layer::Layer};
 
-#[derive(Object, Clone)]
+#[derive(Object, Clone, ObjClone)]
 pub struct Frame {
     pub layer: ObjPtr<Layer>,
     #[field]
@@ -19,6 +19,18 @@ impl ChildObj for Frame {
             Some(&mut layer.frames)
         } else {
             None
+        }
+    }
+
+}
+
+impl Default for Frame {
+
+    fn default() -> Self {
+        Self {
+            layer: ObjPtr::null(),
+            time: 0,
+            strokes: Vec::new()
         }
     }
 
