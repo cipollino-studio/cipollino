@@ -1,7 +1,7 @@
 
 use project_macros::{ObjClone, Object};
 
-use super::{action::ObjAction, layer::Layer, obj::{Obj, ObjPtr, ObjBox, ObjList, ObjClone}, saveload::Asset, Project};
+use super::{action::ObjAction, layer::Layer, obj::{asset::Asset, Obj, ObjBox, ObjClone, ObjList, ObjPtr}, Project};
 
 #[derive(Object, Clone, ObjClone)]
 pub struct Graphic {
@@ -34,8 +34,8 @@ impl Default for Graphic {
 
 impl Asset for Graphic {
 
-    fn name(&self) -> String {
-        self.name.clone()
+    fn name(&self) -> &String {
+        &self.name
     }
 
 }

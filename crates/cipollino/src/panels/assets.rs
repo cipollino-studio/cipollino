@@ -2,7 +2,7 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{editor::EditorState, project::{action::{Action, ObjAction}, graphic::Graphic}};
+use crate::{editor::EditorState, project::{action::{Action, ObjAction}, graphic::Graphic, obj::asset::next_valid_name}};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct AssetsPanel {
@@ -36,7 +36,7 @@ impl AssetsPanel {
                 if ui.button("Create").clicked() {
                     let gfx = state.project.graphics.add(Graphic {
                         layers: Vec::new(),
-                        name: self.create_graphic_data.name.clone(),
+                        name: next_valid_name(&state.project, self.create_graphic_data.name.clone(), &state.project.root_graphics),
                         ..self.create_graphic_data
                     });
                     let gfx_ptr = gfx.make_ptr();

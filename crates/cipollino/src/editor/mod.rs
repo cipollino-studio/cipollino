@@ -38,7 +38,7 @@ pub struct EditorState {
     // Subsystems
     pub project: Project, 
     pub actions: ActionManager,
-    
+   
     // Tools
     pub select: Rc<RefCell<dyn Tool>>,
     pub pencil: Rc<RefCell<dyn Tool>>,
@@ -321,7 +321,13 @@ impl Editor {
 
     pub fn save_as(&mut self) {
         if let Some(path) = rfd::FileDialog::new().pick_folder() {
-            self.save_project(path);
+            if let Ok(dir) = fs::read_dir(path.clone()) {
+                if dir.count() == 0 {
+                    self.save_project(path);
+                } else {
+                    // TODO: make some user-visible error message
+                }
+            }
         }
     }
 

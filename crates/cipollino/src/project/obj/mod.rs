@@ -4,6 +4,7 @@ use std::{cell::RefCell, collections::HashMap, marker::PhantomData, rc::Rc};
 use super::{action::ObjAction, Project};
 
 mod obj_clone_impls;
+pub mod asset;
 
 pub struct ObjList<T: Obj> {
     objs: HashMap<u64, T>, 

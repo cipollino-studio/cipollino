@@ -5,7 +5,7 @@ use serde_json::json;
 
 use crate::project::{graphic::Graphic, obj::ObjBox};
 
-use super::{obj::{Obj, ObjClone}, Project};
+use super::{obj::{asset::Asset, ObjClone}, Project};
 
 pub fn read_json_file(path: &PathBuf) -> Option<serde_json::Value> {
     let mut file = fs::File::open(path).ok()?;
@@ -21,11 +21,6 @@ pub fn write_json_file(path: &PathBuf, data: serde_json::Value) -> Option<()> {
     Some(())
 }
 
-pub trait Asset : Obj {
-
-    fn name(&self) -> String;
-
-}
 
 impl Project {
 
