@@ -9,7 +9,15 @@ pub mod util;
 pub mod export;
 
 fn main() -> Result<(), eframe::Error> {
+    let (icon, w, h) = {
+        let img = image::load_from_memory(include_bytes!("../../../res/icon256.png")).unwrap().into_rgba8();
+        let (w, h) = img.dimensions();
+        let rgba = img.into_raw();
+        (rgba, w, h)
+    };
+
     let options = eframe::NativeOptions {
+        icon_data: Some(eframe::IconData { rgba: icon, width: w, height: h }),
         initial_window_size: Some(egui::vec2(1280.0, 720.0)),
         multisampling: 4,
         renderer: eframe::Renderer::Glow,
