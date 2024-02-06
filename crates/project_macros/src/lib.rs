@@ -14,15 +14,10 @@ pub fn object(input: TokenStream) -> TokenStream {
     let name = ast.ident;
     let list_name = Ident::new((name.to_string().to_ascii_lowercase() + "s").as_str(), name.span()); 
 
-    let mut obj_clone_impl = quote!{};
     let mut field_setters = quote!{};
     for field in fields {
         let field_name = field.ident;
         let ty = field.ty.to_token_stream();
-
-        obj_clone_impl.append_all(quote! {
-            #field_name: self.#field_name.obj_clone(project),
-        });
 
         for attr in field.attrs {
             // Hack
@@ -58,20 +53,71 @@ pub fn object(input: TokenStream) -> TokenStream {
 
         } 
 
-        impl ObjClone for #name {
-            
-            fn obj_clone(&self, project: &mut Project) -> Self {
-                Self {
-                    #obj_clone_impl
-                }                
-            }
-
-        }
-
         impl #name {
 
             #field_setters 
             
+        }
+
+    }.into()
+}
+
+#[proc_macro_derive(ObjClone)]
+pub fn obj_clone(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as DeriveInput);
+    let fields = if let Data::Struct(data) = ast.data {
+        data.fields
+    } else {
+        panic!("object must be a struct!");
+    };
+    let name = ast.ident;
+
+    let mut obj_clone_impl = quote!{};
+    let mut serialize_impl = quote!{};
+    let mut deserialize_impl = quote!{};
+    for field in fields {
+        let field_name = field.ident;
+        obj_clone_impl.append_all(quote! {
+            #field_name: self.#field_name.obj_clone(project),
+        });
+
+        let field_name_str = field_name.to_token_stream().to_string();
+        serialize_impl.append_all(quote! {
+            #field_name_str: self.#field_name.obj_serialize(project),
+        });
+
+        let ty = field.ty.to_token_stream();
+        deserialize_impl.append_all(quote! {
+            if let Some(field) = data.get(#field_name_str) {
+                if let Some(val) = <#ty>::obj_deserialize(project, field) {
+                    res.#field_name = val;
+                }
+            }
+        });
+    }
+
+    quote! {
+
+        impl ObjClone for #name {
+
+            fn obj_clone(&self, project: &mut Project) -> Self {
+                Self {
+                    #obj_clone_impl
+                }
+            }
+
+            fn obj_serialize(&self, project: &Project) -> serde_json::Value {
+                serde_json::json! {{
+                    #serialize_impl
+                }}
+            }
+
+            fn obj_deserialize(project: &mut Project, data: &serde_json::Value) -> Option<Self> {
+                let mut res = Self::default();
+                #deserialize_impl 
+                Some(res)
+            }
+
         }
 
     }.into()
