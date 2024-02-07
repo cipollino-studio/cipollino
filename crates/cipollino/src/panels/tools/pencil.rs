@@ -147,4 +147,16 @@ impl Tool for Pencil {
         }
     }
 
+    fn get_icon(&self) -> &str {
+        egui_phosphor::regular::PENCIL
+    }
+
+    fn name(&self) -> &str {
+        "Pencil"
+    }
+
+    fn shortcut(&self) -> egui::KeyboardShortcut {
+        egui::KeyboardShortcut::new(egui::Modifiers::NONE, egui::Key::P)
+    }
+
 }

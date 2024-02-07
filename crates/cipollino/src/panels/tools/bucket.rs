@@ -42,7 +42,7 @@ impl Tool for Bucket {
         // This uses a standard bitmap floodfill algorithmn adapted to work with vector art
         // Is this the best approach? Probably not.
 
-        let grid_size = (0.01 * scene.cam_size).min(0.07).max(0.008);
+        let grid_size = 0.04;
 
         let snap_coords = |pt: Vec2| {
             ((pt.x / grid_size).floor() as i32, (pt.y / grid_size).floor() as i32)
@@ -308,6 +308,18 @@ impl Tool for Bucket {
 
         state.actions.add(Action::from_list(acts));
 
+    }
+
+    fn get_icon(&self) -> &str {
+        egui_phosphor::regular::PAINT_BUCKET
+    }
+
+    fn name(&self) -> &str {
+        "Bucket"
+    }
+
+    fn shortcut(&self) -> egui::KeyboardShortcut {
+        egui::KeyboardShortcut::new(egui::Modifiers::NONE, egui::Key::B)
     }
 
 }

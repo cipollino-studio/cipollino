@@ -61,35 +61,21 @@ impl ScenePanel {
                 .exact_width(34.0)
                 .frame(no_margin)
                 .show_inside(ui, |ui| {
-                    if ui
-                        .button(
-                            egui::RichText::new(format!("{}", egui_phosphor::regular::CURSOR))
-                                .size(20.0),
-                        )
-                        .clicked()
-                    {
-                        state.reset_tool();
-                        state.curr_tool = state.select.clone();
+                    let mut new_tool = None; 
+                    for tool_rc in &state.tools {
+                        let tool = tool_rc.borrow();
+                        let resp = ui.add_enabled(
+                            tool.name() != state.curr_tool.borrow().name(),
+                            egui::Button::new(egui::RichText::new(format!("{}", tool.get_icon())).size(20.0)));
+                        let shortcut = tool.shortcut();
+                        let resp = resp.on_hover_text(format!("{} ({})", tool.name(), ui.ctx().format_shortcut(&shortcut)));
+                        if resp.clicked() || ui.input_mut(|i| i.consume_shortcut(&shortcut)) {
+                            new_tool = Some(tool_rc.clone());
+                        }
                     }
-                    if ui
-                        .button(
-                            egui::RichText::new(format!("{}", egui_phosphor::regular::PENCIL))
-                                .size(20.0),
-                        )
-                        .clicked()
-                    {
+                    if let Some(tool) = new_tool {
                         state.reset_tool();
-                        state.curr_tool = state.pencil.clone();
-                    }
-                    if ui
-                        .button(
-                            egui::RichText::new(format!("{}", egui_phosphor::regular::PAINT_BUCKET))
-                                .size(20.0),
-                        )
-                        .clicked()
-                    {
-                        state.reset_tool();
-                        state.curr_tool = state.bucket.clone();
+                        state.curr_tool = tool;
                     }
                 });
             let response = egui::CentralPanel::default()

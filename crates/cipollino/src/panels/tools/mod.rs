@@ -23,6 +23,10 @@ pub trait Tool {
     fn tool_panel(&mut self, _ui: &mut egui::Ui, _state: &mut EditorState) {}
     fn reset(&mut self, _state: &mut EditorState) {}
 
+    fn get_icon(&self) -> &str;
+    fn name(&self) -> &str;
+    fn shortcut(&self) -> egui::KeyboardShortcut;
+
 }
 
 pub fn active_frame_proj_layer_frame(project: &mut Project, active_layer: ObjPtr<Layer>, frame: i32) -> Option<(ObjPtr<Frame>, Option<ObjAction>)> {

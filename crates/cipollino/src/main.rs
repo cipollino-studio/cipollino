@@ -53,6 +53,9 @@ impl Cipollino {
 impl eframe::App for Cipollino {
 
     fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+        ctx.style_mut(|style| {
+            style.interaction.tooltip_delay = 0.75;
+        });
         self.editor.render(ctx, frame);
     }
 

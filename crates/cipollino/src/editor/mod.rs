@@ -42,9 +42,7 @@ pub struct EditorState {
     pub toasts: egui_toast::Toasts,
    
     // Tools
-    pub select: Rc<RefCell<dyn Tool>>,
-    pub pencil: Rc<RefCell<dyn Tool>>,
-    pub bucket: Rc<RefCell<dyn Tool>>,
+    pub tools: Vec<Rc<RefCell<dyn Tool>>>,
     pub curr_tool: Rc<RefCell<dyn Tool>>,
 
     // Selections
@@ -87,9 +85,7 @@ impl EditorState {
             playing: false,
             onion_before: 0,
             onion_after: 0,
-            select: select.clone(),
-            pencil: pencil.clone(),
-            bucket: bucket.clone(),
+            tools: vec![select.clone(), pencil, bucket],
             curr_tool: select,
             color: glam::Vec3::ZERO,
             stroke_r: 0.05,
@@ -154,7 +150,6 @@ impl Editor {
     pub fn new() -> Self {
         let config_path = directories::ProjectDirs::from("com", "Cipollino", "Cipollino").unwrap().config_dir().to_str().unwrap().to_owned();
         let _ = fs::create_dir(config_path.clone());
-        println!("{}", config_path);
         let panels = if let Ok(data) = std::fs::read(config_path.clone() + "/dock.json") {
             if let Ok(panels) = serde_json::from_slice::<panels::PanelManager>(data.as_slice()) {
                 panels

@@ -396,4 +396,16 @@ impl Tool for Select {
         }
     }
 
+    fn get_icon(&self) -> &str {
+        egui_phosphor::regular::CURSOR
+    }
+
+    fn name(&self) -> &str {
+        "Select"
+    }
+
+    fn shortcut(&self) -> egui::KeyboardShortcut {
+        egui::KeyboardShortcut::new(egui::Modifiers::NONE, egui::Key::V)
+    }
+
 }
