@@ -1,5 +1,6 @@
 [package]
 name = "cipollino"
+description = "2D Animation Program"
 version = "0.1.0"
 edition = "2021"
 

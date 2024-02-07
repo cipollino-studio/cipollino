@@ -10,7 +10,7 @@ pub mod export;
 
 fn main() -> Result<(), eframe::Error> {
     let (icon, w, h) = {
-        let img = image::load_from_memory(include_bytes!("../../../res/icon256.png")).unwrap().into_rgba8();
+        let img = image::load_from_memory(include_bytes!("../../../res/icon256x256.png")).unwrap().into_rgba8();
         let (w, h) = img.dimensions();
         let rgba = img.into_raw();
         (rgba, w, h)
