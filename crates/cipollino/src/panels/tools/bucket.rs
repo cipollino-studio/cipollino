@@ -29,6 +29,7 @@ impl Tool for Bucket {
         if let Some(stroke) = scene.sample_pick(mouse_pos, gl) {
             if let Some(act) = Stroke::set_color(&mut state.project, stroke, state.color) {
                 state.actions.add(Action::from_single(act));
+                return;
             }
         }
 
@@ -42,7 +43,7 @@ impl Tool for Bucket {
         // This uses a standard bitmap floodfill algorithmn adapted to work with vector art
         // Is this the best approach? Probably not.
 
-        let grid_size = 0.04;
+        let grid_size = 1.0;
 
         let snap_coords = |pt: Vec2| {
             ((pt.x / grid_size).floor() as i32, (pt.y / grid_size).floor() as i32)
@@ -79,7 +80,7 @@ impl Tool for Bucket {
                 }
                 for stroke in &visible_strokes {
                     if let Some(stroke) = state.project.strokes.get(*stroke) {
-                        let r = if !stroke.filled { (stroke.r - 0.025).max(0.0) } else { 0.0 };
+                        let r = if !stroke.filled { (stroke.r - 0.4).max(0.0) } else { 0.0 };
                         'point_pairs: for (p0, p1) in stroke.iter_point_pairs() {
 
                             let (mut bb_min, mut bb_max) = bezier_bounding_box(p0.pt, p0.b, p1.a, p1.pt);

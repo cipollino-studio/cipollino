@@ -88,7 +88,7 @@ impl EditorState {
             tools: vec![select.clone(), pencil, bucket],
             curr_tool: select,
             color: glam::Vec3::ZERO,
-            stroke_r: 0.05,
+            stroke_r: 5.0,
             stroke_filled: false
         }
     }

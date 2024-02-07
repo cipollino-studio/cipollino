@@ -93,7 +93,7 @@ impl Tool for Pencil {
                 }
 
                 let mut stroke_points = Vec::new();
-                let curve_pts = curve::fit_curve(2, pts.as_slice(), 0.01);
+                let curve_pts = curve::fit_curve(2, pts.as_slice(), 1.0);
                 for i in 0..(curve_pts.len() / (2 * 3)) {
                     let a = glam::vec2(curve_pts[i * 6 + 0], curve_pts[i * 6 + 1]);
                     let p = glam::vec2(curve_pts[i * 6 + 2], curve_pts[i * 6 + 3]);
@@ -134,7 +134,7 @@ impl Tool for Pencil {
         ui.color_edit_button_rgb(&mut color);
         state.color = glam::Vec3::from_slice(&color);
 
-        ui.add(egui::Slider::new(&mut state.stroke_r, 0.01..=1.0));
+        ui.add(egui::Slider::new(&mut state.stroke_r, 1.0..=50.0));
 
         ui.checkbox(&mut state.stroke_filled, "Filled");
     }

@@ -21,7 +21,7 @@ pub struct ScenePanel {
 
     #[serde(skip)]
     pub cam_pos: glam::Vec2,
-    #[serde(default)]
+    #[serde(skip)]
     pub cam_size: f32,
     #[serde(skip)]
     pub cam_aspect : f32
@@ -40,12 +40,17 @@ impl ScenePanel {
             fb_pick: Arc::new(Mutex::new(None)),
             color_key_map: Vec::new(),
             cam_pos: glam::vec2(0.0, 0.0),
-            cam_size: 5.0,
+            cam_size: 600.0,
             cam_aspect: 1.0
         }
     }
 
     pub fn render(&mut self, ui: &mut egui::Ui, state: &mut EditorState, renderer: &mut EditorRenderer) {
+        // Hack to get around serde's default stuff
+        if self.cam_size == 0.0 {
+            self.cam_size = 600.0; 
+        }
+
         let no_margin = egui::Frame {
             inner_margin: egui::Margin::same(0.0),
             ..Default::default()
@@ -188,7 +193,7 @@ impl ScenePanel {
                         acts.push(act);
                     }
                     for stroke in strokes {
-                        Stroke::transform(&mut state.project, stroke.make_ptr(), glam::Mat4::from_translation(glam::vec3(0.5, 0.0, 0.0)));
+                        Stroke::transform(&mut state.project, stroke.make_ptr(), glam::Mat4::from_translation(glam::vec3(20.0, 0.0, 0.0)));
                         if let Some(clone) = stroke.make_ptr().make_obj_clone(&mut state.project) {
                             if let Some((stroke, act)) = Stroke::add(&mut state.project, frame, clone) {
                                 acts.push(act);
@@ -215,7 +220,7 @@ impl ScenePanel {
             let zoom_fac =
                 (1.05 as f32).powf(-ui.input(|i| i.scroll_delta.y.clamp(-6.0, 6.0) * 0.7));
             let next_cam_size = self.cam_size * zoom_fac;
-            if next_cam_size > 0.02 && next_cam_size < 1000.0 {
+            if next_cam_size > 10.0 && next_cam_size < 1000.0 {
                 self.cam_pos -= (mouse_pos - self.cam_pos) * (zoom_fac - 1.0);
                 self.cam_size = next_cam_size;
             }
@@ -296,7 +301,7 @@ impl ScenePanel {
         if let Some(gfx) = state.project.graphics.get(gfx) { 
 
             if gfx.clip {
-                let cam_top = 5.0;
+                let cam_top = gfx.h as f32 / 2.0;
                 let cam_btm = -cam_top;
                 let cam_right = cam_top * ((gfx.w as f32) / (gfx.h as f32));
                 let cam_left = -cam_right;

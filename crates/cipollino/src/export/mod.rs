@@ -54,7 +54,7 @@ impl Export {
                     let gfx = state.project.graphics.get(*gfx_key).unwrap();
                     let w = gfx.w;
                     let h = gfx.h;
-                    renderer.render(fb, None, w * aa_scl, h * aa_scl, glam::Vec2::ZERO, 5.0, &mut state.project, *gfx_key, *frame, 0, 0, gl);
+                    renderer.render(fb, None, w * aa_scl, h * aa_scl, glam::Vec2::ZERO, h as f32 / 2.0, &mut state.project, *gfx_key, *frame, 0, 0, gl);
                     aa_fb.resize(w, h, gl);
                     unsafe {
                         gl.bind_framebuffer(glow::FRAMEBUFFER, Some(aa_fb.fbo));
