@@ -14,12 +14,12 @@ pub struct Frame {
 impl ChildObj for Frame {
     type Parent = Layer;
 
-    fn get_sibling_list(project: &mut Project, parent: ObjPtr<Self::Parent>) -> Option<&mut Vec<ObjBox<Frame>>> {
-        if let Some(layer) = project.layers.get_mut(parent) {
-            Some(&mut layer.frames)
-        } else {
-            None
-        }
+    fn get_list_in_parent(parent: &Self::Parent) -> &Vec<ObjBox<Self>> {
+        &parent.frames
+    }
+
+    fn get_list_in_parent_mut(parent: &mut Self::Parent) -> &mut Vec<ObjBox<Self>> {
+        &mut parent.frames
     }
 
 }

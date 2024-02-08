@@ -104,6 +104,14 @@ impl<T: Obj> PartialEq for ObjPtr<T> {
 
 impl<T: Obj> Eq for ObjPtr<T> {}
 
+impl<T: Obj> Default for ObjPtr<T> {
+
+    fn default() -> Self {
+        Self::null() 
+    }
+    
+}
+
 #[derive(Clone)]
 pub struct ObjBox<T: Obj> {
     ptr: ObjPtr<T>
@@ -147,10 +155,27 @@ pub trait Obj: Sized + ObjClone {
 pub trait ChildObj: Obj + 'static {
     type Parent: Obj;
 
-    fn get_sibling_list(project: &mut Project, parent: ObjPtr<Self::Parent>) -> Option<&mut Vec<ObjBox<Self>>>;
+    fn get_list_in_parent(parent: &Self::Parent) -> &Vec<ObjBox<Self>>;
+    fn get_list_in_parent_mut(parent: &mut Self::Parent) -> &mut Vec<ObjBox<Self>>;
+
+    fn get_sibling_list(project: &Project, parent: ObjPtr<Self::Parent>) -> Option<&Vec<ObjBox<Self>>> {
+        if let Some(parent) = Self::Parent::get_list(project).get(parent) {
+            Some(Self::get_list_in_parent(parent))
+        } else {
+            None
+        }
+    }
+
+    fn get_sibling_list_mut(project: &mut Project, parent: ObjPtr<Self::Parent>) -> Option<&mut Vec<ObjBox<Self>>> {
+        if let Some(parent) = Self::Parent::get_list_mut(project).get_mut(parent) {
+            Some(Self::get_list_in_parent_mut(parent))
+        } else {
+            None
+        }
+    }
 
     fn add_at_idx(project: &mut Project, parent: ObjPtr<Self::Parent>, obj: Self, idx: i32) -> Option<(ObjPtr<Self>, ObjAction)> {
-        if let None = Self::get_sibling_list(project, parent) {
+        if let None = Self::get_sibling_list_mut(project, parent) {
             return None;
         }
         let obj_box = Self::get_list_mut(project).add(obj);
@@ -159,7 +184,7 @@ pub trait ChildObj: Obj + 'static {
 
         let obj_store = orig_obj_store.clone();
         let redo = move |proj: &'_ mut Project| {
-            if let Some(siblings) = Self::get_sibling_list(proj, parent) {
+            if let Some(siblings) = Self::get_sibling_list_mut(proj, parent) {
                 let obj = obj_store.replace(None).unwrap(); 
                 let idx = if siblings.len() == 0 {
                     0
@@ -174,7 +199,7 @@ pub trait ChildObj: Obj + 'static {
 
         let obj_store = orig_obj_store.clone();
         let undo = move |proj: &'_ mut Project| {
-            if let Some(siblings) = Self::get_sibling_list(proj, parent) {
+            if let Some(siblings) = Self::get_sibling_list_mut(proj, parent) {
                 let idx = siblings.iter().position(|other_obj| other_obj.make_ptr() == obj_ptr).unwrap();
                 let obj = siblings.remove(idx);
                 obj_store.replace(Some(obj));
@@ -191,7 +216,7 @@ pub trait ChildObj: Obj + 'static {
     }
 
     fn delete(project: &mut Project, parent: ObjPtr<Self::Parent>, obj: ObjPtr<Self>) -> Option<ObjAction> {
-        let siblings = Self::get_sibling_list(project, parent);
+        let siblings = Self::get_sibling_list_mut(project, parent);
         if let None = siblings {
             return None;
         }
@@ -201,7 +226,7 @@ pub trait ChildObj: Obj + 'static {
 
             let obj_store = orig_obj_store.clone();
             let redo = move |proj: &'_ mut Project| {
-                if let Some(siblings) = Self::get_sibling_list(proj, parent) {
+                if let Some(siblings) = Self::get_sibling_list_mut(proj, parent) {
                     let obj_box = siblings.remove(idx);
                     obj_store.replace(Some(obj_box));
                 }
@@ -209,7 +234,7 @@ pub trait ChildObj: Obj + 'static {
 
             let obj_store = orig_obj_store.clone();
             let undo = move |proj: &'_ mut Project| {
-                if let Some(siblings) = Self::get_sibling_list(proj, parent) {
+                if let Some(siblings) = Self::get_sibling_list_mut(proj, parent) {
                     let obj_box = obj_store.replace(None).unwrap();
                     siblings.insert(idx, obj_box);
                 }
@@ -223,7 +248,7 @@ pub trait ChildObj: Obj + 'static {
     }
 
     fn get_box(project: &mut Project, parent: ObjPtr<Self::Parent>, obj: ObjPtr<Self>) -> Option<&ObjBox<Self>> {
-        let siblings = Self::get_sibling_list(project, parent)?;
+        let siblings = Self::get_sibling_list_mut(project, parent)?;
         for sibling in siblings {
             if sibling.make_ptr() == obj {
                 return Some(sibling);

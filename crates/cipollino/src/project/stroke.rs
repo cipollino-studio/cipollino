@@ -103,12 +103,12 @@ impl Stroke {
 impl ChildObj for Stroke {
     type Parent = Frame;
 
-    fn get_sibling_list(project: &mut Project, parent: ObjPtr<Self::Parent>) -> Option<&mut Vec<ObjBox<Self>>> {
-        if let Some(frame) = project.frames.get_mut(parent) {
-            Some(&mut frame.strokes)
-        } else {
-            None
-        }
+    fn get_list_in_parent(parent: &Self::Parent) -> &Vec<ObjBox<Self>> {
+        &parent.strokes
+    }
+
+    fn get_list_in_parent_mut(parent: &mut Self::Parent) -> &mut Vec<ObjBox<Self>> {
+        &mut parent.strokes
     }
 
 }

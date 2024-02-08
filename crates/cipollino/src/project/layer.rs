@@ -62,12 +62,12 @@ impl Layer {
 impl ChildObj for Layer {
     type Parent = Graphic;
 
-    fn get_sibling_list(project: &mut super::Project, parent: ObjPtr<Self::Parent>) -> Option<&mut Vec<ObjBox<Self>>> {
-        if let Some(graphic) = project.graphics.get_mut(parent) {
-            Some(&mut graphic.layers)
-        } else {
-            None
-        }
+    fn get_list_in_parent(parent: &Self::Parent) -> &Vec<ObjBox<Self>> {
+        &parent.layers
+    }
+
+    fn get_list_in_parent_mut(parent: &mut Self::Parent) -> &mut Vec<ObjBox<Self>> {
+        &mut parent.layers
     }
 
 }

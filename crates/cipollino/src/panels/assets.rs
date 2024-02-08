@@ -1,8 +1,5 @@
 
-
-use std::{cell::RefCell, rc::Rc};
-
-use crate::{editor::EditorState, project::{action::{Action, ObjAction}, graphic::Graphic, obj::asset::next_valid_name}};
+use crate::{editor::EditorState, project::{action::Action, graphic::Graphic, obj::{asset::Asset, ObjPtr}}};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct AssetsPanel {
@@ -10,6 +7,10 @@ pub struct AssetsPanel {
     create_graphic_data: Graphic,
     #[serde(skip)]
     create_graphic_dialog_open: bool,
+    #[serde(skip)]
+    gfx_editing_name: ObjPtr<Graphic>,
+    #[serde(skip)]
+    gfx_edit_curr_name: String
 }
 
 impl AssetsPanel {
@@ -19,6 +20,8 @@ impl AssetsPanel {
         Self {
             create_graphic_data: Graphic::default(),
             create_graphic_dialog_open: false,
+            gfx_editing_name: ObjPtr::null(),
+            gfx_edit_curr_name: "".to_owned()
         }
     }
 
@@ -28,31 +31,20 @@ impl AssetsPanel {
         }
 
         let mut close_create_graphic_dialog = false;
+        let root_folder = state.project.root_folder.make_ptr();
         egui::Window::new("New Graphic")
             .collapsible(false)
             .open(&mut self.create_graphic_dialog_open)
             .show(ui.ctx(), |ui| {
                 graphic_data_editor(ui, &mut self.create_graphic_data);
                 if ui.button("Create").clicked() {
-                    let gfx = state.project.graphics.add(Graphic {
+                    if let Some((_, acts)) = Graphic::asset_add(&mut state.project, root_folder, Graphic {
                         layers: Vec::new(),
-                        name: next_valid_name(&state.project, self.create_graphic_data.name.clone(), &state.project.root_graphics),
+                        name: self.create_graphic_data.name.clone(),
                         ..self.create_graphic_data
-                    });
-                    let gfx_ptr = gfx.make_ptr();
-                    state.project.root_graphics.push(gfx);
-
-                    let obj_store_redo = Rc::new(RefCell::new(None));
-                    let obj_store_undo = obj_store_redo.clone();
-                    state.actions.add(Action::from_single(ObjAction::new(move |proj| {
-                        let obj = obj_store_undo.replace(None).unwrap();
-                        proj.root_graphics.push(obj);
-                    }, move |proj| {
-                        let idx = proj.root_graphics.iter().position(|gfx| gfx.make_ptr() == gfx_ptr).unwrap();
-                        let obj = proj.root_graphics.remove(idx);
-                        *obj_store_redo.borrow_mut() = Some(obj);
-                    })));
-
+                    }) {
+                        state.actions.add(Action::from_list(acts));
+                    }
                     close_create_graphic_dialog = true;
                 }
         });
@@ -60,17 +52,51 @@ impl AssetsPanel {
             self.create_graphic_dialog_open = false;
         }
 
-        for gfx in state.project.root_graphics.iter() {
-            let label_response = ui.add(
-                egui::Label::new(gfx.get(&state.project).name.as_str())
-                .sense(egui::Sense::click()));
-            if label_response.double_clicked() {
-                state.open_graphic = gfx.make_ptr(); 
-                if gfx.get(&state.project).layers.len() > 0 {
-                    state.active_layer = gfx.get(&state.project).layers[0].make_ptr();
+        let mut delete_gfx = None;
+        let mut rename_gfx = None;
+        for gfx in state.project.root_folder.get(&state.project).graphics.iter() {
+            if gfx.make_ptr() != self.gfx_editing_name {
+                let label_response = ui.add(
+                    egui::Label::new(gfx.get(&state.project).name.as_str())
+                    .sense(egui::Sense::click()));
+                if label_response.double_clicked() {
+                    state.open_graphic = gfx.make_ptr(); 
+                    if gfx.get(&state.project).layers.len() > 0 {
+                        state.active_layer = gfx.get(&state.project).layers[0].make_ptr();
+                    }
+                }
+                label_response.context_menu(|ui| {
+                    if ui.button("Rename").clicked() {
+                        self.gfx_editing_name = gfx.make_ptr();
+                        self.gfx_edit_curr_name = gfx.get(&state.project).name().clone();
+                        ui.close_menu();
+                    }
+                    if ui.button("Delete").clicked() {
+                        delete_gfx = Some(gfx.make_ptr());
+                        ui.close_menu();
+                    }
+                });
+            } else {
+                if ui.text_edit_singleline(&mut self.gfx_edit_curr_name).lost_focus() {
+                    rename_gfx = Some(self.gfx_edit_curr_name.clone());
                 }
             }
         }
+        if let Some(name) = rename_gfx {
+            if let Some(act) = Graphic::rename(&mut state.project, self.gfx_editing_name, name) {
+                state.actions.add(Action::from_single(act));
+            }
+            self.gfx_editing_name = ObjPtr::null();
+        }
+        if let Some(gfx) = delete_gfx {
+            if gfx == state.open_graphic {
+                state.open_graphic = ObjPtr::null();
+            }
+            if let Some(acts) = Graphic::asset_delete(&mut state.project, gfx) {
+                state.actions.add(Action::from_list(acts));
+            }
+        }
+        
     }
 
 }
