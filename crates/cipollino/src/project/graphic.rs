@@ -1,7 +1,7 @@
 
 use project_macros::{ObjClone, Object};
 
-use super::{action::ObjAction, folder::Folder, layer::Layer, obj::{asset::Asset, ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr}, Project};
+use super::{action::ObjAction, folder::Folder, layer::Layer, obj::{asset::Asset, child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr}, Project};
 
 #[derive(Object, Clone, ObjClone)]
 pub struct Graphic {
@@ -36,6 +36,10 @@ impl Default for Graphic {
 
 impl ChildObj for Graphic {
     type Parent = Folder;
+
+    fn parent_mut(&mut self) -> &mut ObjPtr<Self::Parent> {
+        &mut self.folder
+    }
 
     fn get_list_in_parent(parent: &Self::Parent) -> &Vec<ObjBox<Self>> {
         &parent.graphics

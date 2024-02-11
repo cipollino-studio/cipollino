@@ -1,5 +1,6 @@
 
 use editor::Editor;
+use renderer::scene::SceneRenderer;
 
 pub mod editor;
 pub mod panels;
@@ -15,12 +16,16 @@ fn main() -> Result<(), eframe::Error> {
         let rgba = img.into_raw();
         (rgba, w, h)
     };
+    let icon_data = egui::IconData {
+        rgba: icon,
+        width: w,
+        height: h,
+    };
 
     let options = eframe::NativeOptions {
-        icon_data: Some(eframe::IconData { rgba: icon, width: w, height: h }),
-        initial_window_size: Some(egui::vec2(1280.0, 720.0)),
         multisampling: 4,
         renderer: eframe::Renderer::Glow,
+        viewport: egui::ViewportBuilder::default().with_title("Cipollino").with_maximized(true).with_icon(icon_data),
         ..Default::default()
     };
     
@@ -32,19 +37,30 @@ fn main() -> Result<(), eframe::Error> {
 }
 
 struct Cipollino {
-    editor: Editor
+    editor: Editor,
+    scene_renderer: Option<SceneRenderer>,
 }
 
 impl Cipollino {
 
     pub fn new(cc: &eframe::CreationContext) -> Self {
         let mut fonts = egui::FontDefinitions::default();
-        egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+        let mut phosphor_font_data = egui::FontData::from_static(include_bytes!("../../../res/Phosphor.ttf"));
+        phosphor_font_data.tweak.y_offset_factor = 0.1;
+
+        fonts
+            .font_data
+            .insert("phosphor".into(),phosphor_font_data);
+
+        if let Some(font_keys) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
+            font_keys.push("phosphor".into());
+        }
 
         cc.egui_ctx.set_fonts(fonts);
         
         Self {
-            editor: Editor::new()
+            editor: Editor::new(),
+            scene_renderer: None
         }
     }
 
@@ -56,7 +72,7 @@ impl eframe::App for Cipollino {
         ctx.style_mut(|style| {
             style.interaction.tooltip_delay = 0.75;
         });
-        self.editor.render(ctx, frame);
+        self.editor.render(ctx, frame, &mut self.scene_renderer);
     }
 
 }

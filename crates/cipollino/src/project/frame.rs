@@ -1,7 +1,7 @@
 
 use project_macros::{ObjClone, Object};
 
-use super::{Project, action::ObjAction, stroke::Stroke, obj::Obj, obj::{ObjBox, ObjList, ObjClone}, obj::ChildObj, obj::ObjPtr, layer::Layer};
+use super::{Project, action::ObjAction, stroke::Stroke, obj::Obj, obj::{ObjBox, ObjList, ObjClone}, obj::child_obj::ChildObj, obj::ObjPtr, layer::Layer};
 
 #[derive(Object, Clone, ObjClone)]
 pub struct Frame {
@@ -13,6 +13,10 @@ pub struct Frame {
 
 impl ChildObj for Frame {
     type Parent = Layer;
+
+    fn parent_mut(&mut self) -> &mut ObjPtr<Self::Parent> {
+        &mut self.layer
+    }
 
     fn get_list_in_parent(parent: &Self::Parent) -> &Vec<ObjBox<Self>> {
         &parent.frames

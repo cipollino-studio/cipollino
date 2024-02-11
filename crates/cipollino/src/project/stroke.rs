@@ -5,7 +5,7 @@ use serde_json::json;
 
 use crate::renderer::mesh::Mesh;
 
-use super::{obj::{Obj, ObjList, ObjClone}, action::ObjAction, Project, obj::{ObjBox, ObjPtr}, obj::ChildObj, frame::Frame};
+use super::{obj::{Obj, ObjList, ObjClone}, action::ObjAction, Project, obj::{ObjBox, ObjPtr}, obj::child_obj::ChildObj, frame::Frame};
 
 #[derive(Clone, Copy, ObjClone, Default)]
 pub struct StrokePoint {
@@ -102,6 +102,10 @@ impl Stroke {
 
 impl ChildObj for Stroke {
     type Parent = Frame;
+
+    fn parent_mut(&mut self) -> &mut ObjPtr<Self::Parent> {
+        &mut self.frame
+    }
 
     fn get_list_in_parent(parent: &Self::Parent) -> &Vec<ObjBox<Self>> {
         &parent.strokes

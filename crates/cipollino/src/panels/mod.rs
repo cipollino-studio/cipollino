@@ -15,13 +15,13 @@ pub enum Panel {
     Tool(tool::ToolPanel)
 }
 
-pub struct PanelViewer<'a> {
+pub struct PanelViewer<'a, 'b> {
     state: &'a mut EditorState,
-    renderer: &'a mut EditorRenderer,
+    renderer: &'a mut EditorRenderer<'b>,
     enable: bool
 }
 
-impl egui_dock::TabViewer for PanelViewer<'_> {
+impl egui_dock::TabViewer for PanelViewer<'_, '_> {
     type Tab = (u64, Panel);
 
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {

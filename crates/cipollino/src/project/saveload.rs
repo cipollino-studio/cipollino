@@ -31,7 +31,11 @@ impl Project {
 
         for file in &self.files_to_delete {
             let path = folder_path.with_file_name(file.clone());
-            let _ = fs::remove_file(path);
+            if path.is_dir() {
+                let _ = fs::remove_dir_all(path);
+            } else {
+                let _ = fs::remove_file(path);
+            }
         }
         self.files_to_delete.clear();
 
@@ -51,12 +55,22 @@ impl Project {
     }
 
     pub fn save_folder(&mut self, folder: ObjPtr<Folder>, path: &PathBuf) {
+        let mut subfolders = Vec::new();
         if let Some(folder) = self.folders.get(folder) {
+            for subfolder in &folder.folders {
+                let mut new_path = path.with_file_name(subfolder.get(self).name.clone()); 
+                let _ = std::fs::create_dir(new_path.clone());
+                new_path.push("a");
+                subfolders.push((subfolder.make_ptr(), new_path));
+            }
             for gfx_box in &folder.graphics {
                 let gfx = gfx_box.get(self);
                 let data = gfx_box.obj_serialize(self);
                 write_json_file(&path.with_file_name(format!("{}.cipgfx", gfx.name)), data);
             }
+        }
+        for (ptr, path) in subfolders {
+            self.save_folder(ptr, &path);
         }
     }
 
@@ -77,27 +91,35 @@ impl Project {
         }
 
         let folder_path = proj_file_path.parent().unwrap();
-        res.root_folder = res.load_folder(&folder_path.to_owned()); 
+        res.root_folder = res.load_folder(&folder_path.to_owned(), ObjPtr::null()); 
 
         res.save_path = Some(proj_file_path);
 
         res
     }
 
-    fn load_folder(&mut self, path: &PathBuf) -> ObjBox<Folder> {
-        let res = self.folders.add(Folder::new());
+    fn load_folder(&mut self, path: &PathBuf, parent: ObjPtr<Folder>) -> ObjBox<Folder> {
+        let res = self.folders.add(Folder::new(parent));
+        res.get_mut(self).name = path.file_name().unwrap().to_str().unwrap().to_owned();
+
         if let Ok(paths) = fs::read_dir(path) {
             for path in paths {
                 if let Ok(path) = path {
-                    if let Some(ext) = path.path().extension() {
+                    let path = path.path();
+                    if let Some(ext) = path.extension() {
                         if ext == "cipgfx" {
-                            if let Some(data) = read_json_file(&path.path()) { 
+                            if let Some(data) = read_json_file(&path) { 
                                 if let Some(gfx) = ObjBox::<Graphic>::obj_deserialize(self, &data) {
+                                    gfx.get_mut(self).folder = res.make_ptr();
                                     res.get_mut(self).graphics.push(gfx);
                                 }
                             }
                         }
                     } 
+                    if path.is_dir() {
+                        let folder = self.load_folder(&path, res.make_ptr());
+                        res.get_mut(self).folders.push(folder);
+                    }
                 }
             }
         }

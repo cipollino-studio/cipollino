@@ -1,5 +1,5 @@
 
-use std::{cell::RefCell, fs, path::PathBuf, rc::Rc, sync::{Arc, Mutex}};
+use std::{cell::RefCell, fs, path::PathBuf, rc::Rc, sync::Arc};
 
 use crate::{panels::{self, timeline::{new_frame, prev_keyframe, next_keyframe}, tools::{pencil::Pencil, Tool, select::Select, bucket::Bucket}}, project::{Project, graphic::Graphic, action::ActionManager, obj::ObjPtr, stroke::Stroke, layer::Layer}, renderer::scene::SceneRenderer, export::Export};
 use egui::Modifiers;
@@ -10,29 +10,9 @@ use self::clipboard::Clipboard;
 pub mod selection;
 pub mod clipboard;
 
-pub struct EditorRenderer {
-    pub gl_ctx: Arc<Mutex<Option<Arc<glow::Context>>>>,
-    renderer: Option<SceneRenderer>,
-}
-
-impl EditorRenderer {
-
-    pub fn new() -> Self {
-        Self {
-            renderer: None,
-            gl_ctx: Arc::new(Mutex::new(None))
-        }
-    }
-
-    pub fn use_renderer<F>(&mut self, f: F) where F: FnOnce(&Arc<glow::Context>, &mut SceneRenderer) {
-        if let Some(gl) = self.gl_ctx.lock().unwrap().as_ref() {
-            if let None = self.renderer {
-                self.renderer = Some(SceneRenderer::new(gl));
-            }
-            f(gl, self.renderer.as_mut().unwrap());
-        }
-    }
-
+pub struct EditorRenderer<'a> {
+    pub gl: &'a Arc<glow::Context>,
+    pub renderer: &'a mut SceneRenderer,
 }
 
 pub struct EditorState {
@@ -141,7 +121,6 @@ pub struct Editor {
     state: EditorState,
     panels: panels::PanelManager,
     config_path: String,
-    pub renderer: EditorRenderer,
     pub export: Export,
 }
 
@@ -164,13 +143,21 @@ impl Editor {
             panels,
             config_path,
             export: Export::new(), 
-            renderer: EditorRenderer::new(),
         };
         
         res
     }
 
-    pub fn render(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    pub fn render(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame, scene_renderer: &mut Option<SceneRenderer>) {
+        let gl = frame.gl().unwrap();
+        if scene_renderer.is_none() {
+            *scene_renderer = Some(SceneRenderer::new(gl));
+        }
+        let mut renderer = EditorRenderer {
+            gl,
+            renderer: scene_renderer.as_mut().unwrap()
+        }; 
+
         if let Some(gfx) = self.state.project.graphics.get(self.state.open_graphic) {
             if self.state.playing {
                 self.state.time += ctx.input(|i| i.stable_dt);
@@ -300,10 +287,10 @@ impl Editor {
         egui::CentralPanel::default()
             .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.))
             .show(ctx, |_ui| {
-                self.panels.render(ctx, self.export.exporting.is_none(), &mut self.state, &mut self.renderer);
+                self.panels.render(ctx, self.export.exporting.is_none(), &mut self.state, &mut renderer);
             });
 
-        self.export.render(ctx, &mut self.state, &mut self.renderer);
+        self.export.render(ctx, &mut self.state, &mut renderer);
 
         let _ = std::fs::write(self.config_path.clone() + "/dock.json", serde_json::json!(self.panels).to_string());
 

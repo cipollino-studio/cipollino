@@ -5,7 +5,7 @@ use glow::HasContext;
 
 use crate::{
     editor::{clipboard::Clipboard, selection::Selection, EditorRenderer, EditorState},
-    renderer::{fb::Framebuffer, mesh::Mesh, shader::Shader, scene::SceneRenderer}, util::curve, project::{action::Action, graphic::Graphic, obj::{ChildObj, ObjPtr}, stroke::Stroke},
+    renderer::{fb::Framebuffer, mesh::Mesh, shader::Shader}, util::curve, project::{action::Action, graphic::Graphic, obj::{child_obj::ChildObj, ObjPtr}, stroke::Stroke},
 };
 
 use super::tools::active_frame_proj_layer_frame;
@@ -92,12 +92,10 @@ impl ScenePanel {
                             egui::Sense::click_and_drag(),
                         );
 
-                        let gl_ctx_copy = renderer.gl_ctx.clone();
                         let fb_copy = self.fb.clone();
 
                         let cb = egui_glow::CallbackFn::new(move |_info, painter| {
                             let gl = painter.gl();
-                            *gl_ctx_copy.lock().unwrap() = Some(gl.clone());
                             if let Some(fb) = fb_copy.lock().unwrap().as_ref() {
                                 // TODO: this is scuffed and inneficient
                                 let mut shader = Shader::new(
@@ -168,11 +166,8 @@ impl ScenePanel {
             if ui.input_mut(|i| i.consume_shortcut(&delete_shortcut)) {
                 let mut action = Action::new();
                 for stroke_ptr in strokes {
-                    if let Some(stroke) = state.project.strokes.get(*stroke_ptr) {
-                        let frame = stroke.frame;
-                        if let Some(act) = Stroke::delete(&mut state.project, frame, *stroke_ptr) {
-                            action.add(act);
-                        }
+                    if let Some(act) = Stroke::delete(&mut state.project, *stroke_ptr) {
+                        action.add(act);
                     }
                 }
                 state.actions.add(action);
@@ -218,7 +213,7 @@ impl ScenePanel {
             self.cam_aspect = rect.aspect_ratio();
 
             let zoom_fac =
-                (1.05 as f32).powf(-ui.input(|i| i.scroll_delta.y.clamp(-6.0, 6.0) * 0.7));
+                (1.05 as f32).powf(-ui.input(|i| i.smooth_scroll_delta.y.clamp(-6.0, 6.0) * 0.7));
             let next_cam_size = self.cam_size * zoom_fac;
             if next_cam_size > 10.0 && next_cam_size < 1000.0 {
                 self.cam_pos -= (mouse_pos - self.cam_pos) * (zoom_fac - 1.0);
@@ -226,76 +221,72 @@ impl ScenePanel {
             }
 
             let tool = state.curr_tool.clone();
-            renderer.use_renderer(|gl, _rendererer| {
-                if response.drag_started() {
-                    tool.borrow_mut().mouse_click(mouse_pos, state, ui, self, gl);
-                }
-                if response.dragged() {
-                    tool.borrow_mut().mouse_down(mouse_pos, state, self);
-                }
-                if response.drag_released() {
-                    tool.borrow_mut().mouse_release(mouse_pos, state, ui, self, gl);
-                }
-                if response.hovered() {
-                    ui.ctx().output_mut(|o| {
-                        let tool = state.curr_tool.clone();
-                        o.cursor_icon = tool.borrow_mut().mouse_cursor(mouse_pos, state, self, gl);
-                    });
-                }
-            });
+            if response.drag_started() {
+                tool.borrow_mut().mouse_click(mouse_pos, state, ui, self, renderer.gl);
+            }
+            if response.dragged() {
+                tool.borrow_mut().mouse_down(mouse_pos, state, self);
+            }
+            if response.drag_released() {
+                tool.borrow_mut().mouse_release(mouse_pos, state, ui, self, renderer.gl);
+            }
+            if response.hovered() {
+                ui.ctx().output_mut(|o| {
+                    let tool = state.curr_tool.clone();
+                    o.cursor_icon = tool.borrow_mut().mouse_cursor(mouse_pos, state, self, renderer.gl);
+                });
+            }
         }
 
         // Render scene to framebuffer
         let frame = state.frame();
-        renderer.use_renderer(|gl, renderer| {
-            let mut fb = self.fb.lock().unwrap();
-            let mut fb_pick = self.fb_pick.lock().unwrap();
-            if let None = fb.as_ref() {
-                *fb = Some(Framebuffer::new(100, 100, gl));
-                *fb_pick = Some(Framebuffer::new(100, 100, gl));
-            }
-            let fb = fb.as_mut().unwrap();
-            let fb_pick = fb_pick.as_mut().unwrap();
+        let mut fb = self.fb.lock().unwrap();
+        let mut fb_pick = self.fb_pick.lock().unwrap();
+        if let None = fb.as_ref() {
+            *fb = Some(Framebuffer::new(100, 100, renderer.gl));
+            *fb_pick = Some(Framebuffer::new(100, 100, renderer.gl));
+        }
+        let fb = fb.as_mut().unwrap();
+        let fb_pick = fb_pick.as_mut().unwrap();
 
-            if let Some(proj_view) = renderer.render(
-                fb,
-                Some((fb_pick, &mut self.color_key_map)),
-                (rect.width() as u32) * 4,
-                (rect.height() as u32) * 4,
-                self.cam_pos,
-                self.cam_size,
-                &mut state.project,
-                gfx,
-                frame,
-                if state.playing { 0 } else { state.onion_before },
-                if state.playing { 0 } else { state.onion_after },
-                gl,
-            ) {
-                self.render_overlays(gfx, renderer, gl, proj_view, state);
-            }
+        if let Some(proj_view) = renderer.renderer.render(
+            fb,
+            Some((fb_pick, &mut self.color_key_map)),
+            (rect.width() as u32) * 4,
+            (rect.height() as u32) * 4,
+            self.cam_pos,
+            self.cam_size,
+            &mut state.project,
+            gfx,
+            frame,
+            if state.playing { 0 } else { state.onion_before },
+            if state.playing { 0 } else { state.onion_after },
+            renderer.gl,
+        ) {
+            self.render_overlays(gfx, renderer, proj_view, state);
+        }
 
-            Framebuffer::render_to_win(
-                ui.ctx().screen_rect().width() as u32,
-                ui.ctx().screen_rect().height() as u32,
-                gl,
-            );
-        });
+        Framebuffer::render_to_win(
+            ui.ctx().screen_rect().width() as u32,
+            ui.ctx().screen_rect().height() as u32,
+            renderer.gl,
+        );
 
     }
 
-    fn render_overlays(&self, gfx: ObjPtr<Graphic>, renderer: &mut SceneRenderer, gl: &Arc<glow::Context>, proj_view: glam::Mat4, state: &mut EditorState) {
-        renderer.flat_color_shader.enable(gl);
+    fn render_overlays(&self, gfx: ObjPtr<Graphic>, renderer: &mut EditorRenderer, proj_view: glam::Mat4, state: &mut EditorState) {
+        renderer.renderer.flat_color_shader.enable(renderer.gl);
         renderer
-            .flat_color_shader
-            .set_vec4("uColor", glam::vec4(0.0, 0.0, 0.0, 0.3), gl);
+            .renderer.flat_color_shader
+            .set_vec4("uColor", glam::vec4(0.0, 0.0, 0.0, 0.3), renderer.gl);
         let mut draw_quad = |left: f32, right: f32, top: f32, bottom: f32| {
             let center = glam::vec3((left + right) / 2.0, (top + bottom) / 2.0, 0.0);
             let scale = glam::vec3(right - left, top - bottom, 1.0);
             let model =
                 glam::Mat4::from_translation(center) * glam::Mat4::from_scale(scale);
             let trans = proj_view * model;
-            renderer.flat_color_shader.set_mat4("uTrans", &trans, gl);
-            renderer.quad.render(gl);
+            renderer.renderer.flat_color_shader.set_mat4("uTrans", &trans, renderer.gl);
+            renderer.renderer.quad.render(renderer.gl);
         };
 
         if let Some(gfx) = state.project.graphics.get(gfx) { 
@@ -316,7 +307,7 @@ impl ScenePanel {
                 draw_quad(-huge, cam_left, cam_btm, -huge);
             }
 
-            let mut overlay = OverlayRenderer::new(renderer, gl, proj_view, self.cam_size);
+            let mut overlay = OverlayRenderer::new(renderer, proj_view, self.cam_size);
             state.curr_tool.clone().borrow_mut().draw_overlay(&mut overlay, state); 
             if let Selection::Scene(strokes) = &state.selection {
                 for stroke in strokes {
@@ -372,19 +363,17 @@ impl ScenePanel {
 
 }
 
-pub struct OverlayRenderer<'a> {
-    renderer: &'a mut SceneRenderer,
-    gl: &'a Arc<glow::Context>,
+pub struct OverlayRenderer<'a, 'b> {
+    renderer: &'a mut EditorRenderer<'b>,
     proj_view: glam::Mat4,
     pub cam_size: f32
 }
 
-impl<'a> OverlayRenderer<'a> {
+impl<'a, 'b> OverlayRenderer<'a, 'b> {
 
-    pub fn new(renderer: &'a mut SceneRenderer, gl: &'a Arc<glow::Context>, proj_view: glam::Mat4, cam_size: f32) -> Self {
+    pub fn new(renderer: &'a mut EditorRenderer<'b>, proj_view: glam::Mat4, cam_size: f32) -> Self {
         Self {
             renderer,
-            gl,
             proj_view,
             cam_size
         }
@@ -397,19 +386,19 @@ impl<'a> OverlayRenderer<'a> {
         let angle = glam::vec2(1.0, 0.0).angle_between(p1 - p0);
         let model = glam::Mat4::from_translation(glam::vec3(center.x, center.y, 0.0)) * glam::Mat4::from_axis_angle(glam::vec3(0.0, 0.0, 1.0), angle) * glam::Mat4::from_scale(scale);
         let trans = self.proj_view * model; 
-        self.renderer.flat_color_shader.enable(self.gl);
-        self.renderer.flat_color_shader.set_mat4("uTrans", &trans, self.gl);
-        self.renderer.flat_color_shader.set_vec4("uColor", color, self.gl);
-        self.renderer.quad.render(self.gl);
+        self.renderer.renderer.flat_color_shader.enable(self.renderer.gl);
+        self.renderer.renderer.flat_color_shader.set_mat4("uTrans", &trans, self.renderer.gl);
+        self.renderer.renderer.flat_color_shader.set_vec4("uColor", color, self.renderer.gl);
+        self.renderer.renderer.quad.render(self.renderer.gl);
     }
 
     pub fn circle(&mut self, pt: Vec2, color: glam::Vec4, r: f32) {
         let model = glam::Mat4::from_translation(glam::vec3(pt.x, pt.y, 0.0)) * glam::Mat4::from_scale(glam::Vec3::splat(r * 2.0));
         let trans = self.proj_view * model;
-        self.renderer.circle_shader.enable(self.gl);
-        self.renderer.flat_color_shader.set_mat4("uTrans", &trans, self.gl);
-        self.renderer.flat_color_shader.set_vec4("uColor", color, self.gl);
-        self.renderer.quad.render(self.gl);
+        self.renderer.renderer.circle_shader.enable(self.renderer.gl);
+        self.renderer.renderer.flat_color_shader.set_mat4("uTrans", &trans, self.renderer.gl);
+        self.renderer.renderer.flat_color_shader.set_vec4("uColor", color, self.renderer.gl);
+        self.renderer.renderer.quad.render(self.renderer.gl);
     }
 
 }

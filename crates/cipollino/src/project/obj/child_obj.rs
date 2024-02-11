@@ -1,0 +1,143 @@
+use std::{cell::RefCell, rc::Rc};
+
+use crate::project::{action::ObjAction, Project};
+
+use super::{Obj, ObjBox, ObjPtr};
+
+
+pub trait ChildObj: Obj + 'static {
+    type Parent: Obj;
+
+    fn parent_mut(&mut self) -> &mut ObjPtr<Self::Parent>;
+    fn get_list_in_parent(parent: &Self::Parent) -> &Vec<ObjBox<Self>>;
+    fn get_list_in_parent_mut(parent: &mut Self::Parent) -> &mut Vec<ObjBox<Self>>;
+
+    fn get_sibling_list(project: &Project, parent: ObjPtr<Self::Parent>) -> Option<&Vec<ObjBox<Self>>> {
+        if let Some(parent) = Self::Parent::get_list(project).get(parent) {
+            Some(Self::get_list_in_parent(parent))
+        } else {
+            None
+        }
+    }
+
+    fn get_sibling_list_mut(project: &mut Project, parent: ObjPtr<Self::Parent>) -> Option<&mut Vec<ObjBox<Self>>> {
+        if let Some(parent) = Self::Parent::get_list_mut(project).get_mut(parent) {
+            Some(Self::get_list_in_parent_mut(parent))
+        } else {
+            None
+        }
+    }
+
+    fn add_at_idx(project: &mut Project, parent: ObjPtr<Self::Parent>, obj: Self, idx: i32) -> Option<(ObjPtr<Self>, ObjAction)> {
+        if let None = Self::get_sibling_list_mut(project, parent) {
+            return None;
+        }
+        let obj_box = Self::get_list_mut(project).add(obj);
+        let obj_ptr = obj_box.make_ptr();
+        let orig_obj_store = Rc::new(RefCell::new(Some(obj_box)));
+
+        let obj_store = orig_obj_store.clone();
+        let redo = move |proj: &'_ mut Project| {
+            if let Some(siblings) = Self::get_sibling_list_mut(proj, parent) {
+                let obj = obj_store.replace(None).unwrap(); 
+                let idx = if siblings.len() == 0 {
+                    0
+                } else if idx < 0 {
+                    siblings.len() - ((-idx as usize) % siblings.len())
+                } else {
+                    (idx as usize) % siblings.len()
+                };
+                siblings.insert(idx, obj);
+            }
+        };
+
+        let obj_store = orig_obj_store.clone();
+        let undo = move |proj: &'_ mut Project| {
+            if let Some(siblings) = Self::get_sibling_list_mut(proj, parent) {
+                let idx = siblings.iter().position(|other_obj| other_obj.make_ptr() == obj_ptr).unwrap();
+                let obj = siblings.remove(idx);
+                obj_store.replace(Some(obj));
+            }
+        };
+
+        redo(project);
+
+        return Some((obj_ptr, ObjAction::new(redo, undo)));
+    }
+
+    fn add(project: &mut Project, parent: ObjPtr<Self::Parent>, obj: Self) -> Option<(ObjPtr<Self>, ObjAction)> {
+        Self::add_at_idx(project, parent, obj, -1)
+    }
+
+    fn delete(project: &mut Project, obj: ObjPtr<Self>) -> Option<ObjAction> {
+        let parent = *Self::get_list_mut(project).get_mut(obj)?.parent_mut();
+        let siblings = Self::get_sibling_list_mut(project, parent);
+        if let None = siblings {
+            return None;
+        }
+        let siblings = siblings.unwrap();
+        if let Some(idx) = siblings.iter().position(|other_obj| other_obj.make_ptr() == obj) {
+            let orig_obj_store = Rc::new(RefCell::new(None));
+
+            let obj_store = orig_obj_store.clone();
+            let redo = move |proj: &'_ mut Project| {
+                if let Some(siblings) = Self::get_sibling_list_mut(proj, parent) {
+                    let obj_box = siblings.remove(idx);
+                    obj_store.replace(Some(obj_box));
+                }
+            };
+
+            let obj_store = orig_obj_store.clone();
+            let undo = move |proj: &'_ mut Project| {
+                if let Some(siblings) = Self::get_sibling_list_mut(proj, parent) {
+                    let obj_box = obj_store.replace(None).unwrap();
+                    siblings.insert(idx, obj_box);
+                }
+            };
+
+            redo(project);
+
+            return Some(ObjAction::new(redo, undo));
+        }
+        None
+    }
+
+    fn get_box(project: &mut Project, parent: ObjPtr<Self::Parent>, obj: ObjPtr<Self>) -> Option<&ObjBox<Self>> {
+        let siblings = Self::get_sibling_list_mut(project, parent)?;
+        for sibling in siblings {
+            if sibling.make_ptr() == obj {
+                return Some(sibling);
+            }
+        }
+        None
+    }
+
+    fn transfer(project: &mut Project, obj_ptr: ObjPtr<Self>, new_parent: ObjPtr<Self::Parent>) -> Option<ObjAction> {
+        let obj = Self::get_list_mut(project).get_mut(obj_ptr)?;
+        if *obj.parent_mut() == new_parent {
+            return None;
+        }
+        let init_parent = *obj.parent_mut();
+        let idx = Self::get_sibling_list(&project, init_parent)?.iter().position(|other_obj| other_obj.make_ptr() == obj_ptr)?;
+        Self::get_sibling_list(&project, new_parent)?;
+
+        let redo = move |proj: &'_ mut Project| {
+            let obj_box = Self::get_sibling_list_mut(proj, init_parent).unwrap().remove(idx);
+            Self::get_sibling_list_mut(proj, new_parent).unwrap().push(obj_box);
+            let obj = Self::get_list_mut(proj).get_mut(obj_ptr).unwrap();
+            *obj.parent_mut() = new_parent;
+        };
+
+        let undo = move |proj: &'_ mut Project| {
+            let obj_box = Self::get_sibling_list_mut(proj, new_parent).unwrap().pop().unwrap();
+            Self::get_sibling_list_mut(proj, init_parent).unwrap().insert(idx, obj_box);
+            let obj = Self::get_list_mut(proj).get_mut(obj_ptr).unwrap();
+            *obj.parent_mut() = init_parent;
+        };
+
+        redo(project);
+
+        Some(ObjAction::new(redo, undo))
+    } 
+
+}

@@ -1,10 +1,11 @@
 
 use project_macros::{ObjClone, Object};
 
-use super::{Project, ObjBox, action::ObjAction, frame::Frame, obj::{Obj, ObjPtr, ChildObj, ObjList, ObjClone}, graphic::Graphic};
+use super::{Project, ObjBox, action::ObjAction, frame::Frame, obj::{Obj, ObjPtr, child_obj::ChildObj, ObjList, ObjClone}, graphic::Graphic};
 
 #[derive(Object, Clone, ObjClone)]
 pub struct Layer {
+    pub graphic: ObjPtr<Graphic>,
     #[field]
     pub name: String,
     pub frames: Vec<ObjBox<Frame>>
@@ -62,6 +63,10 @@ impl Layer {
 impl ChildObj for Layer {
     type Parent = Graphic;
 
+    fn parent_mut(&mut self) -> &mut ObjPtr<Self::Parent> {
+        &mut self.graphic
+    }
+
     fn get_list_in_parent(parent: &Self::Parent) -> &Vec<ObjBox<Self>> {
         &parent.layers
     }
@@ -76,6 +81,7 @@ impl Default for Layer {
 
     fn default() -> Self {
         Self {
+            graphic: ObjPtr::null(),
             name: "Layer".to_owned(),
             frames: Vec::new()
         }

@@ -9,7 +9,7 @@ pub mod action;
 pub mod saveload;
 use std::{collections::HashSet, path::PathBuf};
 
-use self::{folder::Folder, frame::Frame, graphic::Graphic, layer::Layer, obj::{ObjBox, ObjList}, stroke::Stroke};
+use self::{folder::Folder, frame::Frame, graphic::Graphic, layer::Layer, obj::{ObjBox, ObjList, ObjPtr}, stroke::Stroke};
 
 pub struct Project {
     pub folders: ObjList<Folder>,
@@ -28,7 +28,7 @@ impl Project {
 
     pub fn new() -> Self {
         let mut folder_list = ObjList::new();
-        let root = folder_list.add(Folder::new());
+        let root = folder_list.add(Folder::new(ObjPtr::null()));
         Self {
             folders: folder_list,
             graphics: ObjList::new(),

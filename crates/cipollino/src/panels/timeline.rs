@@ -1,6 +1,6 @@
 
 use egui::Vec2;
-use crate::{editor::{selection::Selection, EditorState}, project::{action::Action, frame::Frame, graphic::Graphic, layer::Layer, obj::ChildObj}};
+use crate::{editor::{selection::Selection, EditorState}, project::{action::Action, frame::Frame, graphic::Graphic, layer::Layer, obj::child_obj::ChildObj}};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct TimelinePanel {
@@ -91,7 +91,7 @@ impl TimelinePanel {
                         .frame(no_margin)
                         .show_inside(ui, |ui| {
                             if hovering_layers {
-                                self.scroll_y -= ui.input(|i| i.scroll_delta.y);
+                                self.scroll_y -= ui.input(|i| i.smooth_scroll_delta.y);
                                 self.scroll_y = self.scroll_y.clamp(0.0, self.scroll_h);
                             }
                             let scroll_area = egui::ScrollArea::vertical()
@@ -118,7 +118,7 @@ impl TimelinePanel {
                 .frame(no_margin)
                 .show_inside(ui, |ui| {
                     if hovering_frame_num_bar {
-                        self.scroll_x -= ui.input(|i| i.scroll_delta.x);
+                        self.scroll_x -= ui.input(|i| i.smooth_scroll_delta.x);
                         self.scroll_x = self.scroll_x.clamp(0.0, self.scroll_w);
                     }
                     let scroll_area = egui::ScrollArea::horizontal()
@@ -163,11 +163,8 @@ impl TimelinePanel {
             if ui.input_mut(|i| i.consume_shortcut(&delete_shortcut)) {
                 let mut action = Action::new();
                 for frame_ptr in frames {
-                    if let Some(frame) = state.project.frames.get(*frame_ptr) {
-                        let layer = frame.layer;
-                        if let Some(act) = Frame::delete(&mut state.project, layer, *frame_ptr) {
-                            action.add(act);
-                        }
+                    if let Some(act) = Frame::delete(&mut state.project, *frame_ptr) {
+                        action.add(act);
                     }
                 }
                 state.selection.clear();
@@ -182,6 +179,7 @@ impl TimelinePanel {
 
         if ui.button("+").clicked() {
             if let Some((layer, act)) = Layer::add(&mut state.project, state.open_graphic, Layer {
+                graphic: state.open_graphic,
                 name: "Layer".to_owned(),
                 frames: Vec::new()
             }) {
@@ -269,19 +267,19 @@ impl TimelinePanel {
             if layer.make_ptr() == state.active_layer {
                 ui.painter().rect(rect, 0.0, highlight, egui::Stroke::NONE);
             }
-            let layer_name_response = ui.put(rect, egui::Label::new(layer.get(&state.project).name.clone()).sense(egui::Sense::click()))
-                .context_menu(|ui| {
-                    if ui.button("Delete").clicked() {
-                        delete_layer = Some(layer.make_ptr()); 
-                    }
-                });
+            let layer_name_response = ui.put(rect, egui::Label::new(layer.get(&state.project).name.clone()).sense(egui::Sense::click()));
+            layer_name_response.context_menu(|ui| {
+                if ui.button("Delete").clicked() {
+                    delete_layer = Some(layer.make_ptr()); 
+                }
+            });
             if layer_name_response.clicked() {
                 state.active_layer = layer.make_ptr();
             }
             i += 1;
         }
         if let Some(layer) = delete_layer {
-            if let Some(act) = Layer::delete(&mut state.project, state.open_graphic, layer) {
+            if let Some(act) = Layer::delete(&mut state.project, layer) {
                 state.actions.add(Action::from_single(act));
             }
         }
