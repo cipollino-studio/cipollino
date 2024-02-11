@@ -83,13 +83,14 @@ impl AssetsPanel {
     fn render_asset_hiearchy(&mut self, ui: &mut egui::Ui, state: &mut EditorState) {
         let mut open_gfx = None;
         let mut delete_gfx = None;
+        let mut delete_folder = None;
         let mut rename_gfx = None;
         let mut asset_transfer = None;
         let style = ui.style_mut();
         let init_inactive_bg_fill = std::mem::replace(&mut style.visuals.widgets.inactive.bg_fill, style.visuals.window_fill);
         let init_active_bg_fill = std::mem::replace(&mut style.visuals.widgets.active.bg_fill, style.visuals.window_fill);
 
-        self.render_folder_contents(ui, state, state.project.root_folder.make_ptr(), &mut open_gfx, &mut delete_gfx, &mut rename_gfx, &mut asset_transfer);
+        self.render_folder_contents(ui, state, state.project.root_folder.make_ptr(), &mut open_gfx, &mut delete_gfx, &mut delete_folder, &mut rename_gfx, &mut asset_transfer);
         let (_, root_payload) = ui.dnd_drop_zone::<AssetDragPayload>(egui::Frame::default(), |ui| {
             ui.allocate_exact_size(ui.available_size(), egui::Sense::hover());
         });
@@ -115,6 +116,12 @@ impl AssetsPanel {
                 state.open_graphic = ObjPtr::null();
             }
             if let Some(acts) = Graphic::asset_delete(&mut state.project, gfx) {
+                state.actions.add(Action::from_list(acts));
+            }
+        }
+
+        if let Some(folder) = delete_folder {
+            if let Some(acts) = Folder::asset_delete(&mut state.project, folder) {
                 state.actions.add(Action::from_list(acts));
             }
         }
@@ -146,13 +153,14 @@ impl AssetsPanel {
             folder_ptr: ObjPtr<Folder>,
             open_gfx: &mut Option<ObjPtr<Graphic>>,
             delete_gfx: &mut Option<ObjPtr<Graphic>>,
+            delete_folder: &mut Option<ObjPtr<Folder>>,
             rename_gfx: &mut Option<String>,
             asset_transfer: &mut Option<(ObjPtr<Folder>, AssetDragPayload)>) -> Option<bool> {
         let folder = state.project.folders.get(folder_ptr)?;
 
         let mut inner_hovered = false;
         for subfolder in &folder.folders {
-            inner_hovered |= self.render_subfolder(ui, state, subfolder, open_gfx, delete_gfx, rename_gfx, asset_transfer)?;
+            inner_hovered |= self.render_subfolder(ui, state, subfolder, open_gfx, delete_gfx, delete_folder, rename_gfx, asset_transfer)?;
         }
 
         for gfx in &folder.graphics {
@@ -189,6 +197,7 @@ impl AssetsPanel {
         folder: &ObjBox<Folder>,
         open_gfx: &mut Option<ObjPtr<Graphic>>,
         delete_gfx: &mut Option<ObjPtr<Graphic>>,
+        delete_folder: &mut Option<ObjPtr<Folder>>,
         rename_gfx: &mut Option<String>,
         asset_transfer: &mut Option<(ObjPtr<Folder>, AssetDragPayload)>) -> Option<bool> {
 
@@ -197,11 +206,11 @@ impl AssetsPanel {
 
         let mut frame = egui::Frame::default().begin(ui);
         let mut inner_hovered = false;
-        draggable_widget(&mut frame.content_ui, AssetDragPayload::Folder(folder.make_ptr()), |ui| {
+        let folder_resp = draggable_widget(&mut frame.content_ui, AssetDragPayload::Folder(folder.make_ptr()), |ui| {
             let resp = ui.collapsing(folder.get(&state.project).name.as_str(), |ui| {
-                inner_hovered |= self.render_folder_contents(ui, state, folder.make_ptr(), open_gfx, delete_gfx, rename_gfx, asset_transfer).unwrap_or(false);
+                inner_hovered |= self.render_folder_contents(ui, state, folder.make_ptr(), open_gfx, delete_gfx, delete_folder, rename_gfx, asset_transfer).unwrap_or(false);
             }).header_response;
-            ((), resp)
+            (resp.clone(), resp)
         });
         let response = frame.allocate_space(ui);
 
@@ -218,6 +227,13 @@ impl AssetsPanel {
         frame.frame.stroke = stroke;
 
         frame.paint(ui);
+
+        folder_resp.context_menu(|ui| {
+            if ui.button("Delete").clicked() {
+                *delete_folder = Some(folder.make_ptr());
+                ui.close_menu();
+            }
+        });
 
         if !inner_hovered {
             if let Some(payload) = response.dnd_release_payload::<AssetDragPayload>() {
