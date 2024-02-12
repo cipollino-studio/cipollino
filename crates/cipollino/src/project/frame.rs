@@ -1,10 +1,11 @@
 
-use project_macros::{ObjClone, Object};
+use project_macros::{ObjClone, ObjSerialize, Object};
 
-use super::{Project, action::ObjAction, stroke::Stroke, obj::Obj, obj::{ObjBox, ObjList, ObjClone}, obj::child_obj::ChildObj, obj::ObjPtr, layer::Layer};
+use super::{Project, action::ObjAction, stroke::Stroke, obj::Obj, obj::{ObjBox, ObjList, ObjClone, ObjSerialize, ObjPtrAny}, obj::child_obj::ChildObj, obj::ObjPtr, layer::Layer};
 
-#[derive(Object, Clone, ObjClone)]
+#[derive(Object, Clone, ObjClone, ObjSerialize)]
 pub struct Frame {
+    #[parent]
     pub layer: ObjPtr<Layer>,
     #[field]
     pub time: i32,

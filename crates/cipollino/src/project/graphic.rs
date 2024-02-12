@@ -1,9 +1,9 @@
 
-use project_macros::{ObjClone, Object};
+use project_macros::{ObjClone, ObjSerialize, Object};
 
-use super::{action::ObjAction, folder::Folder, layer::Layer, obj::{asset::Asset, child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr}, Project};
+use super::{action::ObjAction, folder::Folder, layer::Layer, obj::{asset::Asset, child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjSerialize, ObjPtrAny}, Project};
 
-#[derive(Object, Clone, ObjClone)]
+#[derive(Object, Clone, ObjClone, ObjSerialize)]
 pub struct Graphic {
     #[field]
     pub name: String,
@@ -16,6 +16,7 @@ pub struct Graphic {
     #[field]
     pub h: u32,
     pub layers: Vec<ObjBox<Layer>>,
+    #[parent]
     pub folder: ObjPtr<Folder>
 }
 

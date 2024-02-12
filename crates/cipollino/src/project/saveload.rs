@@ -5,7 +5,7 @@ use serde_json::json;
 
 use crate::project::{graphic::Graphic, obj::ObjBox};
 
-use super::{folder::Folder, obj::{ObjClone, ObjPtr}, Project};
+use super::{folder::Folder, obj::{ObjPtr, ObjSerialize}, Project};
 
 pub fn read_json_file(path: &PathBuf) -> Option<serde_json::Value> {
     let mut file = fs::File::open(path).ok()?;
@@ -41,15 +41,7 @@ impl Project {
 
         self.save_folder(self.root_folder.make_ptr(), &folder_path);
         
-        let data = json!{{
-            "curr_keys": {
-                "graphics": self.graphics.curr_key,
-                "layers": self.layers.curr_key,
-                "frames": self.frames.curr_key,
-                "strokes": self.strokes.curr_key,
-            }
-        }};
-        write_json_file(&folder_path.with_file_name("proj.cip"), data);
+        write_json_file(&folder_path.with_file_name("proj.cip"), json!({}));
 
         self.save_path = Some(folder_path.with_file_name("proj.cip"));
     }
@@ -77,17 +69,8 @@ impl Project {
     pub fn load(proj_file_path: PathBuf) -> Self {
         let mut res = Self::new();
 
-        if let Some(proj_data) = read_json_file(&proj_file_path) {
-            let mut read_curr_keys = || {
-                let curr_keys = proj_data.get("curr_keys")?.as_object()?;
-                res.graphics.curr_key = curr_keys.get("graphics").unwrap_or(&json!(1)).as_u64().unwrap_or(1);
-                res.layers.curr_key = curr_keys.get("layers").unwrap_or(&json!(1)).as_u64().unwrap_or(1);
-                res.frames.curr_key = curr_keys.get("frames").unwrap_or(&json!(1)).as_u64().unwrap_or(1);
-                res.strokes.curr_key = curr_keys.get("strokes").unwrap_or(&json!(1)).as_u64().unwrap_or(1);
-                Some(()) 
-            };
-
-            read_curr_keys();
+        if let Some(_proj_data) = read_json_file(&proj_file_path) {
+            
         }
 
         let folder_path = proj_file_path.parent().unwrap();
@@ -109,8 +92,8 @@ impl Project {
                     if let Some(ext) = path.extension() {
                         if ext == "cipgfx" {
                             if let Some(data) = read_json_file(&path) { 
-                                if let Some(gfx) = ObjBox::<Graphic>::obj_deserialize(self, &data) {
-                                    gfx.get_mut(self).folder = res.make_ptr();
+                                if let Some(gfx) = ObjBox::<Graphic>::obj_deserialize(self, &data, res.make_ptr().into()) {
+                                    gfx.get_mut(self).name = path.file_stem().unwrap().to_str().unwrap().to_owned();
                                     res.get_mut(self).graphics.push(gfx);
                                 }
                             }

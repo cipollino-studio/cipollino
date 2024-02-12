@@ -1,8 +1,8 @@
 
 use std::path::PathBuf;
 
-use project_macros::{ObjClone, Object};
-use crate::project::obj::{Obj, ObjList};
+use project_macros::{ObjClone, ObjSerialize, Object};
+use crate::project::obj::{Obj, ObjList, ObjSerialize, ObjPtrAny};
 use crate::project::Project;
 use super::graphic::Graphic;
 use super::obj::asset::Asset;
@@ -11,11 +11,12 @@ use super::obj::{ObjBox, ObjClone, ObjPtr};
 use super::action::ObjAction;
 
 
-#[derive(Object, Clone, ObjClone)]
+#[derive(Object, Clone, ObjClone, ObjSerialize)]
 pub struct Folder {
     #[field]
     pub name: String,
 
+    #[parent]
     pub folder: ObjPtr<Folder>,
     pub graphics: Vec<ObjBox<Graphic>>,
     pub folders: Vec<ObjBox<Folder>>

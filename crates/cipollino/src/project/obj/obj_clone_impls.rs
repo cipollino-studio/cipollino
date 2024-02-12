@@ -1,20 +1,20 @@
 
-use std::marker::PhantomData;
-
 use crate::project::Project;
-use super::{Obj, ObjBox, ObjClone, ObjPtr};
+use super::{child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjPtr, ObjPtrAny, ObjSerialize};
 use serde_json::json;
 
-impl<T: ObjClone> ObjClone for Vec<T> {
+impl<T: ObjClone> ObjClone for Vec<T> {}
+
+impl<T: ObjSerialize> ObjSerialize for Vec<T> {
 
     fn obj_serialize(&self, project: &Project) -> serde_json::Value {
         self.iter().map(|elem| elem.obj_serialize(project)).collect()
     }
 
-    fn obj_deserialize(project: &mut Project, data: &serde_json::Value) -> Option<Self> {
+    fn obj_deserialize(project: &mut Project, data: &serde_json::Value, parent: ObjPtrAny) -> Option<Self> {
         let mut res = Vec::new(); 
         for elem in data.as_array()? {
-            res.push(T::obj_deserialize(project, elem)?);
+            res.push(T::obj_deserialize(project, elem, parent)?);
         }
         Some(res)
     }
@@ -23,13 +23,15 @@ impl<T: ObjClone> ObjClone for Vec<T> {
 
 trait Simple : Clone + serde::Serialize + for<'a> serde::Deserialize<'a> {}
 
-impl<T: Simple> ObjClone for T {
+impl<T: Simple> ObjClone for T {}
+
+impl<T: Simple> ObjSerialize for T {
 
     fn obj_serialize(&self, _project: &Project) -> serde_json::Value {
         json! {self}
     }
 
-    fn obj_deserialize(_project: &mut Project, data: &serde_json::Value) -> Option<Self> {
+    fn obj_deserialize(_project: &mut Project, data: &serde_json::Value, _parent: ObjPtrAny) -> Option<Self> {
         serde_json::from_value(data.clone()).ok()
     }
 
@@ -45,20 +47,7 @@ impl Simple for glam::Vec2 {}
 impl Simple for glam::Vec3 {}
 impl Simple for glam::Vec4 {}
 
-impl<T: Obj> ObjClone for ObjPtr<T> {
-
-    fn obj_serialize(&self, _project: &Project) -> serde_json::Value {
-        json!{self.key}
-    }
-
-    fn obj_deserialize(_project: &mut Project, data: &serde_json::Value) -> Option<Self> {
-        Some(Self {
-            key: data.as_u64()?,
-            _marker: PhantomData
-        })
-    }
-
-}
+impl<T: Obj> ObjClone for ObjPtr<T> {}
 
 impl<T: Obj> ObjClone for ObjBox<T> {
 
@@ -70,17 +59,17 @@ impl<T: Obj> ObjClone for ObjBox<T> {
         T::get_list_mut(project).add(obj_clone)
     }
 
+}
+
+impl<T: ChildObj + ObjSerialize> ObjSerialize for ObjBox<T> {
+
     fn obj_serialize(&self, project: &Project) -> serde_json::Value {
-        json! {{
-            "ptr": self.ptr.obj_serialize(project),
-            "obj": self.get(project).obj_serialize(project)
-        }}
+        self.get(project).obj_serialize(project)
     }
 
-    fn obj_deserialize(project: &mut Project, data: &serde_json::Value) -> Option<Self> {
-        let ptr = ObjPtr::<T>::obj_deserialize(project, data.get("ptr")?)?;
-        let obj = T::obj_deserialize(project, data.get("obj")?)?;
+    fn obj_deserialize(project: &mut Project, data: &serde_json::Value, _parent: ObjPtrAny) -> Option<Self> {
+        let ptr = T::get_list_mut(project).next_ptr();
+        let obj = T::obj_deserialize(project, data, ptr.into())?;
         Some(T::get_list_mut(project).add_with_ptr(obj, ptr))
     }
-
 }

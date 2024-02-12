@@ -1,13 +1,13 @@
 
 use glam::{Vec2, Mat4, vec3, vec2};
-use project_macros::{ObjClone, Object};
+use project_macros::{ObjClone, ObjSerialize, Object};
 use serde_json::json;
 
 use crate::renderer::mesh::Mesh;
 
-use super::{obj::{Obj, ObjList, ObjClone}, action::ObjAction, Project, obj::{ObjBox, ObjPtr}, obj::child_obj::ChildObj, frame::Frame};
+use super::{action::ObjAction, frame::Frame, obj::{child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjSerialize, ObjPtrAny}, Project};
 
-#[derive(Clone, Copy, ObjClone, Default)]
+#[derive(Clone, Copy, ObjClone, Default, ObjSerialize)]
 pub struct StrokePoint {
     pub a: Vec2,
     pub pt: Vec2,
@@ -44,20 +44,23 @@ impl Default for StrokeMesh {
     }
 }
 
-impl ObjClone for StrokeMesh {
+impl ObjClone for StrokeMesh {}
+
+impl ObjSerialize for StrokeMesh {
     fn obj_serialize(&self, _project: &Project) -> serde_json::Value {
         json! {
             null
         }
     }
 
-    fn obj_deserialize(_project: &mut Project, _data: &serde_json::Value) -> Option<Self> {
+    fn obj_deserialize(_project: &mut Project, _data: &serde_json::Value, _parent: ObjPtrAny) -> Option<Self> {
         Some(Self::new())
     }
 }
 
-#[derive(Object, Clone, ObjClone)]
+#[derive(Object, Clone, ObjClone, ObjSerialize)]
 pub struct Stroke {
+    #[parent]
     pub frame: ObjPtr<Frame>,
     #[field]
     pub color: glam::Vec3,

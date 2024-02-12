@@ -26,6 +26,14 @@ impl<T: Obj> ObjList<T> {
         }
     }
 
+    pub fn next_ptr(&mut self) -> ObjPtr<T> {
+        self.curr_key += 1;
+        ObjPtr {
+            key: self.curr_key - 1,
+            _marker: PhantomData
+        }
+    }
+
     pub fn add(&mut self, obj: T) -> ObjBox<T> {
         self.objs.insert(self.curr_key, obj);
         self.curr_key += 1;
@@ -97,6 +105,28 @@ impl<T: Obj> ObjPtr<T> {
 
 }
 
+#[derive(Clone, Copy)]
+pub struct ObjPtrAny(u64);
+
+impl<T: Obj> From<ObjPtrAny> for ObjPtr<T> {
+
+    fn from(value: ObjPtrAny) -> Self {
+        ObjPtr {
+            key: value.0,
+            _marker: PhantomData
+        }
+    }
+
+}
+
+impl<T: Obj> From<ObjPtr<T>> for ObjPtrAny {
+
+    fn from(value: ObjPtr<T>) -> Self {
+        Self(value.key)
+    }
+
+}
+
 impl<T: Obj> Clone for ObjPtr<T> {
 
     fn clone(&self) -> Self {
@@ -164,9 +194,12 @@ pub trait ObjClone : Clone {
         self.clone()
     }
 
-    fn obj_serialize(&self, project: &Project) -> serde_json::Value;
+}
 
-    fn obj_deserialize(project: &mut Project, data: &serde_json::Value) -> Option<Self>;
+pub trait ObjSerialize : Sized {
+
+    fn obj_serialize(&self, project: &Project) -> serde_json::Value;
+    fn obj_deserialize(project: &mut Project, data: &serde_json::Value, parent: ObjPtrAny) -> Option<Self>;
 
 }
 

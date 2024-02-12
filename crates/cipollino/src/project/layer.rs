@@ -1,10 +1,11 @@
 
-use project_macros::{ObjClone, Object};
+use project_macros::{ObjClone, ObjSerialize, Object};
 
-use super::{Project, ObjBox, action::ObjAction, frame::Frame, obj::{Obj, ObjPtr, child_obj::ChildObj, ObjList, ObjClone}, graphic::Graphic};
+use super::{Project, ObjBox, action::ObjAction, frame::Frame, obj::{Obj, ObjPtr, child_obj::ChildObj, ObjList, ObjClone, ObjSerialize, ObjPtrAny}, graphic::Graphic};
 
-#[derive(Object, Clone, ObjClone)]
+#[derive(Object, Clone, ObjClone, ObjSerialize)]
 pub struct Layer {
+    #[parent]
     pub graphic: ObjPtr<Graphic>,
     #[field]
     pub name: String,
