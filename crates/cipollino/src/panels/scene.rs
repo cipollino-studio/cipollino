@@ -86,6 +86,13 @@ impl ScenePanel {
                         state.reset_tool();
                         state.curr_tool = tool;
                     }
+
+                    let mut color = [state.color.x.powf(2.0), state.color.y.powf(2.0), state.color.z.powf(2.0)];
+                    let prev_interact_size = ui.spacing().interact_size;
+                    ui.spacing_mut().interact_size = egui::Vec2::splat(30.0);
+                    ui.color_edit_button_rgb(&mut color);
+                    ui.spacing_mut().interact_size = prev_interact_size; 
+                    state.color = glam::vec3(color[0].sqrt(), color[1].sqrt(), color[2].sqrt()); 
                 });
             let response = egui::CentralPanel::default()
                 .frame(no_margin)

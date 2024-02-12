@@ -130,12 +130,7 @@ impl Tool for Pencil {
     }
 
     fn tool_panel(&mut self, ui: &mut egui::Ui, state: &mut crate::editor::EditorState) {
-        let mut color = [state.color.x, state.color.y, state.color.z];
-        ui.color_edit_button_rgb(&mut color);
-        state.color = glam::Vec3::from_slice(&color);
-
         ui.add(egui::Slider::new(&mut state.stroke_r, 1.0..=50.0));
-
         ui.checkbox(&mut state.stroke_filled, "Filled");
     }
 
