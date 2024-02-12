@@ -43,7 +43,7 @@ impl Tool for Bucket {
         // This uses a standard bitmap floodfill algorithmn adapted to work with vector art
         // Is this the best approach? Probably not.
 
-        let grid_size = 1.0;
+        let grid_size = 2.0;
 
         let snap_coords = |pt: Vec2| {
             ((pt.x / grid_size).floor() as i32, (pt.y / grid_size).floor() as i32)
@@ -121,8 +121,8 @@ impl Tool for Bucket {
                                 for i in 0..10 {
                                     let a0 = i as f32 / 10.0 * std::f32::consts::PI;
                                     let a1 = (i + 1) as f32 / 10.0 * std::f32::consts::PI;
-                                    let p0 = p1 + a0.cos() * norm + a0.sin() * tang;
-                                    let p1 = p1 + a1.cos() * norm + a1.sin() * tang;
+                                    let p0 = p1 + a0.cos() * norm - a0.sin() * tang;
+                                    let p1 = p1 + a1.cos() * norm - a1.sin() * tang;
                                     if let Some(intersect) = segment_intersect(p0, p1, curr_unsnapped, next_unsnapped) {
                                         boundary.insert(next, intersect);
                                         return true;
