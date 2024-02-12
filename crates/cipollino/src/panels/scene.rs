@@ -188,9 +188,9 @@ impl ScenePanel {
         }
 
         // Pasting strokes
-        let paste_shortcut = state.paste_shortcut();
         if let Clipboard::Scene(strokes) = &state.clipboard {
-            if ui.input_mut(|i| i.consume_shortcut(&paste_shortcut)) {
+            let event_list = ui.input(|i| i.filtered_events(&egui::EventFilter::default()));
+            if event_list.iter().position(|e| if let egui::Event::Paste(_) = e { true } else { false }).is_some() {
                 let frame = state.frame();
                 if let Some((frame, act)) = active_frame_proj_layer_frame(&mut state.project, state.active_layer, frame) {
                     state.selection.clear();

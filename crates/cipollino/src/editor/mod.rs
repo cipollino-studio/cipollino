@@ -104,11 +104,11 @@ impl EditorState {
     }
 
     pub fn copy_shortcut(&self) -> egui::KeyboardShortcut {
-        egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::C)
+        egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::Copy)
     }
 
     pub fn paste_shortcut(&self) -> egui::KeyboardShortcut {
-        egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::V)
+        egui::KeyboardShortcut::new(egui::Modifiers::NONE, egui::Key::Paste)
     }
 
     pub fn reset_tool(&mut self) {
@@ -222,12 +222,12 @@ impl Editor {
                 next_keyframe(&mut self.state); 
             }
 
+            if ui.input(|i| i.filtered_events(&egui::EventFilter::default()).contains(&egui::Event::Copy)) {
+                self.state.clipboard = Clipboard::from_selection(&self.state.selection, &mut self.state.project);
+            }
+
             if ui.input_mut(|i| i.consume_shortcut(&save_shortcut)) {
                 self.save();
-            }
-            
-            if ui.input_mut(|i| i.consume_shortcut(&self.state.copy_shortcut())) {
-                self.state.clipboard = Clipboard::from_selection(&self.state.selection, &mut self.state.project);
             }
 
             egui::menu::bar(ui, |ui| {
