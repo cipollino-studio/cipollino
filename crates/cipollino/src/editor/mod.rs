@@ -296,6 +296,8 @@ impl Editor {
 
         self.state.toasts.show(ctx);
 
+        self.state.project.garbage_collect_objs();
+
     }
 
     pub fn save(&mut self) {

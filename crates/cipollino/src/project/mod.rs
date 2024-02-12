@@ -41,4 +41,12 @@ impl Project {
         }
     }
 
+    pub fn garbage_collect_objs(&mut self) {
+        self.folders.garbage_collect_objs();
+        self.graphics.garbage_collect_objs();
+        self.layers.garbage_collect_objs();
+        self.frames.garbage_collect_objs();
+        self.strokes.garbage_collect_objs();
+    }
+
 }

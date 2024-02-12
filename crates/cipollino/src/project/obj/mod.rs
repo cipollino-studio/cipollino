@@ -1,5 +1,5 @@
 
-use std::{collections::HashMap, marker::PhantomData};
+use std::{collections::HashMap, marker::PhantomData, sync::{Arc, Mutex}};
 use super::Project;
 
 mod obj_clone_impls;
@@ -7,7 +7,12 @@ pub mod asset;
 pub mod child_obj;
 
 pub struct ObjList<T: Obj> {
-    objs: HashMap<u64, T>, 
+    objs: HashMap<u64, T>,
+    /*
+        When an ObjBox is dropped, we want to automatically destroy the object it contained.
+        A reference to list is given to each ObjBox, allowing the list to "garbage collect" deleted objects.
+    */
+    dropped: Arc<Mutex<Vec<u64>>>,
     pub curr_key: u64
 }
 
@@ -16,6 +21,7 @@ impl<T: Obj> ObjList<T> {
     pub fn new() -> Self {
         Self {
             objs: HashMap::new(),
+            dropped: Arc::new(Mutex::new(Vec::new())),
             curr_key: 1
         }
     }
@@ -27,14 +33,16 @@ impl<T: Obj> ObjList<T> {
             ptr: ObjPtr {
                 key: self.curr_key - 1,
                 _marker: PhantomData
-            } 
+            },
+            dropped: self.dropped.clone()
         }
     }
 
     pub fn add_with_ptr(&mut self, obj: T, ptr: ObjPtr<T>) -> ObjBox<T> {
         self.objs.insert(ptr.key, obj);
         ObjBox {
-            ptr
+            ptr,
+            dropped: self.dropped.clone()
         }
     }
 
@@ -53,6 +61,14 @@ impl<T: Obj> ObjList<T> {
     pub fn get_then_mut<F, R>(&mut self, ptr: ObjPtr<T>, callback: F) -> Option<R> where F: FnOnce(&mut T) -> R {
         self.get_mut(ptr).map(callback)
     }
+
+    pub fn garbage_collect_objs(&mut self) {
+        let mut dropped = self.dropped.lock().unwrap();
+        for key in dropped.iter() {
+            self.objs.remove(key);
+        }
+        dropped.clear();
+    } 
 
 }
 
@@ -114,7 +130,8 @@ impl<T: Obj> Default for ObjPtr<T> {
 
 #[derive(Clone)]
 pub struct ObjBox<T: Obj> {
-    ptr: ObjPtr<T>
+    ptr: ObjPtr<T>,
+    dropped: Arc<Mutex<Vec<u64>>>
 }
 
 impl<T: Obj> ObjBox<T> {
@@ -129,6 +146,14 @@ impl<T: Obj> ObjBox<T> {
 
     pub fn make_ptr(&self) -> ObjPtr<T> {
         self.ptr
+    }
+
+}
+
+impl<T: Obj> Drop for ObjBox<T> {
+
+    fn drop(&mut self) {
+        self.dropped.lock().unwrap().push(self.ptr.key);
     }
 
 }
