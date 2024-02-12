@@ -20,6 +20,9 @@ pub struct ScenePanel {
     color_key_map: Vec<ObjPtr<Stroke>>, 
 
     #[serde(skip)]
+    prev_mouse_down: bool,
+
+    #[serde(skip)]
     pub cam_pos: glam::Vec2,
     #[serde(skip)]
     pub cam_size: f32,
@@ -39,6 +42,7 @@ impl ScenePanel {
             fb: Arc::new(Mutex::new(None)),
             fb_pick: Arc::new(Mutex::new(None)),
             color_key_map: Vec::new(),
+            prev_mouse_down: false,
             cam_pos: glam::vec2(0.0, 0.0),
             cam_size: 600.0,
             cam_aspect: 1.0
@@ -221,15 +225,17 @@ impl ScenePanel {
             }
 
             let tool = state.curr_tool.clone();
-            if response.drag_started() {
+            let mouse_down = response.is_pointer_button_down_on() || response.clicked();
+            if mouse_down && !self.prev_mouse_down {
                 tool.borrow_mut().mouse_click(mouse_pos, state, ui, self, renderer.gl);
             }
-            if response.dragged() {
+            if mouse_down && self.prev_mouse_down {
                 tool.borrow_mut().mouse_down(mouse_pos, state, self);
             }
-            if response.drag_released() {
+            if !mouse_down && self.prev_mouse_down {
                 tool.borrow_mut().mouse_release(mouse_pos, state, ui, self, renderer.gl);
             }
+            self.prev_mouse_down = mouse_down;
             if response.hovered() {
                 ui.ctx().output_mut(|o| {
                     let tool = state.curr_tool.clone();
