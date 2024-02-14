@@ -6,7 +6,6 @@ use crate::{editor::EditorState, panels::scene::ScenePanel, util::{curve::{fit_c
 
 use super::{Tool, active_frame};
 
-
 pub struct Bucket {
 
 }
@@ -43,7 +42,7 @@ impl Tool for Bucket {
         // This uses a standard bitmap floodfill algorithmn adapted to work with vector art
         // Is this the best approach? Probably not.
 
-        let grid_size = 2.0;
+        let grid_size = 1.5;
 
         let snap_coords = |pt: Vec2| {
             ((pt.x / grid_size).floor() as i32, (pt.y / grid_size).floor() as i32)

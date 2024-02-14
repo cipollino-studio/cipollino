@@ -40,3 +40,21 @@ impl Default for Frame {
     }
 
 }
+
+impl Frame {
+
+    pub fn frame_set_time(project: &mut Project, frame_ptr: ObjPtr<Frame>, time: i32) -> Option<Vec<ObjAction>> {
+        let frame = project.frames.get(frame_ptr)?;
+        let layer = project.layers.get(frame.layer)?;
+        let mut acts = Vec::new();
+        for other_frame in &layer.frames {
+            if other_frame.make_ptr() != frame_ptr && other_frame.get(&project).time == time {
+                acts.push(Frame::delete(project, other_frame.make_ptr())?);
+                break;
+            }
+        }
+        acts.push(Frame::set_time(project, frame_ptr, time)?);
+        Some(acts)
+    }
+
+}
