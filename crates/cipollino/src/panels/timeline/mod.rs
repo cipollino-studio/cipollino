@@ -39,7 +39,8 @@ pub enum FrameGridRowKind {
 }
 
 pub struct FrameGridRow {
-    kind: FrameGridRowKind
+    kind: FrameGridRowKind,
+    idx: usize
 }
 
 impl TimelinePanel {
@@ -64,9 +65,10 @@ impl TimelinePanel {
     fn calc_grid_rows(&mut self, state: &mut EditorState) -> Vec<FrameGridRow> {
         let gfx = state.project.graphics.get(state.open_graphic).unwrap();
         let mut grid_rows = Vec::new();
-        for layer in &gfx.layers {
+        for (idx, layer) in gfx.layers.iter().enumerate() {
             grid_rows.push(FrameGridRow {
-                kind: FrameGridRowKind::Layer(layer.make_ptr())
+                kind: FrameGridRowKind::Layer(layer.make_ptr()),
+                idx: idx 
             });
         }
         grid_rows

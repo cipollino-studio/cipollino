@@ -140,4 +140,32 @@ pub trait ChildObj: Obj + 'static {
         Some(ObjAction::new(redo, undo))
     } 
 
+    fn set_index(project: &mut Project, obj_ptr: ObjPtr<Self>, new_idx: usize) -> Option<ObjAction> {
+        let obj = Self::get_list_mut(project).get_mut(obj_ptr)?;
+        let parent = *obj.parent_mut();
+        let sibling_list = Self::get_sibling_list_mut(project, parent)?;
+        let old_idx = sibling_list.iter().position(|other_obj| other_obj.make_ptr() == obj_ptr)?;
+        let new_idx = new_idx.clamp(0, sibling_list.len() - 1);
+
+        let redo = move |proj: &'_ mut Project| {
+            let obj = Self::get_list_mut(proj).get_mut(obj_ptr).unwrap();
+            let parent = *obj.parent_mut();
+            let sibling_list = Self::get_sibling_list_mut(proj, parent).unwrap();
+            let obj = sibling_list.remove(old_idx);
+            sibling_list.insert(new_idx, obj);
+        };
+
+        let undo = move |proj: &'_ mut Project| {
+            let obj = Self::get_list_mut(proj).get_mut(obj_ptr).unwrap();
+            let parent = *obj.parent_mut();
+            let sibling_list = Self::get_sibling_list_mut(proj, parent).unwrap();
+            let obj = sibling_list.remove(new_idx);
+            sibling_list.insert(old_idx, obj);
+        };
+
+        redo(project);
+
+        Some(ObjAction::new(redo, undo)) 
+    }
+
 }

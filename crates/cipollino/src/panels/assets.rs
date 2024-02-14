@@ -1,5 +1,5 @@
 
-use crate::{editor::EditorState, project::{action::Action, folder::Folder, graphic::Graphic, obj::{asset::Asset, ObjBox, ObjPtr}}};
+use crate::{editor::EditorState, project::{action::Action, folder::Folder, graphic::Graphic, obj::{asset::Asset, ObjBox, ObjPtr}}, util::ui::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_label, draggable_widget}};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct AssetsPanel {
@@ -94,9 +94,8 @@ impl AssetsPanel {
         let mut rename_gfx = None;
         let mut rename_folder = None;
         let mut asset_transfer = None;
-        let style = ui.style_mut();
-        let init_inactive_bg_fill = std::mem::replace(&mut style.visuals.widgets.inactive.bg_fill, style.visuals.window_fill);
-        let init_active_bg_fill = std::mem::replace(&mut style.visuals.widgets.active.bg_fill, style.visuals.window_fill);
+
+        let colors = dnd_drop_zone_setup_colors(ui);
 
         self.render_folder_contents(ui, state, state.project.root_folder.make_ptr(), &mut open_gfx, &mut delete_gfx, &mut delete_folder, &mut rename_gfx, &mut rename_folder, &mut asset_transfer);
         let (_, root_payload) = ui.dnd_drop_zone::<AssetDragPayload>(egui::Frame::default(), |ui| {
@@ -106,9 +105,7 @@ impl AssetsPanel {
             asset_transfer = Some((state.project.root_folder.make_ptr(), *root_payload.as_ref()));
         }
 
-        let style = ui.style_mut();
-        style.visuals.widgets.inactive.bg_fill = init_inactive_bg_fill;
-        style.visuals.widgets.active.bg_fill = init_active_bg_fill;
+        dnd_drop_zone_reset_colors(ui, colors);
 
         if let Some(gfx_ptr) = open_gfx {
             if let Some(gfx) = state.project.graphics.get(gfx_ptr) { 
@@ -273,39 +270,6 @@ impl AssetsPanel {
         Some(hovered || inner_hovered)
     }
 
-}
-
-fn draggable_label<P>(ui: &mut egui::Ui, text: &str, payload: P) -> egui::Response where P: std::marker::Send + std::marker::Sync + 'static {
-    draggable_widget(ui, payload, |ui| {
-    let label = egui::Label::new(text).selectable(false).sense(egui::Sense::click());
-        let resp = ui.add(label);
-        (resp.clone(), resp)
-    })
-}
-
-fn draggable_widget<F, P, R>(ui: &mut egui::Ui, payload: P, mut add_contents: F) -> R
-    where F: FnMut(&mut egui::Ui) -> (R, egui::Response),
-          P: std::marker::Send + std::marker::Sync + 'static {
-    let id = ui.next_auto_id();
-    let dragged = ui.memory(|mem| mem.is_being_dragged(id));
-    if dragged {
-        ui.dnd_drag_source(id, payload, |ui| {
-            add_contents(ui)
-        }).inner.0
-    } else {
-        let (val, resp) = add_contents(ui);
-        if resp.is_pointer_button_down_on() && ui.input(|i| i.pointer.delta()).length() > 1.0 {
-            ui.memory_mut(|mem| mem.set_dragged_id(id));
-            egui::DragAndDrop::set_payload(ui.ctx(), payload);
-        } else {
-            ui.memory_mut(|mem| {
-                if mem.dragged_id() == Some(id) {
-                    mem.stop_dragging();
-                }
-            })
-        } 
-        val
-    }
 }
 
 
