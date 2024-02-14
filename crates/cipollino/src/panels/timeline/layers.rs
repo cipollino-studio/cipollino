@@ -62,7 +62,7 @@ impl FrameGridRow {
             timeline.layer_editing_name = ObjPtr::null();
         }
 
-        if let (Some(pointer), Some(_)) = (
+        if let (Some(pointer), Some(payload)) = (
             ui.input(|i| i.pointer.hover_pos()),
             response.dnd_hover_payload::<ObjPtr<Layer>>(),
         ) {
@@ -70,10 +70,14 @@ impl FrameGridRow {
                 let stroke = egui::Stroke::new(1.0, egui::Color32::WHITE);
                 if pointer.y < rect.center().y {
                     ui.painter().hline(rect.x_range(), rect.top(), stroke);
-                    *layer_drop_idx = Some(self.idx);
+                    if *payload.as_ref() != layer_ptr {
+                        *layer_drop_idx = Some(self.idx.max(1) - 1);
+                    }
                 } else {
                     ui.painter().hline(rect.x_range(), rect.bottom(), stroke);
-                    *layer_drop_idx = Some(self.idx + 1);
+                    if *payload.as_ref() != layer_ptr {
+                        *layer_drop_idx = Some(self.idx);
+                    }
                 }
             }
         }

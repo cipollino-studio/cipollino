@@ -145,7 +145,7 @@ pub trait ChildObj: Obj + 'static {
         let parent = *obj.parent_mut();
         let sibling_list = Self::get_sibling_list_mut(project, parent)?;
         let old_idx = sibling_list.iter().position(|other_obj| other_obj.make_ptr() == obj_ptr)?;
-        let new_idx = new_idx.clamp(0, sibling_list.len() - 1);
+        let new_idx = new_idx.clamp(0, sibling_list.len());
 
         let redo = move |proj: &'_ mut Project| {
             let obj = Self::get_list_mut(proj).get_mut(obj_ptr).unwrap();

@@ -132,11 +132,7 @@ pub fn obj_serialize(input: TokenStream) -> TokenStream {
                     }
                 }
             });
-        } else {
-            deserialize_impl.append_all(quote! {
-                res.#field_name = parent.into();
-            });
-        }
+        } 
     }
 
     quote! {

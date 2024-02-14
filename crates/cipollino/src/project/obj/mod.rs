@@ -105,7 +105,7 @@ impl<T: Obj> ObjPtr<T> {
 
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct ObjPtrAny(u64);
 
 impl<T: Obj> From<ObjPtrAny> for ObjPtr<T> {

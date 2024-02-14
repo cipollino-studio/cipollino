@@ -67,9 +67,10 @@ impl<T: ChildObj + ObjSerialize> ObjSerialize for ObjBox<T> {
         self.get(project).obj_serialize(project)
     }
 
-    fn obj_deserialize(project: &mut Project, data: &serde_json::Value, _parent: ObjPtrAny) -> Option<Self> {
+    fn obj_deserialize(project: &mut Project, data: &serde_json::Value, parent: ObjPtrAny) -> Option<Self> {
         let ptr = T::get_list_mut(project).next_ptr();
-        let obj = T::obj_deserialize(project, data, ptr.into())?;
+        let mut obj = T::obj_deserialize(project, data, ptr.into())?;
+        *obj.parent_mut() = parent.into();
         Some(T::get_list_mut(project).add_with_ptr(obj, ptr))
     }
 }
