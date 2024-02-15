@@ -223,12 +223,11 @@ impl ScenePanel {
             self.cam_aspect = rect.aspect_ratio();
 
             let zoom_fac =
-                (1.05 as f32).powf(-ui.input(|i| i.smooth_scroll_delta.y.clamp(-6.0, 6.0) * 0.7));
-            let next_cam_size = self.cam_size * zoom_fac;
-            if next_cam_size > 10.0 && next_cam_size < 1000.0 {
-                self.cam_pos -= (mouse_pos - self.cam_pos) * (zoom_fac - 1.0);
-                self.cam_size = next_cam_size;
-            }
+                (1.05 as f32).powf(-ui.input(|i| i.smooth_scroll_delta.y.clamp(-4.0, 4.0) * 0.7));
+            let next_cam_size = (self.cam_size * zoom_fac).clamp(10.0, 5000.0);
+            let zoom_fac = next_cam_size / self.cam_size;
+            self.cam_pos -= (mouse_pos - self.cam_pos) * (zoom_fac - 1.0);
+            self.cam_size = next_cam_size;
 
             let tool = state.curr_tool.clone();
             let mouse_down = response.is_pointer_button_down_on() || response.clicked();
@@ -264,8 +263,8 @@ impl ScenePanel {
         if let Some(proj_view) = renderer.renderer.render(
             fb,
             Some((fb_pick, &mut self.color_key_map)),
-            (rect.width() as u32) * 4,
-            (rect.height() as u32) * 4,
+            (rect.width() as u32) * 2,
+            (rect.height() as u32) * 2,
             self.cam_pos,
             self.cam_size,
             &mut state.project,
