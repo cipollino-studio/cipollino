@@ -44,7 +44,10 @@ pub struct EditorState {
     // Tool Options
     pub color: glam::Vec3,
     pub stroke_r: f32,
-    pub stroke_filled: bool
+    pub stroke_filled: bool,
+
+    // Misc
+    pub pasted: bool
 }
 
 impl EditorState {
@@ -69,7 +72,8 @@ impl EditorState {
             curr_tool: select,
             color: glam::Vec3::ZERO,
             stroke_r: 5.0,
-            stroke_filled: false
+            stroke_filled: false,
+            pasted: false
         }
     }
 
@@ -101,14 +105,6 @@ impl EditorState {
 
     pub fn delete_shortcut(&self) -> egui::KeyboardShortcut {
         egui::KeyboardShortcut::new(egui::Modifiers::NONE, egui::Key::X)
-    }
-
-    pub fn copy_shortcut(&self) -> egui::KeyboardShortcut {
-        egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::Copy)
-    }
-
-    pub fn paste_shortcut(&self) -> egui::KeyboardShortcut {
-        egui::KeyboardShortcut::new(egui::Modifiers::NONE, egui::Key::Paste)
     }
 
     pub fn reset_tool(&mut self) {
@@ -222,8 +218,17 @@ impl Editor {
                 next_keyframe(&mut self.state); 
             }
 
-            if ui.input(|i| i.filtered_events(&egui::EventFilter::default()).contains(&egui::Event::Copy)) {
-                self.state.clipboard = Clipboard::from_selection(&self.state.selection, &mut self.state.project);
+            self.state.pasted = false;
+            for event in ui.input(|i| i.filtered_events(&egui::EventFilter::default())) {
+                match event {
+                    egui::Event::Copy => {
+                        self.state.clipboard = Clipboard::from_selection(&self.state.selection, &mut self.state.project);
+                    },
+                    egui::Event::Paste(_) => {
+                        self.state.pasted = true;
+                    },
+                    _ => ()
+                }
             }
 
             if ui.input_mut(|i| i.consume_shortcut(&save_shortcut)) {
