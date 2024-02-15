@@ -1,5 +1,5 @@
 
-use egui::Vec2;
+use egui::{vec2, Vec2};
 
 use crate::{editor::EditorState, project::{action::Action, layer::Layer, obj::{child_obj::ChildObj, ObjPtr}}, util::ui::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_widget, label_size}};
 
@@ -12,6 +12,7 @@ impl FrameGridRow {
 
         let mut set_name = false;
         let mut delete_layer = false;
+        let mut show_hide_layer = false; 
 
         if layer_ptr == state.active_layer {
             ui.painter().rect(rect, 0.0, super::HIGHLIGHT, egui::Stroke::NONE);
@@ -48,7 +49,17 @@ impl FrameGridRow {
             if layer_name_response.clicked() {
                 state.active_layer = layer_ptr;
             }
+
+            let eye_text = if layer.show { egui_phosphor::regular::EYE } else { egui_phosphor::regular::EYE_CLOSED };
+            let eye_size = label_size(ui, egui::Label::new(eye_text).selectable(false));
+            let eye_rect = egui::Rect::from_min_size(rect.max - vec2(eye_size.x + ui.spacing().icon_spacing, rect.height()), vec2(eye_size.x, rect.height())); 
+            let eye_resp = ui.put(eye_rect, egui::Label::new(eye_text).selectable(false).sense(egui::Sense::click()));
+            if eye_resp.clicked() {
+                show_hide_layer = true;
+            }
         }
+    
+        let showing_layer = layer.show;
     
         if delete_layer {
             if let Some(act) = Layer::delete(&mut state.project, layer_ptr) {
@@ -60,6 +71,11 @@ impl FrameGridRow {
                 state.actions.add(Action::from_single(act));
             }
             timeline.layer_editing_name = ObjPtr::null();
+        }
+        if show_hide_layer {
+            if let Some(act) = Layer::set_show(&mut state.project, layer_ptr, !showing_layer) {
+                state.actions.add(Action::from_single(act));
+            }
         }
 
         if let (Some(pointer), Some(payload)) = (
@@ -98,7 +114,7 @@ pub fn layers(timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_h: f32, sta
     let colors = dnd_drop_zone_setup_colors(ui);
     let init_stroke = std::mem::replace(&mut ui.visuals_mut().widgets.active.bg_stroke.color, egui::Color32::TRANSPARENT);
     let mut layer_drop_idx = None;
-    if let (_, Some(payload)) = ui.dnd_drop_zone::<ObjPtr<Layer>>(egui::Frame::default(), |ui| {
+    if let (_, Some(payload)) = ui.dnd_drop_zone::<ObjPtr<Layer>>(egui::Frame::default().inner_margin(0.0).outer_margin(0.0), |ui| {
         let (rect, response) = ui.allocate_exact_size(Vec2::new(100.0, (grid_rows.len() as f32) * frame_h), egui::Sense::click());
         let tl = rect.left_top(); 
         for row in grid_rows {

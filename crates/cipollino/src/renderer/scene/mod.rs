@@ -120,6 +120,9 @@ impl SceneRenderer {
         let mut onion_strokes = Vec::new();
         let mut stroke_keys = Vec::new();
         for layer in project.graphics.get(gfx)?.layers.iter().rev() {
+            if !layer.get(&project).show {
+                continue;
+            }
             if let Some(frame) = layer.get(project).get_frame_at(project, time) {
                 let mut curr_time = frame.get(project).time;
                 let mut alpha = 0.75;

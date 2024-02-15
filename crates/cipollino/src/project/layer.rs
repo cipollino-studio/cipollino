@@ -9,6 +9,8 @@ pub struct Layer {
     pub graphic: ObjPtr<Graphic>,
     #[field]
     pub name: String,
+    #[field]
+    pub show: bool,
     pub frames: Vec<ObjBox<Frame>>
 }
 
@@ -84,6 +86,7 @@ impl Default for Layer {
         Self {
             graphic: ObjPtr::null(),
             name: "Layer".to_owned(),
+            show: true,
             frames: Vec::new()
         }
     }

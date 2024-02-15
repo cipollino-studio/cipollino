@@ -85,6 +85,9 @@ impl EditorState {
         let mut res = Vec::new();
         if let Some(graphic) = self.project.graphics.get(self.open_graphic) {
             for layer in &graphic.layers {
+                if !layer.get(&self.project).show {
+                    continue;
+                }
                 if let Some(frame) = layer.get(&self.project).get_frame_at(&self.project, self.frame()) {
                     for stroke in &frame.get(&self.project).strokes {
                         res.push(stroke.make_ptr());
@@ -224,7 +227,7 @@ impl Editor {
                     egui::Event::Copy => {
                         self.state.clipboard = Clipboard::from_selection(&self.state.selection, &mut self.state.project);
                         if !self.state.selection.is_empty() {
-                            ui.output_mut(|o| o.copied_text = "".to_owned());
+                            ui.output_mut(|o| o.copied_text = "_".to_owned());
                         }
                     },
                     egui::Event::Paste(_) => {

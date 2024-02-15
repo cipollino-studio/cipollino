@@ -50,20 +50,19 @@ impl Lasso {
                 cnt % 2 == 1 
             };
 
-            if let Some(gfx) = state.project.graphics.get(state.open_graphic) {
-                for layer in &gfx.layers {
-                    if let Some(frame) = layer.get(&state.project).get_frame_at(&state.project, state.frame()) {
-                        for stroke in &frame.get(&state.project).strokes {
-                            'pt_loop: for (p0, p1) in stroke.get(&state.project).iter_point_pairs() {
-                                for i in 0..10 {
-                                    let t = (i as f32) / 9.0;
-                                    let pt = bezier_sample(t, p0.pt, p0.b, p1.a, p1.pt);
-                                    if inside_lasso(pt) {
-                                        state.selection.select_stroke(stroke.make_ptr());
-                                        break 'pt_loop;
-                                    }
-                                }
-                            }
+            for stroke_ptr in state.visible_strokes() {
+                let stroke = state.project.strokes.get(stroke_ptr);
+                if stroke.is_none() {
+                    continue;
+                } 
+                let stroke = stroke.unwrap();
+                'pt_loop: for (p0, p1) in stroke.iter_point_pairs() {
+                    for i in 0..10 {
+                        let t = (i as f32) / 9.0;
+                        let pt = bezier_sample(t, p0.pt, p0.b, p1.a, p1.pt);
+                        if inside_lasso(pt) {
+                            state.selection.select_stroke(stroke_ptr);
+                            break 'pt_loop;
                         }
                     }
                 }

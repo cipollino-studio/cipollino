@@ -9,6 +9,7 @@ pub fn timeline_controls(timeline: &mut TimelinePanel, ui: &mut egui::Ui, state:
         if let Some((layer, act)) = Layer::add(&mut state.project, state.open_graphic, Layer {
             graphic: state.open_graphic,
             name: "Layer".to_owned(),
+            show: true,
             frames: Vec::new()
         }) {
             state.actions.add(Action::from_single(act));
