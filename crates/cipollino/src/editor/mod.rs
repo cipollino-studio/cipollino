@@ -223,6 +223,9 @@ impl Editor {
                 match event {
                     egui::Event::Copy => {
                         self.state.clipboard = Clipboard::from_selection(&self.state.selection, &mut self.state.project);
+                        if !self.state.selection.is_empty() {
+                            ui.output_mut(|o| o.copied_text = "".to_owned());
+                        }
                     },
                     egui::Event::Paste(_) => {
                         self.state.pasted = true;

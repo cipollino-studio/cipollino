@@ -29,6 +29,13 @@ impl Selection {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Selection::None => true,
+            _ => false
+        }
+    }
+
     pub fn stroke_selected(&self, stroke: ObjPtr<Stroke>) -> bool {
         if let Self::Scene(strokes) = self {
             strokes.contains(&stroke)
