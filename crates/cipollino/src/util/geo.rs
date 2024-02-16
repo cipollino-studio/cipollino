@@ -1,4 +1,4 @@
-use glam::{Vec2, vec2};
+use glam::{vec2, vec3, Vec2, Vec3};
 use intersection_detection::{Intersection, point_like::Between};
 
 pub fn segment_intersect(a0: Vec2, a1: Vec2, b0: Vec2, b1: Vec2) -> Option<Vec2> {
@@ -45,4 +45,8 @@ pub fn segment_aabb_intersect(a0: Vec2, a1: Vec2, bb_min: Vec2, bb_max: Vec2) ->
         return true;
     }
     false
+}
+
+pub fn vec2_to_vec3(vec: Vec2) -> Vec3 {
+    vec3(vec.x, vec.y, 0.0)
 }

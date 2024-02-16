@@ -1,5 +1,7 @@
 {
     "rust-analyzer.linkedProjects": [
+        "./crates/cipollino/Cargo.toml",
+        "./crates/cipollino/Cargo.toml",
         "./crates/cipollino/Cargo.toml"
     ]
 }

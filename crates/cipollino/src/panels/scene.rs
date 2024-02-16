@@ -287,6 +287,9 @@ impl ScenePanel {
 
     fn render_overlays(&self, gfx: ObjPtr<Graphic>, renderer: &mut EditorRenderer, proj_view: glam::Mat4, state: &mut EditorState) {
         renderer.renderer.flat_color_shader.enable(renderer.gl);
+        unsafe {
+            renderer.gl.disable(glow::DEPTH_TEST);
+        }
         renderer
             .renderer.flat_color_shader
             .set_vec4("uColor", glam::vec4(0.0, 0.0, 0.0, 0.3), renderer.gl);
