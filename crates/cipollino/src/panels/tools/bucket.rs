@@ -2,7 +2,7 @@
 use std::{sync::Arc, collections::{VecDeque, HashSet, HashMap}};
 
 use glam::{Vec2, vec2};
-use crate::{editor::EditorState, panels::scene::ScenePanel, util::{curve::{fit_curve, bezier_bounding_box, bezier_to_discrete_t_vals, bezier_sample, bezier_dsample}, geo::{segment_intersect, segment_aabb_intersect}}, project::{stroke::{Stroke, StrokeMesh, StrokePoint}, action::Action, obj::child_obj::ChildObj}};
+use crate::{editor::EditorState, panels::scene::ScenePanel, project::{action::Action, obj::child_obj::ChildObj, stroke::{Stroke, StrokeColor, StrokeMesh, StrokePoint}}, util::{curve::{bezier_bounding_box, bezier_dsample, bezier_sample, bezier_to_discrete_t_vals, fit_curve}, geo::{segment_aabb_intersect, segment_intersect}}};
 
 use super::{Tool, active_frame};
 
@@ -26,7 +26,7 @@ impl Tool for Bucket {
 
         // If we click on an existing stroke, let's just change its color
         if let Some(stroke) = scene.sample_pick(mouse_pos, gl) {
-            if let Some(act) = Stroke::set_color(&mut state.project, stroke, state.color) {
+            if let Some(act) = Stroke::set_color(&mut state.project, stroke, StrokeColor::Color(state.color)) {
                 state.actions.add(Action::from_single(act));
                 return;
             }
@@ -297,7 +297,7 @@ impl Tool for Bucket {
 
         if let Some((_, act)) = Stroke::add_at_idx(&mut state.project, frame, Stroke {
             frame: frame,
-            color: state.color,
+            color: StrokeColor::Color(state.color),
             r: 0.05,
             filled: true,
             points: all_pts,

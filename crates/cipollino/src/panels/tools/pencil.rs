@@ -3,7 +3,7 @@ use std::{mem, sync::Arc};
 
 use glam::vec2;
 
-use crate::{util::curve, project::{obj::child_obj::ChildObj, action::{ObjAction, Action}, stroke::{Stroke, StrokeMesh, StrokePoint}, frame::Frame, obj::ObjPtr}, panels::scene::ScenePanel};
+use crate::{panels::scene::ScenePanel, project::{action::{Action, ObjAction}, frame::Frame, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokeColor, StrokeMesh, StrokePoint}}, util::curve};
 
 use super::{active_frame, Tool};
 
@@ -70,7 +70,7 @@ impl Tool for Pencil {
         if let Some((stroke, act)) = Stroke::add(&mut state.project, frame, Stroke {
             frame: frame,
             points: pts,
-            color: state.color,
+            color: StrokeColor::Color(state.color),
             r: state.stroke_r,
             filled: state.stroke_filled,
             mesh: StrokeMesh::new()
@@ -107,7 +107,7 @@ impl Tool for Pencil {
 
                 if let Some((new_stroke, act)) = Stroke::add(&mut state.project, frame, Stroke {
                     frame: frame,
-                    color: state.color,
+                    color: StrokeColor::Color(state.color),
                     r: state.stroke_r,
                     filled: state.stroke_filled,
                     points: vec![stroke_points],

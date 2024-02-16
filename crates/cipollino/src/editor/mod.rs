@@ -42,7 +42,7 @@ pub struct EditorState {
     pub onion_after: i32,
 
     // Tool Options
-    pub color: glam::Vec3,
+    pub color: glam::Vec4,
     pub stroke_r: f32,
     pub stroke_filled: bool,
 
@@ -70,7 +70,7 @@ impl EditorState {
             onion_after: 0,
             tools: vec![select.clone(), pencil, bucket],
             curr_tool: select,
-            color: glam::Vec3::ZERO,
+            color: glam::vec4(0.0, 0.0, 0.0, 1.0),
             stroke_r: 5.0,
             stroke_filled: false,
             pasted: false

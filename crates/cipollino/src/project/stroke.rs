@@ -58,12 +58,52 @@ impl ObjSerialize for StrokeMesh {
     }
 }
 
+#[derive(Clone)]
+pub enum StrokeColor {
+    Color(glam::Vec4) 
+}
+
+impl StrokeColor {
+
+    pub fn get_color(&self) -> glam::Vec4 {
+        match self {
+            StrokeColor::Color(color) => *color
+        }
+    }
+    
+}
+
+impl ObjClone for StrokeColor {}
+
+impl ObjSerialize for StrokeColor {
+
+    fn obj_serialize(&self, _project: &Project) -> serde_json::Value {
+        match self {
+            StrokeColor::Color(color) => json!([color.x, color.y, color.z, color.w]),
+        }
+    }
+
+    fn obj_deserialize(_project: &mut Project, data: &serde_json::Value, _parent: ObjPtrAny) -> Option<Self> {
+        if let Some(arr) = data.as_array() {
+            let mut color = [0.0; 4];
+            color[3] = 1.0;
+            for i in 0..(arr.len().min(4)) {
+                color[i] = arr[i].as_f64()? as f32;
+            } 
+            let color = glam::Vec4::from_slice(&color);
+            Some(StrokeColor::Color(color))
+        } else {
+            None
+        }
+    }
+}
+
 #[derive(Object, Clone, ObjClone, ObjSerialize)]
 pub struct Stroke {
     #[parent]
     pub frame: ObjPtr<Frame>,
     #[field]
-    pub color: glam::Vec3,
+    pub color: StrokeColor,
     #[field]
     pub r: f32,
     #[field]
@@ -125,7 +165,7 @@ impl Default for Stroke {
     fn default() -> Self {
         Self {
             frame: ObjPtr::null(),
-            color: glam::Vec3::ZERO,
+            color: StrokeColor::Color(glam::vec4(0.0, 0.0, 0.0, 1.0)),
             r: 0.05,
             filled: false,
             points: Vec::new(),

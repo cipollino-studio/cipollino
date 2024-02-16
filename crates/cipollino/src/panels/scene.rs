@@ -87,12 +87,12 @@ impl ScenePanel {
                         state.curr_tool = tool;
                     }
 
-                    let mut color = [state.color.x.powf(2.0), state.color.y.powf(2.0), state.color.z.powf(2.0)];
+                    let mut color = [state.color.x.powf(2.0), state.color.y.powf(2.0), state.color.z.powf(2.0), state.color.w];
                     let prev_interact_size = ui.spacing().interact_size;
                     ui.spacing_mut().interact_size = egui::Vec2::splat(30.0);
-                    ui.color_edit_button_rgb(&mut color);
+                    ui.color_edit_button_rgba_premultiplied(&mut color);
                     ui.spacing_mut().interact_size = prev_interact_size; 
-                    state.color = glam::vec3(color[0].sqrt(), color[1].sqrt(), color[2].sqrt()); 
+                    state.color = glam::vec4(color[0].sqrt(), color[1].sqrt(), color[2].sqrt(), color[3]); 
                 });
             let response = egui::CentralPanel::default()
                 .frame(no_margin)
@@ -324,7 +324,7 @@ impl ScenePanel {
                 for stroke in strokes {
                     if let Some(stroke) = state.project.strokes.get(*stroke) {
                         for (p0, p1) in stroke.iter_point_pairs() {
-                            let n = 20;
+                            let n = 8;
                             for i in 0..n {
                                 let t = (i as f32) / (n as f32);
                                 overlay.line(

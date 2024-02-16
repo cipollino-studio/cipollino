@@ -3,7 +3,7 @@ mod meshgen;
 
 use std::sync::Arc;
 
-use glam::{Vec3, vec3};
+use glam::{vec4, Vec4};
 use glow::{Context, HasContext};
 
 use crate::project::{Project, obj::ObjPtr, stroke::Stroke, graphic::Graphic};
@@ -106,8 +106,10 @@ impl SceneRenderer {
 
         unsafe {
             gl.clear_color(1.0, 1.0, 1.0, 1.0);
-            gl.clear(glow::COLOR_BUFFER_BIT);
+            gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
             gl.enable(glow::BLEND);
+            gl.enable(glow::DEPTH_TEST);
+            gl.depth_func(glow::LESS);
         }
 
         let aspect = (w as f32) / (h as f32);
@@ -160,11 +162,15 @@ impl SceneRenderer {
             }
         }
 
-        let mut render_stroke_mesh = |mesh: &Mesh, color: Vec3, filled: bool, gl: &Arc<glow::Context>| {
+        let mut render_stroke_mesh = |mesh: &Mesh, color: Vec4, filled: bool, gl: &Arc<glow::Context>| {
             if !filled {
-                self.flat_color_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, 1.0), gl);
+                unsafe {
+                    gl.clear(glow::DEPTH_BUFFER_BIT);
+                }
+                self.flat_color_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, color.w), gl);
                 mesh.render(gl);
             } else {
+                self.flat_color_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, 1.0), gl);
                 unsafe {
                     gl.enable(glow::STENCIL_TEST);
                     gl.stencil_mask(0xFF);
@@ -177,9 +183,9 @@ impl SceneRenderer {
                     gl.stencil_func(glow::EQUAL, 0xFF, 0xFF);
                     gl.stencil_op(glow::KEEP, glow::KEEP, glow::KEEP);
                     gl.stencil_mask(0);
-                    gl.disable(glow::DEPTH_TEST);
+                    gl.clear(glow::DEPTH_BUFFER_BIT);
                 }
-                self.flat_color_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, 1.0), gl);
+                self.flat_color_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, color.w), gl);
                 mesh.render(gl);
                 unsafe {
                     gl.disable(glow::STENCIL_TEST);
@@ -193,7 +199,7 @@ impl SceneRenderer {
                 continue;
             }
             let stroke = stroke.unwrap();
-            let color = stroke.color;
+            let color = stroke.color.get_color();
             let filled = stroke.filled;
             if let Some(mesh) = meshgen::get_mesh(project, *stroke_ptr, gl) {
                 render_stroke_mesh(mesh, color, filled, gl); 
@@ -229,7 +235,7 @@ impl SceneRenderer {
                     let g = (bytes[1] as f32) / 255.0;
                     let b = (bytes[2] as f32) / 255.0;
 
-                    render_stroke_mesh(mesh, vec3(r, g, b), filled, gl); 
+                    render_stroke_mesh(mesh, vec4(r, g, b, 1.0), filled, gl); 
                 }
             }
             fb.render_to(gl);
