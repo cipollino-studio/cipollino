@@ -89,7 +89,7 @@ impl TimelinePanel {
 
         let frame_w = 10.0;
         let frame_h = 15.0;
-        let sidebar_w = 100.0;
+        let sidebar_w = 150.0;
 
         let n_frames = ((ui.available_width() - sidebar_w) / frame_w) as i32 + (gfx.len as i32) - 2;
         let n_frames = 5 * (n_frames / 5) + 4;
@@ -120,8 +120,8 @@ impl TimelinePanel {
                         .exact_height(header_height)
                         .show_separator_line(false)
                         .frame(no_margin)
-                        .show_inside(ui, |ui| {
-                            ui.label("EYE/LOCK ICONS?");
+                        .show_inside(ui, |_ui| {
+
                         });
                     let hovering_layers = if let Some(pos) = ui.ctx().input(|i| i.pointer.hover_pos()) {
                         ui.available_rect_before_wrap().contains(pos)
@@ -139,7 +139,7 @@ impl TimelinePanel {
                                 .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
                                 .vertical_scroll_offset(self.scroll_y);
                             scroll_area.show(ui, |ui| {
-                                layers::layers(self, ui, frame_h, state, &grid_rows);
+                                layers::layers(self, ui, frame_h, state, &grid_rows, sidebar_w);
                             });
                         });
                     hovering_layers

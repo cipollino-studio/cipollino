@@ -28,10 +28,11 @@ pub trait ChildObj: Obj + 'static {
         }
     }
 
-    fn add_at_idx(project: &mut Project, parent: ObjPtr<Self::Parent>, obj: Self, idx: i32) -> Option<(ObjPtr<Self>, ObjAction)> {
+    fn add_at_idx(project: &mut Project, parent: ObjPtr<Self::Parent>, mut obj: Self, idx: i32) -> Option<(ObjPtr<Self>, ObjAction)> {
         if let None = Self::get_sibling_list_mut(project, parent) {
             return None;
         }
+        *obj.parent_mut() = parent;
         let obj_box = Self::get_list_mut(project).add(obj);
         let obj_ptr = obj_box.make_ptr();
         let orig_obj_store = Rc::new(RefCell::new(Some(obj_box)));

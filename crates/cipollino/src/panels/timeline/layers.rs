@@ -109,17 +109,17 @@ impl FrameGridRow {
 
 }
 
-pub fn layers(timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_h: f32, state: &mut EditorState, grid_rows: &Vec<FrameGridRow>) {
+pub fn layers(timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_h: f32, state: &mut EditorState, grid_rows: &Vec<FrameGridRow>, sidebar_w: f32) {
     let mut i = 0;
     let colors = dnd_drop_zone_setup_colors(ui);
     let init_stroke = std::mem::replace(&mut ui.visuals_mut().widgets.active.bg_stroke.color, egui::Color32::TRANSPARENT);
     let mut layer_drop_idx = None;
     if let (_, Some(payload)) = ui.dnd_drop_zone::<ObjPtr<Layer>>(egui::Frame::default().inner_margin(0.0).outer_margin(0.0), |ui| {
-        let (rect, response) = ui.allocate_exact_size(Vec2::new(100.0, (grid_rows.len() as f32) * frame_h), egui::Sense::click());
+        let (rect, response) = ui.allocate_exact_size(Vec2::new(sidebar_w, (grid_rows.len() as f32) * frame_h), egui::Sense::click());
         let tl = rect.left_top(); 
         for row in grid_rows {
             let layer_name_tl = tl + Vec2::new(0.0, frame_h * (i as f32)); 
-            let layer_name_br = layer_name_tl + Vec2::new(100.0, frame_h); 
+            let layer_name_br = layer_name_tl + Vec2::new(sidebar_w, frame_h); 
             let rect = egui::Rect::from_min_max(layer_name_tl, layer_name_br);
             row.render_layer(timeline, ui, rect, state, &response, &mut layer_drop_idx);
             i += 1;

@@ -5,7 +5,7 @@ use super::{next_keyframe, prev_keyframe, TimelinePanel};
 
 pub fn timeline_controls(timeline: &mut TimelinePanel, ui: &mut egui::Ui, state: &mut EditorState) {
 
-    if ui.button("+").clicked() {
+    if ui.button(egui_phosphor::regular::FILE_PLUS).clicked() {
         if let Some((layer, act)) = Layer::add(&mut state.project, state.open_graphic, Layer {
             graphic: state.open_graphic,
             name: "Layer".to_owned(),
@@ -17,24 +17,24 @@ pub fn timeline_controls(timeline: &mut TimelinePanel, ui: &mut egui::Ui, state:
         }
     }
 
-    if ui.button("<<").clicked() {
+    if ui.button(egui_phosphor::regular::REWIND).clicked() {
         state.time = 0.0;
         state.playing = false;
     }
-    if ui.button("*<").clicked() {
+    if ui.button(egui_phosphor::regular::CARET_CIRCLE_LEFT).clicked() {
         prev_keyframe(state);
         state.playing = false;
     }
-    if ui.button(if state.playing { "||" } else { ">" }).clicked() {
+    if ui.button(if state.playing { egui_phosphor::regular::PAUSE } else { egui_phosphor::regular::PLAY }).clicked() {
         state.playing = !state.playing; 
     }
-    if ui.button(">*").clicked() {
+    if ui.button(egui_phosphor::regular::CARET_CIRCLE_RIGHT).clicked() {
         next_keyframe(state);
         state.playing = false;
     }
 
     let gfx = state.project.graphics.get(state.open_graphic).unwrap();
-    if ui.button(">>").clicked() {
+    if ui.button(egui_phosphor::regular::FAST_FORWARD).clicked() {
         state.time = (gfx.len as f32 - 1.0) * state.frame_len();
         state.playing = false;
     }

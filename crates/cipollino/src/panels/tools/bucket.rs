@@ -37,7 +37,7 @@ impl Tool for Bucket {
         if active_frame.is_none() {
             return;
         }
-        let (frame, frame_act) = active_frame.unwrap();
+        let (frame, mut acts) = active_frame.unwrap();
         
         // This uses a standard bitmap floodfill algorithmn adapted to work with vector art
         // Is this the best approach? Probably not.
@@ -268,11 +268,6 @@ impl Tool for Bucket {
         }
 
         // Step 4: Convert to the final bezier form
-        let mut acts = Vec::new();
-        if let Some(frame_act) = frame_act {
-            acts.push(frame_act);
-        }
-
         let mut all_pts = Vec::new();
         for (_chain_idx, chain) in chains.iter().enumerate() {
             let mut pts_data = Vec::new();

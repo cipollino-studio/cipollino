@@ -10,7 +10,7 @@ use super::{active_frame, Tool};
 pub struct Pencil {
     points: Vec<glam::Vec2>,
     curr_stroke_frame: Option<(ObjPtr<Stroke>, ObjPtr<Frame>)>,
-    frame_creation_act: Option<ObjAction>,
+    frame_creation_acts: Vec<ObjAction>,
     stroke_act: Option<ObjAction> 
 }
 
@@ -20,7 +20,7 @@ impl Pencil {
         Self {
             points: Vec::new(),
             curr_stroke_frame: None,
-            frame_creation_act: None,
+            frame_creation_acts: Vec::new(),
             stroke_act: None
         }
     }
@@ -31,9 +31,8 @@ impl Pencil {
 
     fn get_action(&mut self) -> Action {
         let mut action = Action::new();
-        if let Some(act) = std::mem::replace(&mut self.frame_creation_act, None) {
-            action.add(act);
-        }
+        let acts = std::mem::replace(&mut self.frame_creation_acts, Vec::new());
+        action.add_list(acts);
         action.add(mem::replace(&mut self.stroke_act, None).unwrap());
         action
     }
@@ -49,7 +48,7 @@ impl Tool for Pencil {
         }
         let (frame, frame_act) = active_frame.unwrap(); 
 
-        self.frame_creation_act = frame_act;
+        self.frame_creation_acts = frame_act;
 
         let offset = vec2(0.001, 0.0);
         let pts = vec![vec![

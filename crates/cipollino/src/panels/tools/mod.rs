@@ -31,7 +31,7 @@ pub trait Tool {
 
 pub fn active_frame_proj_layer_frame(project: &mut Project, active_layer: ObjPtr<Layer>, frame: i32) -> Option<(ObjPtr<Frame>, Option<ObjAction>)> {
     let layer = project.layers.get(active_layer)?;
-    if let Some(frame) = layer.get_frame_exactly_at(project, frame) {
+    if let Some(frame) = layer.get_frame_at(project, frame) {
         Some((frame.make_ptr(), None))
     } else {
         let (frame, act) = Frame::add(project, active_layer, Frame {
@@ -43,7 +43,27 @@ pub fn active_frame_proj_layer_frame(project: &mut Project, active_layer: ObjPtr
     }
 }
 
-pub fn active_frame(state: &mut EditorState) -> Option<(ObjPtr<Frame>, Option<ObjAction>)> {
+pub fn active_frame(state: &mut EditorState) -> Option<(ObjPtr<Frame>, Vec<ObjAction>)> {
     let frame = state.frame();
-    active_frame_proj_layer_frame(&mut state.project, state.active_layer, frame)
+    let layer_act = if state.project.layers.get(state.active_layer).is_none() {
+        let (layer, act) = Layer::add(&mut state.project, state.open_graphic, Layer {
+            graphic: state.open_graphic,
+            name: "Layer".to_owned(),
+            show: true,
+            frames: Vec::new()
+        })?;
+        state.active_layer = layer;
+        Some(act)
+    } else {
+        None
+    };
+    let (frame, frame_act) = active_frame_proj_layer_frame(&mut state.project, state.active_layer, frame)?;
+    let mut acts = Vec::new();
+    if let Some(layer_act) = layer_act {
+        acts.push(layer_act);
+    }
+    if let Some(frame_act) = frame_act {
+        acts.push(frame_act);
+    }
+    Some((frame, acts))
 }
