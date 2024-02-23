@@ -2,10 +2,9 @@ use std::sync::Arc;
 
 use glam::Vec2;
 
-use crate::{editor::EditorState, panels::{scene::{OverlayRenderer, ScenePanel}, tools::Tool}, util::{curve::bezier_sample, geo::segment_intersect}};
-
+use crate::{editor::EditorState, panels::scene::{OverlayRenderer, ScenePanel}, util::{curve::bezier_sample, geo::segment_intersect}};
 use super::Select;
-
+use crate::tools::Tool;
 
 pub struct Lasso;
 

@@ -5,11 +5,12 @@ use glam::Vec2;
 
 use crate::{editor::EditorState, project::{action::ObjAction, frame::Frame, layer::Layer, obj::{child_obj::ChildObj, ObjPtr}, Project}};
 
-use super::scene::{OverlayRenderer, ScenePanel};
+use super::panels::scene::{OverlayRenderer, ScenePanel};
 
 pub mod pencil;
 pub mod select;
 pub mod bucket;
+pub mod color_picker;
 
 pub trait Tool {
 

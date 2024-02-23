@@ -1,10 +1,8 @@
 use crate::editor::{EditorRenderer, EditorState};
 
-
 pub mod assets;
 pub mod timeline;
 pub mod scene;
-pub mod tools;
 pub mod tool;
 
 #[derive(serde::Serialize, serde::Deserialize)]

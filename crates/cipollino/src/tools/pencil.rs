@@ -3,7 +3,7 @@ use std::{mem, sync::Arc};
 
 use glam::vec2;
 
-use crate::{panels::scene::ScenePanel, project::{action::{Action, ObjAction}, frame::Frame, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokeColor, StrokeMesh, StrokePoint}}, util::curve};
+use crate::{panels::scene::ScenePanel, project::{action::{Action, ObjAction}, frame::Frame, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokeMesh, StrokePoint}}, util::curve};
 
 use super::{active_frame, Tool};
 
@@ -69,7 +69,7 @@ impl Tool for Pencil {
         if let Some((stroke, act)) = Stroke::add(&mut state.project, frame, Stroke {
             frame: frame,
             points: pts,
-            color: StrokeColor::Color(state.color),
+            color: state.color,
             r: state.stroke_r,
             filled: state.stroke_filled,
             mesh: StrokeMesh::new()
@@ -106,7 +106,7 @@ impl Tool for Pencil {
 
                 if let Some((new_stroke, act)) = Stroke::add(&mut state.project, frame, Stroke {
                     frame: frame,
-                    color: StrokeColor::Color(state.color),
+                    color: state.color,
                     r: state.stroke_r,
                     filled: state.stroke_filled,
                     points: vec![stroke_points],
@@ -150,7 +150,7 @@ impl Tool for Pencil {
     }
 
     fn shortcut(&self) -> egui::KeyboardShortcut {
-        egui::KeyboardShortcut::new(egui::Modifiers::NONE, egui::Key::P)
+        egui::KeyboardShortcut::new(egui::Modifiers::NONE, egui::Key::D)
     }
 
 }

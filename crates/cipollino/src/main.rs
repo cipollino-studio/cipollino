@@ -8,6 +8,7 @@ pub mod project;
 pub mod renderer;
 pub mod util;
 pub mod export;
+pub mod tools;
 
 fn main() -> Result<(), eframe::Error> {
     let (icon, w, h) = {
