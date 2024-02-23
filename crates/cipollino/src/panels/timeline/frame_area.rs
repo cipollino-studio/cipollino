@@ -136,17 +136,30 @@ pub fn frames(timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_w: f32, fra
     if timeline.frame_drag.x.abs() > frame_w {
         if let Selection::Frames(frames) = &state.selection {
             let mut frame_shift_inc = (timeline.frame_drag.x.signum() * (timeline.frame_drag.x.abs() / frame_w).floor()) as i32; 
-                for frame in frames {
-                    state.project.frames.get_then(*frame, |frame| {
-                        frame_shift_inc = frame_shift_inc.max(-frame.time);
-                    });
-                }
+            for frame in frames {
+                state.project.frames.get_then(*frame, |frame| {
+                    frame_shift_inc = frame_shift_inc.max(-frame.time);
+                });
+            }
             timeline.frame_shift += frame_shift_inc;
             if let Some(action) = &timeline.frame_drag_action {
                 action.undo(&mut state.project);
             }
             let mut new_action = Action::new();
-            for frame_ptr in frames {
+            let mut frames = frames.clone();
+            frames.sort_by(|a_ptr, b_ptr| {
+                if let Some(a) = state.project.frames.get(*a_ptr) {
+                    if let Some(b) = state.project.frames.get(*b_ptr) {
+                        if timeline.frame_shift > 0 {
+                            return b.time.cmp(&a.time);
+                        } else {
+                            return a.time.cmp(&b.time);
+                        } 
+                    }
+                } 
+                std::cmp::Ordering::Equal
+            });
+            for frame_ptr in &frames {
                 if let Some(frame) = state.project.frames.get(*frame_ptr) {
                     let time = frame.time;
                     if let Some(acts) = Frame::frame_set_time(&mut state.project, *frame_ptr, time + timeline.frame_shift) {
