@@ -41,7 +41,7 @@ impl FrameGridRow {
             if let Some(hover_pos) = response.hover_pos() {
                 if frame_rect.contains(hover_pos) {
                     if response.clicked() {
-                        state.selection.select_frame(frame.make_ptr());
+                        state.selection.select_frame_inverting(frame.make_ptr());
                     } 
                     if mouse_went_down {
                         timeline.mouse_down_frame = frame.make_ptr();

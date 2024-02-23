@@ -202,7 +202,7 @@ impl ScenePanel {
                         if let Some(clone) = stroke.make_ptr().make_obj_clone(&mut state.project) {
                             if let Some((stroke, act)) = Stroke::add(&mut state.project, frame, clone) {
                                 acts.push(act);
-                                state.selection.select_stroke(stroke);
+                                state.selection.select_stroke_inverting(stroke);
                             }
                         }
                     }

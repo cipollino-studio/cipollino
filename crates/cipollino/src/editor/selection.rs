@@ -52,7 +52,7 @@ impl Selection {
         }
     }
 
-    pub fn select_stroke(&mut self, stroke: ObjPtr<Stroke>) {
+    pub fn select_stroke_inverting(&mut self, stroke: ObjPtr<Stroke>) {
         if let Self::Scene(strokes) = self {
             if let Some(idx) = strokes.iter().position(|other_stroke| *other_stroke == stroke) {
                 strokes.remove(idx);
@@ -67,6 +67,17 @@ impl Selection {
 
     pub fn select_frame(&mut self, frame: ObjPtr<Frame>) {
         if let Self::Frames(frames) = self {
+            if frames.iter().position(|other_frame| *other_frame == frame).is_none() {
+                frames.push(frame);
+            }
+        } else {
+            let new_sel = Self::Frames(vec![frame]);
+            *self = new_sel;
+        }
+    }
+
+    pub fn select_frame_inverting(&mut self, frame: ObjPtr<Frame>) {
+        if let Self::Frames(frames) = self {
             if let Some(idx) = frames.iter().position(|other_frame| *other_frame == frame) {
                 frames.remove(idx);
             } else {
@@ -77,5 +88,5 @@ impl Selection {
             *self = new_sel;
         }
     }
-
+    
 }

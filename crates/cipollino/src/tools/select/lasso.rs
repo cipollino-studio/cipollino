@@ -28,7 +28,7 @@ impl Lasso {
 
         if select.lasso_pts.len() == 1 {
             if let Some(stroke_key) = scene.sample_pick(select.lasso_pts[0], gl) {
-                state.selection.select_stroke(stroke_key);
+                state.selection.select_stroke_inverting(stroke_key);
             }
         } else if let Some(pt) = select.lasso_pts.first() {
             select.lasso_pts.push(*pt);
@@ -60,7 +60,7 @@ impl Lasso {
                         let t = (i as f32) / 9.0;
                         let pt = bezier_sample(t, p0.pt, p0.b, p1.a, p1.pt);
                         if inside_lasso(pt) {
-                            state.selection.select_stroke(stroke_ptr);
+                            state.selection.select_stroke_inverting(stroke_ptr);
                             break 'pt_loop;
                         }
                     }
