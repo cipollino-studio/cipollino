@@ -11,6 +11,7 @@ pub mod pencil;
 pub mod select;
 pub mod bucket;
 pub mod color_picker;
+pub mod line;
 
 pub trait Tool {
 

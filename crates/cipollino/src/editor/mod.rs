@@ -1,7 +1,7 @@
 
 use std::{cell::RefCell, fs, path::PathBuf, rc::Rc, sync::Arc};
 
-use crate::{export::Export, panels::{self, timeline::{new_frame, next_keyframe, prev_keyframe}}, project::{action::ActionManager, graphic::Graphic, layer::Layer, obj::ObjPtr, stroke::{Stroke, StrokeColor}, Project}, renderer::scene::SceneRenderer, tools::{bucket::Bucket, color_picker::ColorPicker, pencil::Pencil, select::Select, Tool}};
+use crate::{export::Export, panels::{self, timeline::{new_frame, next_keyframe, prev_keyframe}}, project::{action::ActionManager, graphic::Graphic, layer::Layer, obj::ObjPtr, stroke::{Stroke, StrokeColor}, Project}, renderer::scene::SceneRenderer, tools::{bucket::Bucket, color_picker::ColorPicker, line::Line, pencil::Pencil, select::Select, Tool}};
 use egui::Modifiers;
 use egui_toast::ToastOptions;
 
@@ -57,6 +57,7 @@ impl EditorState {
         let pencil = Rc::new(RefCell::new(Pencil::new()));
         let bucket = Rc::new(RefCell::new(Bucket::new()));
         let color_picker = Rc::new(RefCell::new(ColorPicker::new()));
+        let line = Rc::new(RefCell::new(Line::new()));
         Self {
             project: project, 
             actions: ActionManager::new(),
@@ -69,7 +70,7 @@ impl EditorState {
             playing: false,
             onion_before: 0,
             onion_after: 0,
-            tools: vec![select.clone(), pencil, bucket, color_picker],
+            tools: vec![select.clone(), pencil, bucket, color_picker, line],
             curr_tool: select,
             color: StrokeColor::Color(glam::vec4(0.0, 0.0, 0.0, 1.0)),
             stroke_r: 5.0,
