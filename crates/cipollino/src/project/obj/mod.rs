@@ -87,6 +87,13 @@ pub struct ObjPtr<T: Obj> {
 
 impl<T: Obj> ObjPtr<T> {
 
+    pub fn from_key(key: u64) -> Self {
+        Self {
+            key,
+            _marker: PhantomData
+        }
+    }
+
     pub fn null() -> Self {
         Self {
             key: 0,

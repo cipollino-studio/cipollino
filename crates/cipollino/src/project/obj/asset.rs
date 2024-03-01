@@ -13,9 +13,9 @@ pub trait Asset : Obj + ChildObj<Parent = Folder> {
     fn folder(&self) -> ObjPtr<Folder>;
     fn folder_mut(&mut self) -> &mut ObjPtr<Folder>;
 
-    fn path(&self, project: &Project) -> Option<PathBuf> {
+    fn file_path(&self, project: &Project) -> Option<PathBuf> {
         let folder = project.folders.get(self.folder().clone())?;
-        let mut path = folder.path(project)?;
+        let mut path = folder.file_path(project)?;
         let extension = if self.extension().len() == 0 { "".to_owned() } else { ".".to_owned() + self.extension() };
         path.push(PathBuf::from_str((self.name().clone() + extension.as_str()).as_str()).unwrap());
         Some(path)
@@ -30,7 +30,7 @@ pub trait Asset : Obj + ChildObj<Parent = Folder> {
 
         }, move |proj| {
             if let Some(obj) = Self::get_list(proj).get(ptr) {
-                if let Some(path) = obj.path(proj) {
+                if let Some(path) = obj.file_path(proj) {
                     proj.files_to_delete.insert(path);
                 }
             }
@@ -39,12 +39,12 @@ pub trait Asset : Obj + ChildObj<Parent = Folder> {
 
     fn asset_delete(project: &mut Project, obj_ptr: ObjPtr<Self>) -> Option<Vec<ObjAction>> {
         let obj = Self::get_list(project).get(obj_ptr)?; 
-        if let Some(path) = obj.path(project) {
+        if let Some(path) = obj.file_path(project) {
             project.files_to_delete.insert(path);
         }
         Some(vec![Self::delete(project, obj_ptr)?, ObjAction::new(move |proj| {
             if let Some(obj) = Self::get_list(proj).get(obj_ptr) { 
-                if let Some(path) = obj.path(proj) {
+                if let Some(path) = obj.file_path(proj) {
                     proj.files_to_delete.insert(path);
                 }
             }
@@ -59,13 +59,13 @@ pub trait Asset : Obj + ChildObj<Parent = Folder> {
         let obj = Self::get_list(project).get(obj_ptr)?;
         let init_name = obj.name().clone();
         let new_name = next_valid_name(project, &name, Self::get_list_in_parent(folder));
-        if let Some(path) = obj.path(&project) {
+        if let Some(path) = obj.file_path(&project) {
             project.files_to_delete.insert(path);
         }
 
         let redo = move |proj: &'_ mut Project| {
             let obj = Self::get_list(proj).get(obj_ptr).unwrap();
-            let path = obj.path(proj);
+            let path = obj.file_path(proj);
             let obj = Self::get_list_mut(proj).get_mut(obj_ptr).unwrap();
             *obj.name_mut() = new_name.clone(); 
             if let Some(path) = path {
@@ -75,7 +75,7 @@ pub trait Asset : Obj + ChildObj<Parent = Folder> {
 
         let undo = move |proj: &'_ mut Project| {
             let obj = Self::get_list(proj).get(obj_ptr).unwrap();
-            let path = obj.path(proj);
+            let path = obj.file_path(proj);
             let obj = Self::get_list_mut(proj).get_mut(obj_ptr).unwrap();
             *obj.name_mut() = init_name.clone(); 
             if let Some(path) = path {
@@ -95,7 +95,7 @@ pub trait Asset : Obj + ChildObj<Parent = Folder> {
         }
         let init_name = obj.name().clone();
         let new_name = next_valid_name(project, &init_name, Self::get_sibling_list(project, new_folder)?);
-        if let Some(path) = obj.path(project) {
+        if let Some(path) = obj.file_path(project) {
             project.files_to_delete.insert(path);
         }
         let obj = Self::get_list_mut(project).get_mut(asset)?;
@@ -103,19 +103,28 @@ pub trait Asset : Obj + ChildObj<Parent = Folder> {
         
         Some(vec![ObjAction::new(move |proj| {
             let obj = Self::get_list(proj).get(asset).unwrap();
-            if let Some(path) = obj.path(proj) {
+            if let Some(path) = obj.file_path(proj) {
                 proj.files_to_delete.insert(path);
             }
             let obj = Self::get_list_mut(proj).get_mut(asset).unwrap();
             *obj.name_mut() = new_name.clone();
         }, move |proj| {
             let obj = Self::get_list(proj).get(asset).unwrap();
-            if let Some(path) = obj.path(proj) {
+            if let Some(path) = obj.file_path(proj) {
                 proj.files_to_delete.insert(path);
             }
             let obj = Self::get_list_mut(proj).get_mut(asset).unwrap();
             *obj.name_mut() = init_name.clone();
         }), Self::transfer(project, asset, new_folder)?])
+    }
+
+    fn find_by_name<'a>(project: &'a Project, folder: &'a Folder, name: &str) -> Option<&'a ObjBox<Self>> {
+        for other in Self::get_list_in_parent(folder) {
+            if other.get(project).name() == name {
+                return Some(other);
+            }
+        }
+        None
     }
 
 }

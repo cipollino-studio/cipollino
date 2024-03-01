@@ -9,7 +9,7 @@ use super::obj::asset::Asset;
 use super::obj::child_obj::ChildObj;
 use super::obj::{ObjBox, ObjClone, ObjPtr};
 use super::action::ObjAction;
-
+use super::palette::Palette;
 
 #[derive(Object, Clone, ObjClone, ObjSerialize)]
 pub struct Folder {
@@ -19,6 +19,7 @@ pub struct Folder {
     #[parent]
     pub folder: ObjPtr<Folder>,
     pub graphics: Vec<ObjBox<Graphic>>,
+    pub palettes: Vec<ObjBox<Palette>>,
     pub folders: Vec<ObjBox<Folder>>
 }
 
@@ -68,23 +69,22 @@ impl Folder {
             name: "Folder".to_owned(),
             folder: parent,
             graphics: Vec::new(),
+            palettes: Vec::new(),
             folders: Vec::new()
         }
     }
 
-    pub fn path(&self, project: &Project) -> Option<PathBuf> {
+    pub fn file_path(&self, project: &Project) -> Option<PathBuf> {
         if let Some(parent) = project.folders.get(self.folder) {
-            let mut path = parent.path(project)?;
+            let mut path = parent.file_path(project)?;
             path.push(self.name.as_str());
             Some(path)
         } else {
             let mut path = project.save_path.clone()?;
             path.pop();
-            Some(path) 
+            Some(path)
         }
     }
-
-
 
 }
 

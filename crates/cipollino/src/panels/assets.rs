@@ -1,5 +1,5 @@
 
-use crate::{editor::EditorState, project::{action::Action, folder::Folder, graphic::Graphic, obj::{asset::Asset, ObjBox, ObjPtr}}, util::ui::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_label, draggable_widget}};
+use crate::{editor::EditorState, project::{action::Action, folder::Folder, graphic::Graphic, obj::{asset::Asset, ObjBox, ObjPtr}, palette::Palette}, util::ui::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_label, draggable_widget}};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct AssetsPanel {
@@ -13,6 +13,10 @@ pub struct AssetsPanel {
     #[serde(skip)]
     gfx_edit_curr_name: String,
     #[serde(skip)]
+    palette_editing_name: ObjPtr<Palette>,
+    #[serde(skip)]
+    palette_edit_curr_name: String,
+    #[serde(skip)]
     folder_editing_name: ObjPtr<Folder>,
     #[serde(skip)]
     folder_edit_curr_name: String
@@ -21,18 +25,20 @@ pub struct AssetsPanel {
 #[derive(Clone, Copy)]
 enum AssetDragPayload {
     Graphic(ObjPtr<Graphic>),
+    Palette(ObjPtr<Palette>),
     Folder(ObjPtr<Folder>)
 }
 
 impl AssetsPanel {
 
     pub fn new() -> Self {
-
         Self {
             create_graphic_data: Graphic::default(),
             create_graphic_dialog_open: false,
             gfx_editing_name: ObjPtr::null(),
             gfx_edit_curr_name: "".to_owned(),
+            palette_editing_name: ObjPtr::null(),
+            palette_edit_curr_name: "".to_owned(),
             folder_editing_name: ObjPtr::null(),
             folder_edit_curr_name: "".to_owned()
         }
@@ -44,6 +50,12 @@ impl AssetsPanel {
             egui::menu::bar(ui, |ui| {
                 if ui.button(egui_phosphor::regular::IMAGE_SQUARE).clicked() {
                     self.create_graphic_dialog_open = true;
+                }
+                if ui.button(egui_phosphor::regular::PALETTE).clicked() {
+                    let root_folder = state.project.root_folder.make_ptr();
+                    if let Some((_ptr, act)) = Palette::asset_add(&mut state.project, root_folder, Palette::new(root_folder)) {
+                        state.actions.add(Action::from_list(act));
+                    }
                 }
                 if ui.button(egui_phosphor::regular::FOLDER).clicked() {
                     create_folder = true;
@@ -89,15 +101,18 @@ impl AssetsPanel {
 
     fn render_asset_hiearchy(&mut self, ui: &mut egui::Ui, state: &mut EditorState) {
         let mut open_gfx = None;
+        let mut open_palette = None;
         let mut delete_gfx = None;
+        let mut delete_palette = None;
         let mut delete_folder = None;
         let mut rename_gfx = None;
+        let mut rename_palette = None;
         let mut rename_folder = None;
         let mut asset_transfer = None;
 
         let colors = dnd_drop_zone_setup_colors(ui);
 
-        self.render_folder_contents(ui, state, state.project.root_folder.make_ptr(), &mut open_gfx, &mut delete_gfx, &mut delete_folder, &mut rename_gfx, &mut rename_folder, &mut asset_transfer);
+        self.render_folder_contents(ui, state, state.project.root_folder.make_ptr(), &mut open_gfx, &mut open_palette, &mut delete_gfx, &mut delete_palette, &mut delete_folder, &mut rename_gfx, &mut rename_palette, &mut rename_folder, &mut asset_transfer);
         let (_, root_payload) = ui.dnd_drop_zone::<AssetDragPayload>(egui::Frame::default(), |ui| {
             ui.allocate_exact_size(ui.available_size(), egui::Sense::hover());
         });
@@ -110,9 +125,16 @@ impl AssetsPanel {
         if let Some(gfx_ptr) = open_gfx {
             if let Some(gfx) = state.project.graphics.get(gfx_ptr) { 
                 state.open_graphic = gfx_ptr; 
+                state.selection.clear();
                 if gfx.layers.len() > 0 {
                     state.active_layer = gfx.layers[0].make_ptr();
                 }
+            }
+        }
+
+        if let Some(palette_ptr) = open_palette {
+            if let Some(_palette) = state.project.palettes.get(palette_ptr) {
+                state.open_palette = palette_ptr;
             }
         }
 
@@ -121,6 +143,12 @@ impl AssetsPanel {
                 state.open_graphic = ObjPtr::null();
             }
             if let Some(acts) = Graphic::asset_delete(&mut state.project, gfx) {
+                state.actions.add(Action::from_list(acts));
+            }
+        }
+
+        if let Some(palette) = delete_palette {
+            if let Some(acts) = Palette::asset_delete(&mut state.project, palette) {
                 state.actions.add(Action::from_list(acts));
             }
         }
@@ -138,6 +166,13 @@ impl AssetsPanel {
             self.gfx_editing_name = ObjPtr::null();
         }
 
+        if let Some(name) = rename_palette {
+            if let Some(act) = Palette::rename(&mut state.project, self.palette_editing_name, name) {
+                state.actions.add(Action::from_single(act));
+            }
+            self.palette_editing_name = ObjPtr::null();
+        }
+
         if let Some(name) = rename_folder {
             if let Some(act) = Folder::rename(&mut state.project, self.folder_editing_name, name) {
                 state.actions.add(Action::from_single(act));
@@ -149,6 +184,9 @@ impl AssetsPanel {
             if let Some(acts) = match asset {
                 AssetDragPayload::Graphic(gfx) => {
                     Graphic::asset_transfer(&mut state.project, gfx, folder) 
+                },
+                AssetDragPayload::Palette(palette) => {
+                    Palette::asset_transfer(&mut state.project, palette, folder)
                 },
                 AssetDragPayload::Folder(subfolder) => {
                     Folder::asset_transfer(&mut state.project, subfolder, folder) 
@@ -164,16 +202,19 @@ impl AssetsPanel {
             ui: &mut egui::Ui, state: &EditorState,
             folder_ptr: ObjPtr<Folder>,
             open_gfx: &mut Option<ObjPtr<Graphic>>,
+            open_palette: &mut Option<ObjPtr<Palette>>,
             delete_gfx: &mut Option<ObjPtr<Graphic>>,
+            delete_palette: &mut Option<ObjPtr<Palette>>,
             delete_folder: &mut Option<ObjPtr<Folder>>,
             rename_gfx: &mut Option<String>,
+            rename_palette: &mut Option<String>,
             rename_folder: &mut Option<String>,
             asset_transfer: &mut Option<(ObjPtr<Folder>, AssetDragPayload)>) -> Option<bool> {
         let folder = state.project.folders.get(folder_ptr)?;
 
         let mut inner_hovered = false;
         for subfolder in &folder.folders {
-            inner_hovered |= self.render_subfolder(ui, state, subfolder, open_gfx, delete_gfx, delete_folder, rename_gfx, rename_folder, asset_transfer)?;
+            inner_hovered |= self.render_subfolder(ui, state, subfolder, open_gfx, open_palette, delete_gfx, delete_palette, delete_folder, rename_gfx, rename_palette, rename_folder, asset_transfer)?;
         }
 
         for gfx in &folder.graphics {
@@ -200,6 +241,28 @@ impl AssetsPanel {
                 }
             }
         }
+        for palette in &folder.palettes {
+            if palette.make_ptr() != self.palette_editing_name {
+                let palette_text = format!("{} {}", egui_phosphor::regular::PALETTE, palette.get(&state.project).name());
+                let resp = draggable_label(ui, &palette_text, AssetDragPayload::Palette(palette.make_ptr()));
+                if resp.double_clicked() {
+                    *open_palette = Some(palette.make_ptr());
+                }
+                resp.context_menu(|ui| {
+                    if ui.button("Rename").clicked() {
+                        self.palette_editing_name = palette.make_ptr();
+                        self.palette_edit_curr_name = palette.get(&state.project).name().clone();
+                    }
+                    if ui.button("Delete").clicked() {
+                        *delete_palette = Some(palette.make_ptr());
+                    }
+                });
+            } else {
+                if ui.text_edit_singleline(&mut self.palette_edit_curr_name).lost_focus() {
+                    *rename_palette = Some(self.palette_edit_curr_name.clone());
+                }
+            }
+        }
         Some(inner_hovered)
     }
 
@@ -209,9 +272,12 @@ impl AssetsPanel {
         state: &EditorState,
         folder: &ObjBox<Folder>,
         open_gfx: &mut Option<ObjPtr<Graphic>>,
+        open_palette: &mut Option<ObjPtr<Palette>>,
         delete_gfx: &mut Option<ObjPtr<Graphic>>,
+        delete_palette: &mut Option<ObjPtr<Palette>>,
         delete_folder: &mut Option<ObjPtr<Folder>>,
         rename_gfx: &mut Option<String>,
+        rename_palette: &mut Option<String>,
         rename_folder: &mut Option<String>,
         asset_transfer: &mut Option<(ObjPtr<Folder>, AssetDragPayload)>) -> Option<bool> {
 
@@ -229,7 +295,7 @@ impl AssetsPanel {
         let mut inner_hovered = false;
         let folder_resp = draggable_widget(&mut frame.content_ui, AssetDragPayload::Folder(folder.make_ptr()), |ui| {
             let resp = ui.collapsing(folder.get(&state.project).name.as_str(), |ui| {
-                inner_hovered |= self.render_folder_contents(ui, state, folder.make_ptr(), open_gfx, delete_gfx, delete_folder, rename_gfx, rename_folder, asset_transfer).unwrap_or(false);
+                inner_hovered |= self.render_folder_contents(ui, state, folder.make_ptr(), open_gfx, open_palette, delete_gfx, delete_palette, delete_folder, rename_gfx, rename_palette, rename_folder, asset_transfer).unwrap_or(false);
             }).header_response;
             (resp.clone(), resp)
         });

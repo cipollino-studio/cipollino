@@ -5,7 +5,7 @@ use serde_json::json;
 
 use crate::project::{graphic::Graphic, obj::ObjBox};
 
-use super::{folder::Folder, obj::{ObjPtr, ObjSerialize}, Project};
+use super::{folder::Folder, obj::{asset::Asset, ObjPtr, ObjSerialize}, palette::Palette, Project};
 
 pub fn read_json_file(path: &PathBuf) -> Option<serde_json::Value> {
     let mut file = fs::File::open(path).ok()?;
@@ -58,7 +58,12 @@ impl Project {
             for gfx_box in &folder.graphics {
                 let gfx = gfx_box.get(self);
                 let data = gfx_box.obj_serialize(self);
-                write_json_file(&path.with_file_name(format!("{}.cipgfx", gfx.name)), data);
+                write_json_file(&path.with_file_name(format!("{}.{}", gfx.name, gfx.extension())), data);
+            }
+            for palette_box in &folder.palettes {
+                let palette = palette_box.get(self);
+                let data = palette_box.obj_serialize(self);
+                write_json_file(&path.with_file_name(format!("{}.{}", palette.name(), palette.extension())), data);
             }
         }
         for (ptr, path) in subfolders {
@@ -74,9 +79,8 @@ impl Project {
         }
 
         let folder_path = proj_file_path.parent().unwrap();
+        res.save_path = Some(proj_file_path.clone());
         res.root_folder = res.load_folder(&folder_path.to_owned(), ObjPtr::null()); 
-
-        res.save_path = Some(proj_file_path);
 
         res
     }
@@ -95,6 +99,15 @@ impl Project {
                                 if let Some(gfx) = ObjBox::<Graphic>::obj_deserialize(self, &data, res.make_ptr().into()) {
                                     gfx.get_mut(self).name = path.file_stem().unwrap().to_str().unwrap().to_owned();
                                     res.get_mut(self).graphics.push(gfx);
+                                }
+                            }
+                        }
+                        if ext == "cippal" {
+                            if let Some(data) = read_json_file(&path) { 
+                                if let Some(palette) = ObjBox::<Palette>::obj_deserialize(self, &data, res.make_ptr().into()) {
+                                    let name = path.file_stem().unwrap().to_str().unwrap().to_owned();
+                                    palette.get_mut(self).name = name; 
+                                    res.get_mut(self).palettes.push(palette);
                                 }
                             }
                         }

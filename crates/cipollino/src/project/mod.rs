@@ -7,9 +7,11 @@ pub mod stroke;
 pub mod obj;
 pub mod action;
 pub mod saveload;
+pub mod palette;
+
 use std::{collections::HashSet, path::PathBuf};
 
-use self::{folder::Folder, frame::Frame, graphic::Graphic, layer::Layer, obj::{ObjBox, ObjList, ObjPtr}, stroke::Stroke};
+use self::{folder::Folder, frame::Frame, graphic::Graphic, layer::Layer, obj::{ObjBox, ObjList, ObjPtr}, palette::{Palette, PaletteColor}, stroke::Stroke};
 
 pub struct Project {
     pub folders: ObjList<Folder>,
@@ -17,6 +19,8 @@ pub struct Project {
     pub layers: ObjList<Layer>,
     pub frames: ObjList<Frame>,
     pub strokes: ObjList<Stroke>,
+    pub palettes: ObjList<Palette>,
+    pub palette_colors: ObjList<PaletteColor>,
 
     pub root_folder: ObjBox<Folder>,
 
@@ -35,6 +39,8 @@ impl Project {
             layers: ObjList::new(),
             frames: ObjList::new(),
             strokes: ObjList::new(),
+            palettes: ObjList::new(),
+            palette_colors: ObjList::new(),
             root_folder: root,
             save_path: None,
             files_to_delete: HashSet::new()

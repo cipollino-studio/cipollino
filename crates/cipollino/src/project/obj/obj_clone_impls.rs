@@ -36,7 +36,6 @@ impl<T: Simple> ObjSerialize for T {
     }
 
 }
-
 impl Simple for bool {}
 impl Simple for u32 {}
 impl Simple for u64 {}
@@ -61,16 +60,45 @@ impl<T: Obj> ObjClone for ObjBox<T> {
 
 }
 
+impl<T: Obj> ObjSerialize for ObjPtr<T> {
+
+    fn obj_serialize(&self, _project: &Project) -> serde_json::Value {
+        json!(self.key)
+    }
+
+    fn obj_deserialize(_project: &mut Project, data: &serde_json::Value, _parent: ObjPtrAny) -> Option<Self> {
+        Some(Self::from_key(data.as_u64()?))
+    }
+}
+
 impl<T: ChildObj + ObjSerialize> ObjSerialize for ObjBox<T> {
 
     fn obj_serialize(&self, project: &Project) -> serde_json::Value {
-        self.get(project).obj_serialize(project)
+        let mut data = self.get(project).obj_serialize(project);
+        if let Some(map) = data.as_object_mut() {
+            map.insert("key".to_owned(), json!(self.ptr.key));
+        }
+        data
     }
 
     fn obj_deserialize(project: &mut Project, data: &serde_json::Value, parent: ObjPtrAny) -> Option<Self> {
-        let ptr = T::get_list_mut(project).next_ptr();
+        
+        let ptr = if let Some(key) = data.get("key") {
+            let key = key.as_u64()?;
+            let ptr = ObjPtr::from_key(key);
+            if T::get_list(project).get(ptr).is_some() {
+                T::get_list_mut(project).next_ptr()
+            } else {
+                T::get_list_mut(project).curr_key = T::get_list_mut(project).curr_key.max(key + 1);
+                ptr
+            }
+        } else {
+            T::get_list_mut(project).next_ptr()
+        }; 
+        
         let mut obj = T::obj_deserialize(project, data, ptr.into())?;
         *obj.parent_mut() = parent.into();
         Some(T::get_list_mut(project).add_with_ptr(obj, ptr))
     }
+
 }

@@ -1,7 +1,7 @@
 
 use std::{cell::RefCell, fs, path::PathBuf, rc::Rc, sync::Arc};
 
-use crate::{export::Export, panels::{self, timeline::{new_frame, next_keyframe, prev_keyframe}}, project::{action::ActionManager, graphic::Graphic, layer::Layer, obj::ObjPtr, stroke::{Stroke, StrokeColor}, Project}, renderer::scene::SceneRenderer, tools::{bucket::Bucket, color_picker::ColorPicker, line::Line, pencil::Pencil, select::Select, Tool}};
+use crate::{export::Export, panels::{self, timeline::{new_frame, next_keyframe, prev_keyframe}}, project::{action::ActionManager, graphic::Graphic, layer::Layer, obj::ObjPtr, palette::Palette, stroke::{Stroke, StrokeColor}, Project}, renderer::scene::SceneRenderer, tools::{bucket::Bucket, color_picker::ColorPicker, line::Line, pencil::Pencil, select::Select, Tool}};
 use egui::Modifiers;
 use egui_toast::ToastOptions;
 
@@ -27,6 +27,7 @@ pub struct EditorState {
 
     // Selections
     pub open_graphic: ObjPtr<Graphic>,
+    pub open_palette: ObjPtr<Palette>,
     pub active_layer: ObjPtr<Layer>,
     pub selection: selection::Selection,
 
@@ -63,6 +64,7 @@ impl EditorState {
             actions: ActionManager::new(),
             toasts: egui_toast::Toasts::default().anchor(egui::Align2::RIGHT_BOTTOM, egui::pos2(-10.0, -10.0)),
             open_graphic: ObjPtr::null(),
+            open_palette: ObjPtr::null(),
             active_layer: ObjPtr::null(),
             selection: selection::Selection::None,
             clipboard: clipboard::Clipboard::None,
@@ -290,6 +292,9 @@ impl Editor {
                         }
                         if ui.button("Tool Options").clicked() {
                             self.panels.add_panel(panels::Panel::Tool(panels::tool::ToolPanel::new()));
+                        }
+                        if ui.button("Colors").clicked() {
+                            self.panels.add_panel(panels::Panel::Color(panels::colors::ColorPanel::new()));
                         }
                     })
                 });

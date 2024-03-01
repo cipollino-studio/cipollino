@@ -1,7 +1,7 @@
 
 use project_macros::{ObjClone, ObjSerialize, Object};
 
-use super::{action::ObjAction, folder::Folder, layer::Layer, obj::{asset::Asset, child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjSerialize, ObjPtrAny}, Project};
+use super::{action::ObjAction, folder::Folder, layer::Layer, obj::{asset::Asset, child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjPtrAny, ObjSerialize}, Project};
 
 #[derive(Object, Clone, ObjClone, ObjSerialize)]
 pub struct Graphic {

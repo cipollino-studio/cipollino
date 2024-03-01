@@ -1,4 +1,5 @@
 
+use convert_case::Casing;
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, Data, DeriveInput, Field, Ident};
 use quote::{format_ident, quote, ToTokens, TokenStreamExt};
@@ -22,7 +23,7 @@ pub fn object(input: TokenStream) -> TokenStream {
         panic!("object must be a struct!");
     };
     let name = ast.ident;
-    let list_name = Ident::new((name.to_string().to_ascii_lowercase() + "s").as_str(), name.span()); 
+    let list_name = Ident::new((name.to_string() + "s").to_case(convert_case::Case::Snake).as_str(), name.span()); 
 
     let mut field_setters = quote!{};
     for field in fields {

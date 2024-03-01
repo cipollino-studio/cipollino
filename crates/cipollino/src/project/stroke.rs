@@ -5,7 +5,7 @@ use serde_json::json;
 
 use crate::renderer::mesh::Mesh;
 
-use super::{action::ObjAction, frame::Frame, obj::{child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjSerialize, ObjPtrAny}, Project};
+use super::{action::ObjAction, frame::Frame, obj::{child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjPtrAny, ObjSerialize}, palette::PaletteColor, Project};
 
 #[derive(Clone, Copy, ObjClone, Default, ObjSerialize)]
 pub struct StrokePoint {
@@ -48,9 +48,7 @@ impl ObjClone for StrokeMesh {}
 
 impl ObjSerialize for StrokeMesh {
     fn obj_serialize(&self, _project: &Project) -> serde_json::Value {
-        json! {
-            null
-        }
+        json! { null }
     }
 
     fn obj_deserialize(_project: &mut Project, _data: &serde_json::Value, _parent: ObjPtrAny) -> Option<Self> {
@@ -60,14 +58,19 @@ impl ObjSerialize for StrokeMesh {
 
 #[derive(Clone, Copy)]
 pub enum StrokeColor {
-    Color(glam::Vec4) 
+    Color(glam::Vec4),
+    Palette(ObjPtr<PaletteColor>, glam::Vec4) 
 }
 
 impl StrokeColor {
 
-    pub fn get_color(&self) -> glam::Vec4 {
+    pub fn get_color(&self, project: &Project) -> glam::Vec4 {
         match self {
-            StrokeColor::Color(color) => *color
+            Self::Color(color) => *color,
+            Self::Palette(ptr, backup_color) => {
+                let color = project.palette_colors.get(*ptr).map(|color| color.color);
+                color.unwrap_or(*backup_color)
+            }
         }
     }
     
@@ -77,13 +80,17 @@ impl ObjClone for StrokeColor {}
 
 impl ObjSerialize for StrokeColor {
 
-    fn obj_serialize(&self, _project: &Project) -> serde_json::Value {
+    fn obj_serialize(&self, project: &Project) -> serde_json::Value {
         match self {
-            StrokeColor::Color(color) => json!([color.x, color.y, color.z, color.w]),
+            Self::Color(color) => json!([color.x, color.y, color.z, color.w]),
+            Self::Palette(ptr, backup_color) => json!({
+                "color": ptr.obj_serialize(project),
+                "backup": [backup_color.x, backup_color.y, backup_color.z, backup_color.w]
+            })
         }
     }
 
-    fn obj_deserialize(_project: &mut Project, data: &serde_json::Value, _parent: ObjPtrAny) -> Option<Self> {
+    fn obj_deserialize(project: &mut Project, data: &serde_json::Value, parent: ObjPtrAny) -> Option<Self> {
         if let Some(arr) = data.as_array() {
             let mut color = [0.0; 4];
             color[3] = 1.0;
@@ -92,6 +99,10 @@ impl ObjSerialize for StrokeColor {
             } 
             let color = glam::Vec4::from_slice(&color);
             Some(StrokeColor::Color(color))
+        } else if let Some(obj) = data.as_object() {
+            let ptr = obj.get(&"color".to_owned()).map(|data| ObjPtr::<PaletteColor>::obj_deserialize(project, data, parent).unwrap_or(ObjPtr::null())).unwrap_or(ObjPtr::null());
+            let backup = obj.get(&"backup".to_owned()).map(|data| glam::Vec4::obj_deserialize(project, data, parent).unwrap_or(glam::vec4(0.0, 0.0, 0.0, 1.0))).unwrap_or(glam::vec4(0.0, 0.0, 0.0, 1.0));
+            Some(Self::Palette(ptr, backup))
         } else {
             None
         }

@@ -4,13 +4,15 @@ pub mod assets;
 pub mod timeline;
 pub mod scene;
 pub mod tool;
+pub mod colors;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum Panel {
     Assets(assets::AssetsPanel),
     Timeline(timeline::TimelinePanel),
     Scene(scene::ScenePanel),
-    Tool(tool::ToolPanel)
+    Tool(tool::ToolPanel),
+    Color(colors::ColorPanel)
 }
 
 pub struct PanelViewer<'a, 'b> {
@@ -27,7 +29,8 @@ impl egui_dock::TabViewer for PanelViewer<'_, '_> {
             Panel::Assets(..) => "Assets",
             Panel::Timeline(..) => "Timeline",
             Panel::Scene(..) => "Scene",
-            Panel::Tool(..) => "Tool Options"
+            Panel::Tool(..) => "Tool Options",
+            Panel::Color(..) => "Color"
         }.into()
     }
 
@@ -41,7 +44,8 @@ impl egui_dock::TabViewer for PanelViewer<'_, '_> {
             Panel::Assets(assets) => assets.render(ui, &mut self.state),
             Panel::Timeline(timeline) => timeline.render(ui, &mut self.state), 
             Panel::Scene(scene) => scene.render(ui, &mut self.state, &mut self.renderer),
-            Panel::Tool(tool) => tool.render(ui, &mut self.state)
+            Panel::Tool(tool) => tool.render(ui, &mut self.state),
+            Panel::Color(color) => color.render(ui, &mut self.state)
         }
     }
 }

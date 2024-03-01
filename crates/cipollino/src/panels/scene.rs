@@ -4,7 +4,7 @@ use glam::Vec2;
 use glow::HasContext;
 
 use crate::{
-    editor::{clipboard::Clipboard, selection::Selection, EditorRenderer, EditorState}, project::{action::Action, graphic::Graphic, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokeColor}}, renderer::{fb::Framebuffer, mesh::Mesh, shader::Shader}, util::curve
+    editor::{clipboard::Clipboard, selection::Selection, EditorRenderer, EditorState}, project::{action::Action, graphic::Graphic, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokeColor}}, renderer::{fb::Framebuffer, mesh::Mesh, shader::Shader}, util::{curve, ui::color::color_picker}
 };
 
 use super::super::tools::active_frame_proj_layer_frame;
@@ -86,13 +86,14 @@ impl ScenePanel {
                         state.curr_tool = tool;
                     }
 
-                    let color = state.color.get_color();
-                    let mut color = [color.x.powf(2.0), color.y.powf(2.0), color.z.powf(2.0), color.w];
-                    let prev_interact_size = ui.spacing().interact_size;
-                    ui.spacing_mut().interact_size = egui::Vec2::splat(30.0);
-                    ui.color_edit_button_rgba_premultiplied(&mut color);
-                    ui.spacing_mut().interact_size = prev_interact_size; 
-                    state.color = StrokeColor::Color(glam::vec4(color[0].sqrt(), color[1].sqrt(), color[2].sqrt(), color[3])); 
+                    let mut color = state.color.get_color(&state.project);
+                    let mut editing_color = false;
+                    let mut _set_color = false;
+                    color_picker(ui, &mut color, Some(egui::Vec2::splat(30.0)), &mut editing_color, &mut _set_color);
+                    if editing_color {
+                        state.color = StrokeColor::Color(color);
+                    }
+                    
                 });
             let response = egui::CentralPanel::default()
                 .frame(no_margin)

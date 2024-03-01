@@ -199,7 +199,7 @@ impl SceneRenderer {
                 continue;
             }
             let stroke = stroke.unwrap();
-            let color = stroke.color.get_color();
+            let color = stroke.color.get_color(&project);
             let filled = stroke.filled;
             if let Some(mesh) = meshgen::get_mesh(project, *stroke_ptr, gl) {
                 render_stroke_mesh(mesh, color, filled, gl); 
