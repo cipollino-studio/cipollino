@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use glam::Vec2;
 
-use crate::{editor::EditorState, project::{action::ObjAction, frame::Frame, layer::Layer, obj::{child_obj::ChildObj, ObjPtr}, Project}};
+use crate::{editor::EditorState, project::{action::ObjAction, frame::Frame, layer::{Layer, LayerKind}, obj::{child_obj::ChildObj, ObjPtr}, Project}};
 
 use super::panels::scene::{OverlayRenderer, ScenePanel};
 
@@ -52,13 +52,18 @@ pub fn active_frame(state: &mut EditorState) -> Option<(ObjPtr<Frame>, Vec<ObjAc
             graphic: state.open_graphic,
             name: "Layer".to_owned(),
             show: true,
-            frames: Vec::new()
+            kind: LayerKind::Animation,
+            frames: Vec::new(),
+            sound_instances: Vec::new()
         })?;
         state.active_layer = layer;
         Some(act)
     } else {
         None
     };
+    if state.project.layers.get(state.active_layer).unwrap().kind != LayerKind::Animation {
+        return None;
+    }
     let (frame, frame_act) = active_frame_proj_layer_frame(&mut state.project, state.active_layer, frame)?;
     let mut acts = Vec::new();
     if let Some(layer_act) = layer_act {

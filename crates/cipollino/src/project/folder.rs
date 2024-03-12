@@ -1,9 +1,10 @@
 
 use std::path::PathBuf;
-
-use project_macros::{ObjClone, ObjSerialize, Object};
-use crate::project::obj::{Obj, ObjList, ObjSerialize, ObjPtrAny};
+use project_macros::{ObjClone, Object};
+use crate::project::obj::{Obj, ObjList};
 use crate::project::Project;
+use super::file::audio::AudioFile;
+use super::file::FilePtr;
 use super::graphic::Graphic;
 use super::obj::asset::Asset;
 use super::obj::child_obj::ChildObj;
@@ -11,7 +12,7 @@ use super::obj::{ObjBox, ObjClone, ObjPtr};
 use super::action::ObjAction;
 use super::palette::Palette;
 
-#[derive(Object, Clone, ObjClone, ObjSerialize)]
+#[derive(Object, Clone, ObjClone)]
 pub struct Folder {
     #[field]
     pub name: String,
@@ -20,7 +21,8 @@ pub struct Folder {
     pub folder: ObjPtr<Folder>,
     pub graphics: Vec<ObjBox<Graphic>>,
     pub palettes: Vec<ObjBox<Palette>>,
-    pub folders: Vec<ObjBox<Folder>>
+    pub audios: Vec<FilePtr<AudioFile>>,
+    pub folders: Vec<ObjBox<Folder>>,
 }
 
 impl ChildObj for Folder {
@@ -70,6 +72,7 @@ impl Folder {
             folder: parent,
             graphics: Vec::new(),
             palettes: Vec::new(),
+            audios: Vec::new(),
             folders: Vec::new()
         }
     }

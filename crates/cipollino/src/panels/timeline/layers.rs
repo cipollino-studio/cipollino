@@ -1,9 +1,9 @@
 
 use egui::{vec2, Vec2};
 
-use crate::{editor::EditorState, project::{action::Action, layer::Layer, obj::{child_obj::ChildObj, ObjPtr}}, util::ui::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_widget, label_size}};
+use crate::{editor::EditorState, project::{action::Action, layer::{Layer, LayerKind}, obj::{child_obj::ChildObj, ObjPtr}}, util::ui::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_widget, label_size}};
 
-use super::{FrameGridRow, TimelinePanel};
+use super::{FrameGridRow, FrameGridRowKind, TimelinePanel};
 
 impl FrameGridRow {
 
@@ -13,6 +13,7 @@ impl FrameGridRow {
         let mut set_name = false;
         let mut delete_layer = false;
         let mut show_hide_layer = false; 
+        let mut set_layer_kind = None;
 
         if layer_ptr == state.active_layer {
             ui.painter().rect(rect, 0.0, super::HIGHLIGHT, egui::Stroke::NONE);
@@ -41,6 +42,16 @@ impl FrameGridRow {
                     timeline.layer_edit_curr_name = layer.name.clone();
                     ui.close_menu();
                 }
+                ui.menu_button("Layer Type", |ui| {
+                    if ui.button("Animation").clicked() {
+                        set_layer_kind = Some(LayerKind::Animation);
+                        ui.close_menu();
+                    }
+                    if ui.button("Audio").clicked() {
+                        set_layer_kind = Some(LayerKind::Audio);
+                        ui.close_menu(); 
+                    }
+                });
                 if ui.button("Delete").clicked() {
                     delete_layer = true;
                     ui.close_menu();
@@ -50,7 +61,17 @@ impl FrameGridRow {
                 state.active_layer = layer_ptr;
             }
 
-            let eye_text = if layer.show { egui_phosphor::regular::EYE } else { egui_phosphor::regular::EYE_CLOSED };
+            let eye_text = if layer.show {
+                match layer.kind {
+                    LayerKind::Animation => egui_phosphor::regular::EYE,
+                    LayerKind::Audio => egui_phosphor::regular::SPEAKER_HIGH,
+                }
+            } else {
+                match layer.kind {
+                    LayerKind::Animation => egui_phosphor::regular::EYE_CLOSED,
+                    LayerKind::Audio => egui_phosphor::regular::SPEAKER_SLASH,
+                }
+            };
             let eye_size = label_size(ui, egui::Label::new(eye_text).selectable(false));
             let eye_rect = egui::Rect::from_min_size(rect.max - vec2(eye_size.x + ui.spacing().icon_spacing, rect.height()), vec2(eye_size.x, rect.height())); 
             let eye_resp = ui.put(eye_rect, egui::Label::new(eye_text).selectable(false).sense(egui::Sense::click()));
@@ -74,6 +95,11 @@ impl FrameGridRow {
         }
         if show_hide_layer {
             if let Some(act) = Layer::set_show(&mut state.project, layer_ptr, !showing_layer) {
+                state.actions.add(Action::from_single(act));
+            }
+        }
+        if let Some(layer_kind) = set_layer_kind {
+            if let Some(act) = Layer::set_kind(&mut state.project, layer_ptr, layer_kind) {
                 state.actions.add(Action::from_single(act));
             }
         }
@@ -103,7 +129,7 @@ impl FrameGridRow {
 
     fn render_layer(&self, timeline: &mut TimelinePanel, ui: &mut egui::Ui, rect: egui::Rect, state: &mut EditorState, response: &egui::Response, layer_drop_idx: &mut Option<usize>) {
         match &self.kind {
-            super::FrameGridRowKind::Layer(layer) => self.render_layer_layer(timeline, ui, rect, state, response, layer_drop_idx, *layer),
+            FrameGridRowKind::AnimationLayer(layer) | FrameGridRowKind::AudioLayer(layer) => self.render_layer_layer(timeline, ui, rect, state, response, layer_drop_idx, *layer),
         };
     }
 

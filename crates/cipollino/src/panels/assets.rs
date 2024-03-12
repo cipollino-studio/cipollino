@@ -1,5 +1,5 @@
 
-use crate::{editor::EditorState, project::{action::Action, folder::Folder, graphic::Graphic, obj::{asset::Asset, ObjBox, ObjPtr}, palette::Palette}, util::ui::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_label, draggable_widget}};
+use crate::{editor::EditorState, project::{action::Action, file::{audio::AudioFile, FilePtr, FileType}, folder::Folder, graphic::Graphic, obj::{asset::Asset, ObjBox, ObjPtr}, palette::Palette}, util::ui::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_label, draggable_widget}};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct AssetsPanel {
@@ -22,11 +22,12 @@ pub struct AssetsPanel {
     folder_edit_curr_name: String
 }
 
-#[derive(Clone, Copy)]
-enum AssetDragPayload {
+#[derive(Clone)]
+pub enum AssetDragPayload {
     Graphic(ObjPtr<Graphic>),
     Palette(ObjPtr<Palette>),
-    Folder(ObjPtr<Folder>)
+    Folder(ObjPtr<Folder>),
+    Audio(ObjPtr<Folder>, FilePtr<AudioFile>)
 }
 
 impl AssetsPanel {
@@ -117,7 +118,7 @@ impl AssetsPanel {
             ui.allocate_exact_size(ui.available_size(), egui::Sense::hover());
         });
         if let Some(root_payload) = root_payload {
-            asset_transfer = Some((state.project.root_folder.make_ptr(), *root_payload.as_ref()));
+            asset_transfer = Some((state.project.root_folder.make_ptr(), root_payload.as_ref().clone()));
         }
 
         dnd_drop_zone_reset_colors(ui, colors);
@@ -191,6 +192,9 @@ impl AssetsPanel {
                 AssetDragPayload::Folder(subfolder) => {
                     Folder::asset_transfer(&mut state.project, subfolder, folder) 
                 },
+                AssetDragPayload::Audio(from, audio) => {
+                    AudioFile::transfer(&mut state.project, audio, from, folder).map(|act| vec![act])
+                }
             } {
                 state.actions.add(Action::from_list(acts));
             } 
@@ -263,6 +267,10 @@ impl AssetsPanel {
                 }
             }
         }
+        for audio in &folder.audios {
+            let audio_text = format!("{} {}", egui_phosphor::regular::SPEAKER_HIGH, audio.name());
+            let _resp = draggable_label(ui, &audio_text, AssetDragPayload::Audio(folder_ptr, audio.clone()));
+        }
         Some(inner_hovered)
     }
 
@@ -329,7 +337,7 @@ impl AssetsPanel {
 
         if !inner_hovered {
             if let Some(payload) = response.dnd_release_payload::<AssetDragPayload>() {
-                *asset_transfer = Some((folder.make_ptr(), *payload.as_ref()));
+                *asset_transfer = Some((folder.make_ptr(), payload.as_ref().clone()));
             }
         }
 

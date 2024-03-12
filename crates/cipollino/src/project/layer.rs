@@ -1,7 +1,15 @@
 
 use project_macros::{ObjClone, ObjSerialize, Object};
 
-use super::{Project, ObjBox, action::ObjAction, frame::Frame, obj::{Obj, ObjPtr, child_obj::ChildObj, ObjList, ObjClone, ObjSerialize, ObjPtrAny}, graphic::Graphic};
+use super::{action::ObjAction, frame::Frame, graphic::Graphic, obj::{child_obj::ChildObj, obj_clone_impls::PrimitiveObjClone, Obj, ObjClone, ObjList, ObjPtr, ObjPtrAny, ObjSerialize}, sound_instance::SoundInstance, ObjBox, Project};
+
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub enum LayerKind {
+    Animation,
+    Audio
+}
+
+impl PrimitiveObjClone for LayerKind {}
 
 #[derive(Object, Clone, ObjClone, ObjSerialize)]
 pub struct Layer {
@@ -11,7 +19,10 @@ pub struct Layer {
     pub name: String,
     #[field]
     pub show: bool,
-    pub frames: Vec<ObjBox<Frame>>
+    #[field]
+    pub kind: LayerKind,
+    pub frames: Vec<ObjBox<Frame>>,
+    pub sound_instances: Vec<ObjBox<SoundInstance>>
 }
 
 impl Layer {
@@ -87,7 +98,9 @@ impl Default for Layer {
             graphic: ObjPtr::null(),
             name: "Layer".to_owned(),
             show: true,
-            frames: Vec::new()
+            kind: LayerKind::Animation,
+            frames: Vec::new(),
+            sound_instances: Vec::new()
         }
     }
 

@@ -1,11 +1,11 @@
 
-use std::{cell::RefCell, fs, path::PathBuf, rc::Rc, sync::Arc};
+use std::{fs, path::PathBuf, sync::{Arc, Mutex, RwLock}};
 
-use crate::{export::Export, panels::{self, timeline::{new_frame, next_keyframe, prev_keyframe}}, project::{action::ActionManager, graphic::Graphic, layer::Layer, obj::ObjPtr, palette::Palette, stroke::{Stroke, StrokeColor}, Project}, renderer::scene::SceneRenderer, tools::{bucket::Bucket, color_picker::ColorPicker, line::Line, pencil::Pencil, select::Select, Tool}};
+use crate::{audio::AudioController, export::Export, panels::{self, timeline::{new_frame, next_keyframe, prev_keyframe}}, project::{action::ActionManager, graphic::Graphic, layer::{Layer, LayerKind}, obj::ObjPtr, palette::Palette, stroke::{Stroke, StrokeColor}, Project}, renderer::scene::SceneRenderer, tools::{bucket::Bucket, color_picker::ColorPicker, line::Line, pencil::Pencil, select::Select, Tool}};
 use egui::Modifiers;
 use egui_toast::ToastOptions;
 
-use self::clipboard::Clipboard;
+use self::{clipboard::Clipboard, selection::Selection};
 
 pub mod selection;
 pub mod clipboard;
@@ -22,8 +22,8 @@ pub struct EditorState {
     pub toasts: egui_toast::Toasts,
    
     // Tools
-    pub tools: Vec<Rc<RefCell<dyn Tool>>>,
-    pub curr_tool: Rc<RefCell<dyn Tool>>,
+    pub tools: Vec<Arc<RwLock<dyn Tool + Send + Sync>>>,
+    pub curr_tool: Arc<RwLock<dyn Tool + Send + Sync>>,
 
     // Selections
     pub open_graphic: ObjPtr<Graphic>,
@@ -35,7 +35,7 @@ pub struct EditorState {
     pub clipboard: clipboard::Clipboard,
 
     // Playback
-    pub time: f32,
+    pub time: i64, // Measured in samples
     pub playing: bool,
 
     // Display
@@ -54,11 +54,11 @@ pub struct EditorState {
 impl EditorState {
 
     pub fn new_with_project(project: Project) -> Self {
-        let select = Rc::new(RefCell::new(Select::new()));
-        let pencil = Rc::new(RefCell::new(Pencil::new()));
-        let bucket = Rc::new(RefCell::new(Bucket::new()));
-        let color_picker = Rc::new(RefCell::new(ColorPicker::new()));
-        let line = Rc::new(RefCell::new(Line::new()));
+        let select = Arc::new(RwLock::new(Select::new()));
+        let pencil = Arc::new(RwLock::new(Pencil::new()));
+        let bucket = Arc::new(RwLock::new(Bucket::new()));
+        let color_picker = Arc::new(RwLock::new(ColorPicker::new()));
+        let line = Arc::new(RwLock::new(Line::new()));
         Self {
             project: project, 
             actions: ActionManager::new(),
@@ -68,7 +68,7 @@ impl EditorState {
             active_layer: ObjPtr::null(),
             selection: selection::Selection::None,
             clipboard: clipboard::Clipboard::None,
-            time: 0.0,
+            time: 0,
             playing: false,
             onion_before: 0,
             onion_after: 0,
@@ -89,10 +89,11 @@ impl EditorState {
         let mut res = Vec::new();
         if let Some(graphic) = self.project.graphics.get(self.open_graphic) {
             for layer in &graphic.layers {
-                if !layer.get(&self.project).show {
+                let layer = layer.get(&self.project);
+                if !layer.show || layer.kind != LayerKind::Animation {
                     continue;
                 }
-                if let Some(frame) = layer.get(&self.project).get_frame_at(&self.project, self.frame()) {
+                if let Some(frame) = layer.get_frame_at(&self.project, self.frame()) {
                     for stroke in &frame.get(&self.project).strokes {
                         res.push(stroke.make_ptr());
                     }
@@ -102,12 +103,37 @@ impl EditorState {
         res
     }
 
+    pub fn pause(&mut self) {
+        self.selection = Selection::None;
+        self.playing = false;
+    }
+
+    pub fn play(&mut self) {
+        self.playing = true;
+    }
+
+    pub fn frame_rate(&self) -> f32 {
+        24.0
+    }
+
     pub fn frame_len(&self) -> f32 {
-        1.0 / 24.0
+        1.0 / self.frame_rate() 
+    }
+
+    pub fn sample_rate(&self) -> f32 {
+        44100.0
+    }
+
+    pub fn sample_len(&self) -> f32 {
+        1.0 / self.sample_rate()
+    }
+
+    pub fn time_secs(&self) -> f32 {
+        self.time as f32 * self.sample_len()
     }
 
     pub fn frame(&self) -> i32 {
-        (self.time / (1.0 / 24.0)).floor() as i32
+        (self.time_secs() / self.frame_len()).floor() as i32
     }  
 
     pub fn delete_shortcut(&self) -> egui::KeyboardShortcut {
@@ -115,13 +141,18 @@ impl EditorState {
     }
 
     pub fn reset_tool(&mut self) {
-        self.curr_tool.clone().borrow_mut().reset(self);
+        self.curr_tool.clone().write().unwrap().reset(self);
+    }
+
+    pub fn with<F>(&mut self, f: F) where F: FnOnce(&mut Self) {
+        f(self)
     }
 
 }
 
 pub struct Editor {
-    state: EditorState,
+    state: Arc<Mutex<EditorState>>,
+    _audio: AudioController,
     panels: panels::PanelManager,
     config_path: String,
     pub export: Export,
@@ -141,8 +172,10 @@ impl Editor {
         } else {
             panels::PanelManager::new()
         };
+        let state = Arc::new(Mutex::new(EditorState::new())); 
         let res = Self {
-            state: EditorState::new(),
+            state: state.clone(),
+            _audio: AudioController::new(state),
             panels,
             config_path,
             export: Export::new(), 
@@ -161,19 +194,19 @@ impl Editor {
             renderer: scene_renderer.as_mut().unwrap()
         }; 
 
-        if let Some(gfx) = self.state.project.graphics.get(self.state.open_graphic) {
-            if self.state.playing {
-                self.state.time += ctx.input(|i| i.stable_dt);
-                ctx.request_repaint();
+        self.state.lock().unwrap().with(|state| {
+            if let Some(gfx) = state.project.graphics.get(state.open_graphic) {
+                if state.playing {
+                    ctx.request_repaint();
+                }
+                if state.time_secs() >= (gfx.len as f32) * state.frame_len() {
+                    state.time = 0;
+                }
+                if state.time < 0 {
+                    state.time = (((gfx.len - 1) as f32) * state.frame_len() / state.sample_len()).floor() as i64;
+                }
             }
-            if self.state.time >= (gfx.len as f32) * self.state.frame_len() {
-                self.state.time = 0.0;
-            }
-            if self.state.time < 0.0 {
-                self.state.time = ((gfx.len - 1) as f32) * self.state.frame_len();
-            }
-        }
-
+        });
 
         egui::TopBottomPanel::top("MenuBar").show(ctx, |ui| {
 
@@ -191,55 +224,61 @@ impl Editor {
 
             let save_shortcut = egui::KeyboardShortcut::new(Modifiers::COMMAND, egui::Key::S);
 
-            if ui.input_mut(|i| i.consume_shortcut(&undo_shortcut)) {
-                self.state.playing = false;
-                self.state.reset_tool();
-                self.state.actions.undo(&mut self.state.project);
-            }
-            if ui.input_mut(|i| i.consume_shortcut(&redo_shortcut)) {
-                self.state.playing = false;
-                self.state.reset_tool();
-                self.state.actions.redo(&mut self.state.project);
-            }
-            if ui.input_mut(|i| i.consume_shortcut(&play_shortcut)) {
-                self.state.playing = !self.state.playing;
-            }
-            if ui.input_mut(|i| i.consume_shortcut(&frame_shortcut)) {
-                self.state.playing = false;
-                new_frame(&mut self.state);
-            }
-            if ui.input_mut(|i| i.consume_shortcut(&prev_frame_shortcut)) {
-                self.state.playing = false;
-                self.state.time = ((self.state.frame() - 1) as f32) * self.state.frame_len();
-            }
-            if ui.input_mut(|i| i.consume_shortcut(&next_frame_shortcut)) {
-                self.state.playing = false;
-                self.state.time = ((self.state.frame() + 1) as f32) * self.state.frame_len();
-            }
-            if ui.input_mut(|i| i.consume_shortcut(&prev_keyframe_shortcut)) {
-                self.state.playing = false;
-                prev_keyframe(&mut self.state); 
-            }
-            if ui.input_mut(|i| i.consume_shortcut(&next_keyframe_shortcut)) {
-                self.state.playing = false;
-                next_keyframe(&mut self.state); 
-            }
-
-            self.state.pasted = false;
-            for event in ui.input(|i| i.filtered_events(&egui::EventFilter::default())) {
-                match event {
-                    egui::Event::Copy => {
-                        self.state.clipboard = Clipboard::from_selection(&self.state.selection, &mut self.state.project);
-                        if !self.state.selection.is_empty() {
-                            ui.output_mut(|o| o.copied_text = "_".to_owned());
-                        }
-                    },
-                    egui::Event::Paste(_) => {
-                        self.state.pasted = true;
-                    },
-                    _ => ()
+            self.state.lock().unwrap().with(|mut state| {
+                if ui.input_mut(|i| i.consume_shortcut(&undo_shortcut)) {
+                    state.pause();
+                    state.reset_tool();
+                    state.actions.undo(&mut state.project);
                 }
-            }
+                if ui.input_mut(|i| i.consume_shortcut(&redo_shortcut)) {
+                    state.pause();
+                    state.reset_tool();
+                    state.actions.redo(&mut state.project);
+                }
+                if ui.input_mut(|i| i.consume_shortcut(&play_shortcut)) {
+                    if state.playing {
+                        state.pause();
+                    } else {
+                        state.play();
+                    }
+                }
+                if ui.input_mut(|i| i.consume_shortcut(&frame_shortcut)) {
+                    state.pause();
+                    new_frame(&mut state);
+                }
+                if ui.input_mut(|i| i.consume_shortcut(&prev_frame_shortcut)) {
+                    state.pause();
+                    state.time = (((state.frame() - 1) as f32) * state.frame_len() / state.sample_len()).floor() as i64 + 1;
+                }
+                if ui.input_mut(|i| i.consume_shortcut(&next_frame_shortcut)) {
+                    state.pause();
+                    state.time = (((state.frame() + 1) as f32) * state.frame_len() / state.sample_len()).floor() as i64 + 1;
+                }
+                if ui.input_mut(|i| i.consume_shortcut(&prev_keyframe_shortcut)) {
+                    state.pause();
+                    prev_keyframe(&mut state); 
+                }
+                if ui.input_mut(|i| i.consume_shortcut(&next_keyframe_shortcut)) {
+                    state.pause();
+                    next_keyframe(&mut state); 
+                }
+
+                state.pasted = false;
+                for event in ui.input(|i| i.filtered_events(&egui::EventFilter::default())) {
+                    match event {
+                        egui::Event::Copy => {
+                            state.clipboard = Clipboard::from_selection(&state.selection, &mut state.project);
+                            if !state.selection.is_empty() {
+                                ui.output_mut(|o| o.copied_text = "_".to_owned());
+                            }
+                        },
+                        egui::Event::Paste(_) => {
+                            state.pasted = true;
+                        },
+                        _ => ()
+                    }
+                }
+            });
 
             if ui.input_mut(|i| i.consume_shortcut(&save_shortcut)) {
                 self.save();
@@ -252,12 +291,13 @@ impl Editor {
                         ui.close_menu();
                     }
                     if ui.button("Save As").clicked() {
+
                         self.save_as();
                         ui.close_menu();
                     }
                     if ui.button("Open").clicked() {
                         if let Some(path) = rfd::FileDialog::new().add_filter("Cipollino Project File", &["cip"]).pick_file() {
-                            self.state = EditorState::new_with_project(Project::load(path));
+                            *self.state.lock().unwrap() = EditorState::new_with_project(Project::load(path));
                             return;
                         }
                         ui.close_menu();
@@ -268,16 +308,18 @@ impl Editor {
                     }
                 });
                 ui.menu_button("Edit", |ui| {
-                    if ui.add_enabled(
-                        self.state.actions.can_undo(),
-                        egui::Button::new("Undo").shortcut_text(ui.ctx().format_shortcut(&undo_shortcut))).clicked() {
-                        self.state.actions.undo(&mut self.state.project);
-                    }
-                    if ui.add_enabled(
-                        self.state.actions.can_redo(),
-                        egui::Button::new("Redo").shortcut_text(ui.ctx().format_shortcut(&redo_shortcut))).clicked() {
-                        self.state.actions.redo(&mut self.state.project);
-                    }
+                    self.state.lock().unwrap().with(|state| {
+                        if ui.add_enabled(
+                            state.actions.can_undo(),
+                            egui::Button::new("Undo").shortcut_text(ui.ctx().format_shortcut(&undo_shortcut))).clicked() {
+                            state.actions.undo(&mut state.project);
+                        }
+                        if ui.add_enabled(
+                            state.actions.can_redo(),
+                            egui::Button::new("Redo").shortcut_text(ui.ctx().format_shortcut(&redo_shortcut))).clicked() {
+                            state.actions.redo(&mut state.project);
+                        }
+                    });
                 });
                 ui.menu_button("View", |ui| {
                     ui.menu_button("Add Panel", |ui| {
@@ -305,45 +347,63 @@ impl Editor {
         egui::CentralPanel::default()
             .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.))
             .show(ctx, |_ui| {
-                self.panels.render(ctx, self.export.exporting.is_none(), &mut self.state, &mut renderer);
+                self.state.lock().unwrap().with(|state| {
+                    self.panels.render(ctx, self.export.exporting.is_none(), state, &mut renderer);
+                });
             });
 
-        self.export.render(ctx, &mut self.state, &mut renderer);
+        self.state.lock().unwrap().with(|state| {
+            self.export.render(ctx, state, &mut renderer);
+        });
 
         let _ = std::fs::write(self.config_path.clone() + "/dock.json", serde_json::json!(self.panels).to_string());
 
-        self.state.toasts.show(ctx);
-
-        self.state.project.garbage_collect_objs();
+        self.state.lock().unwrap().with(|state| {
+            state.toasts.show(ctx);
+            state.project.garbage_collect_objs();
+        });
 
     }
 
-    pub fn save(&mut self) {
-        if let Some(path) = &self.state.project.save_path {
-            self.save_project(path.clone());
-        } else {
-            self.save_as();
-        }
+    fn save(&mut self) {
+        self.state.lock().unwrap().with(|state| {
+            save(state);
+        });
     }
 
-    pub fn save_as(&mut self) {
-        if let Some(path) = rfd::FileDialog::new().pick_folder() {
-            if let Ok(dir) = fs::read_dir(path.clone()) {
-                if dir.count() == 0 {
-                    self.save_project(path);
-                } else {
-                    self.state.toasts.add(egui_toast::Toast {
-                        kind: egui_toast::ToastKind::Error,
-                        text: "Cannot save project to non-empty directory".into(),
-                        options: ToastOptions::default().show_progress(false),
-                    });
-                }
+    fn save_as(&mut self) {
+        self.state.lock().unwrap().with(|state| {
+            save_as(state);
+        });
+    }
+
+
+}
+
+fn save(state: &mut EditorState) {
+    if let Some(path) = &state.project.save_path {
+        save_project(state, path.clone());
+    } else {
+        save_as(state);
+    }
+}
+
+pub fn save_as(state: &mut EditorState) {
+    if let Some(path) = rfd::FileDialog::new().pick_folder() {
+        if let Ok(dir) = fs::read_dir(path.clone()) {
+            if dir.count() == 0 {
+                save_project(state, path);
+            } else {
+                state.toasts.add(egui_toast::Toast {
+                    kind: egui_toast::ToastKind::Error,
+                    text: "Cannot save project to non-empty directory".into(),
+                    options: ToastOptions::default().show_progress(false),
+                });
             }
         }
     }
+}
 
-    pub fn save_project(&mut self, path: PathBuf) {
-        self.state.project.save(path); 
-    }
-
+pub fn save_project(state: &mut EditorState, path: PathBuf) {
+    state.project.save(path); 
 }

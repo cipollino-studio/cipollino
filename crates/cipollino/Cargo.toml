@@ -23,6 +23,11 @@ rgeometry = "0.9.0"
 rand = "0.8.5"
 project_macros = { path = "../project_macros" }
 egui-toast = "0.12.0"
+cpal = "0.15.2"
+sha2 = "0.10"
+minimp3_fixed = "0.5.4"
+pathdiff = "0.2.1"
+wav = "1.0.0"
 
 [build-dependencies]
 cc = "1.0"

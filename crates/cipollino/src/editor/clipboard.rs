@@ -1,12 +1,12 @@
 
-use crate::project::{frame::Frame, obj::ObjBox, stroke::Stroke, Project};
+use crate::project::{frame::Frame, obj::ObjBox, sound_instance::SoundInstance, stroke::Stroke, Project};
 
 use super::selection::Selection;
 
 pub enum Clipboard {
     None,
     Scene(Vec<ObjBox<Stroke>>),
-    Frames(Vec<ObjBox<Frame>>) 
+    Frames(Vec<ObjBox<Frame>>, Vec<ObjBox<SoundInstance>>) 
 }
 
 impl Clipboard {
@@ -23,14 +23,20 @@ impl Clipboard {
                 }
                 Self::Scene(clip_strokes)
             },
-            Selection::Frames(frames) => {
+            Selection::Timeline(frames, sounds) => {
                 let mut clip_frames = Vec::new();
+                let mut clip_sounds = Vec::new();
                 for frame_ptr in frames {
                     if let Some(clone) = frame_ptr.make_obj_clone(project) {
                         clip_frames.push(project.frames.add(clone));
                     }
                 }
-                Self::Frames(clip_frames)
+                for sound_ptr in sounds {
+                    if let Some(clone) = sound_ptr.make_obj_clone(project) {
+                        clip_sounds.push(project.sound_instances.add(clone));
+                    }
+                }
+                Self::Frames(clip_frames, clip_sounds)
             },
         }
     }

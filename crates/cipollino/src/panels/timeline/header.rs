@@ -12,8 +12,8 @@ pub fn header(_timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_w: f32, n_
         if let Some(mouse_pos) = response.hover_pos() {
             let mx = mouse_pos.x - rect.left();
             let frame = (mx / frame_w).floor();
-            state.time = frame * (1.0 / 24.0);
-            state.playing = false;
+            state.time = (frame * state.frame_len() / state.sample_len()).floor() as i64;
+            state.pause();
         }
     }
     for i in (4..n_frames).step_by(5) {

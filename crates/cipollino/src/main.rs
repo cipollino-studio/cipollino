@@ -9,6 +9,7 @@ pub mod renderer;
 pub mod util;
 pub mod export;
 pub mod tools;
+pub mod audio;
 
 fn main() -> Result<(), eframe::Error> {
     let (icon, w, h) = {
@@ -29,6 +30,7 @@ fn main() -> Result<(), eframe::Error> {
         viewport: egui::ViewportBuilder::default().with_title("Cipollino").with_maximized(true).with_icon(icon_data),
         ..Default::default()
     };
+
     
     eframe::run_native(
         "Cipollino",

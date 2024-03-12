@@ -42,6 +42,7 @@ impl Pencil {
 impl Tool for Pencil {
 
     fn mouse_click(&mut self, mouse_pos: glam::Vec2, state: &mut crate::editor::EditorState, _ui: &mut egui::Ui, _scene: &mut ScenePanel, _gl: &Arc<glow::Context>) {
+        state.pause();
         let active_frame = active_frame(state);
         if active_frame.is_none() {
             return;
@@ -81,6 +82,8 @@ impl Tool for Pencil {
     }
 
     fn mouse_down(&mut self, mouse_pos: glam::Vec2, state: &mut crate::editor::EditorState, _scene: &mut ScenePanel) {
+        state.pause();
+
         if let Some((stroke, frame)) = self.curr_stroke_frame {
             if self.points.last().map(|prev_pt| (*prev_pt - mouse_pos).length() > 0.001).unwrap_or(true) {
                 self.points.push(mouse_pos);
@@ -121,6 +124,7 @@ impl Tool for Pencil {
     }
 
     fn mouse_release(&mut self, _mouse_pos: glam::Vec2, state: &mut crate::editor::EditorState, _ui: &mut egui::Ui, _scene: &mut ScenePanel, _gl: &Arc<glow::Context>) {
+        state.pause();
         self.reset(state); 
     }
 

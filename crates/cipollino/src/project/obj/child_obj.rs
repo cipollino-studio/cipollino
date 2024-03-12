@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::sync::{Arc, Mutex};
 
 use crate::project::{action::ObjAction, Project};
 
@@ -35,12 +35,12 @@ pub trait ChildObj: Obj + 'static {
         *obj.parent_mut() = parent;
         let obj_box = Self::get_list_mut(project).add(obj);
         let obj_ptr = obj_box.make_ptr();
-        let orig_obj_store = Rc::new(RefCell::new(Some(obj_box)));
+        let orig_obj_store = Arc::new(Mutex::new(Some(obj_box)));
 
         let obj_store = orig_obj_store.clone();
         let redo = move |proj: &'_ mut Project| {
             if let Some(siblings) = Self::get_sibling_list_mut(proj, parent) {
-                let obj = obj_store.replace(None).unwrap(); 
+                let obj = std::mem::replace(&mut *obj_store.lock().unwrap(), None).unwrap();
                 let idx = if siblings.len() == 0 {
                     0
                 } else if idx < 0 {
@@ -57,7 +57,7 @@ pub trait ChildObj: Obj + 'static {
             if let Some(siblings) = Self::get_sibling_list_mut(proj, parent) {
                 let idx = siblings.iter().position(|other_obj| other_obj.make_ptr() == obj_ptr).unwrap();
                 let obj = siblings.remove(idx);
-                obj_store.replace(Some(obj));
+                *obj_store.lock().unwrap() = Some(obj);
             }
         };
 
@@ -78,20 +78,20 @@ pub trait ChildObj: Obj + 'static {
         }
         let siblings = siblings.unwrap();
         if let Some(idx) = siblings.iter().position(|other_obj| other_obj.make_ptr() == obj) {
-            let orig_obj_store = Rc::new(RefCell::new(None));
+            let orig_obj_store = Arc::new(Mutex::new(None));
 
             let obj_store = orig_obj_store.clone();
             let redo = move |proj: &'_ mut Project| {
                 if let Some(siblings) = Self::get_sibling_list_mut(proj, parent) {
                     let obj_box = siblings.remove(idx);
-                    obj_store.replace(Some(obj_box));
+                    *obj_store.lock().unwrap() = Some(obj_box);
                 }
             };
 
             let obj_store = orig_obj_store.clone();
             let undo = move |proj: &'_ mut Project| {
                 if let Some(siblings) = Self::get_sibling_list_mut(proj, parent) {
-                    let obj_box = obj_store.replace(None).unwrap();
+                    let obj_box = std::mem::replace(&mut *obj_store.lock().unwrap(), None).unwrap(); 
                     siblings.insert(idx, obj_box);
                 }
             };

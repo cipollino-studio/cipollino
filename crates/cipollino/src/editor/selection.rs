@@ -1,10 +1,10 @@
 
-use crate::project::{obj::ObjPtr, stroke::Stroke, frame::Frame}; 
+use crate::project::{frame::Frame, obj::ObjPtr, sound_instance::SoundInstance, stroke::Stroke}; 
 
 pub enum Selection {
     None,
     Scene(Vec<ObjPtr<Stroke>>),
-    Frames(Vec<ObjPtr<Frame>>)
+    Timeline(Vec<ObjPtr<Frame>>, Vec<ObjPtr<SoundInstance>>)
 }
 
 impl Selection {
@@ -22,7 +22,7 @@ impl Selection {
     }
 
     pub fn is_frames(&self) -> bool {
-        if let Self::Frames(_) = self {
+        if let Self::Timeline(..) = self {
             true
         } else {
             false
@@ -45,8 +45,16 @@ impl Selection {
     }
 
     pub fn frame_selected(&self, frame: ObjPtr<Frame>) -> bool {
-        if let Self::Frames(frames) = self {
+        if let Self::Timeline(frames, _) = self {
             frames.contains(&frame)
+        } else {
+            false
+        }
+    }
+    
+    pub fn sound_selected(&self, sound: ObjPtr<SoundInstance>) -> bool {
+        if let Self::Timeline(_, sounds) = self {
+            sounds.contains(&sound)
         } else {
             false
         }
@@ -66,25 +74,49 @@ impl Selection {
     }
 
     pub fn select_frame(&mut self, frame: ObjPtr<Frame>) {
-        if let Self::Frames(frames) = self {
+        if let Self::Timeline(frames, _) = self {
             if frames.iter().position(|other_frame| *other_frame == frame).is_none() {
                 frames.push(frame);
             }
         } else {
-            let new_sel = Self::Frames(vec![frame]);
+            let new_sel = Self::Timeline(vec![frame], vec![]);
             *self = new_sel;
         }
     }
 
     pub fn select_frame_inverting(&mut self, frame: ObjPtr<Frame>) {
-        if let Self::Frames(frames) = self {
+        if let Self::Timeline(frames, ..) = self {
             if let Some(idx) = frames.iter().position(|other_frame| *other_frame == frame) {
                 frames.remove(idx);
             } else {
                 frames.push(frame);
             }
         } else {
-            let new_sel = Self::Frames(vec![frame]);
+            let new_sel = Self::Timeline(vec![frame], vec![]);
+            *self = new_sel;
+        }
+    }
+
+    pub fn select_sound(&mut self, sound: ObjPtr<SoundInstance>) {
+        if let Self::Timeline(_, sounds) = self {
+            if sounds.iter().position(|other_sound| *other_sound == sound).is_none() {
+                sounds.push(sound);
+            }
+        } else {
+            let new_sel = Self::Timeline(vec![], vec![sound]);
+            *self = new_sel;
+        }
+    }
+
+    pub fn select_sound_inverting(&mut self, sound: ObjPtr<SoundInstance>) {
+        if let Self::Timeline(_, sounds) = self {
+            if let Some(idx) = sounds.iter().position(|other_sound| *other_sound == sound) {
+                sounds.remove(idx);
+            } else {
+                sounds.push(sound);
+            }
+        } else {
+            let new_sel = Self::Timeline(vec![], vec![sound]);
             *self = new_sel;
         }
     }

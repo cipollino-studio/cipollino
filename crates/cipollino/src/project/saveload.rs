@@ -4,8 +4,9 @@ use std::{fs, io::{Read, Write}, path::PathBuf};
 use serde_json::json;
 
 use crate::project::{graphic::Graphic, obj::ObjBox};
+use sha2::Digest;
 
-use super::{folder::Folder, obj::{asset::Asset, ObjPtr, ObjSerialize}, palette::Palette, Project};
+use super::{file::{audio::AudioFile, FilePtr, FileType}, folder::Folder, obj::{asset::Asset, ObjPtr, ObjSerialize}, palette::Palette, Project};
 
 pub fn read_json_file(path: &PathBuf) -> Option<serde_json::Value> {
     let mut file = fs::File::open(path).ok()?;
@@ -28,6 +29,11 @@ impl Project {
         if folder_path.is_dir() {
             folder_path.push("a");
         }
+
+        for (from, to) in &self.files_to_move {
+            let _ = std::fs::rename(from, to);
+        }
+        self.files_to_move.clear();
 
         for file in &self.files_to_delete {
             let path = folder_path.with_file_name(file.clone());
@@ -74,18 +80,21 @@ impl Project {
     pub fn load(proj_file_path: PathBuf) -> Self {
         let mut res = Self::new();
 
+        let mut base_folder_path = proj_file_path.clone();
+        base_folder_path.pop();
+
         if let Some(_proj_data) = read_json_file(&proj_file_path) {
             
         }
 
         let folder_path = proj_file_path.parent().unwrap();
         res.save_path = Some(proj_file_path.clone());
-        res.root_folder = res.load_folder(&folder_path.to_owned(), ObjPtr::null()); 
+        res.root_folder = res.load_folder(&folder_path.to_owned(), &base_folder_path, ObjPtr::null()); 
 
         res
     }
 
-    fn load_folder(&mut self, path: &PathBuf, parent: ObjPtr<Folder>) -> ObjBox<Folder> {
+    fn load_folder(&mut self, path: &PathBuf, base_path: &PathBuf, parent: ObjPtr<Folder>) -> ObjBox<Folder> {
         let res = self.folders.add(Folder::new(parent));
         res.get_mut(self).name = path.file_name().unwrap().to_str().unwrap().to_owned();
 
@@ -94,26 +103,39 @@ impl Project {
                 if let Ok(path) = path {
                     let path = path.path();
                     if let Some(ext) = path.extension() {
-                        if ext == "cipgfx" {
-                            if let Some(data) = read_json_file(&path) { 
-                                if let Some(gfx) = ObjBox::<Graphic>::obj_deserialize(self, &data, res.make_ptr().into()) {
-                                    gfx.get_mut(self).name = path.file_stem().unwrap().to_str().unwrap().to_owned();
-                                    res.get_mut(self).graphics.push(gfx);
+                        match ext.to_str().unwrap() {
+                            "cipgfx" => {
+                                if let Some(data) = read_json_file(&path) { 
+                                    if let Some(gfx) = ObjBox::<Graphic>::obj_deserialize(self, &data, res.make_ptr().into()) {
+                                        gfx.get_mut(self).name = path.file_stem().unwrap().to_str().unwrap().to_owned();
+                                        res.get_mut(self).graphics.push(gfx);
+                                    }
                                 }
-                            }
-                        }
-                        if ext == "cippal" {
-                            if let Some(data) = read_json_file(&path) { 
-                                if let Some(palette) = ObjBox::<Palette>::obj_deserialize(self, &data, res.make_ptr().into()) {
-                                    let name = path.file_stem().unwrap().to_str().unwrap().to_owned();
-                                    palette.get_mut(self).name = name; 
-                                    res.get_mut(self).palettes.push(palette);
+                            },
+                            "cippal" => {
+                                if let Some(data) = read_json_file(&path) { 
+                                    if let Some(palette) = ObjBox::<Palette>::obj_deserialize(self, &data, res.make_ptr().into()) {
+                                        let name = path.file_stem().unwrap().to_str().unwrap().to_owned();
+                                        palette.get_mut(self).name = name; 
+                                        res.get_mut(self).palettes.push(palette);
+                                    }
                                 }
-                            }
+                            },
+                            "mp3" => {
+                                let file_ptr = self.get_file_ptr(&path, base_path);
+                                let data = AudioFile::load(&path);
+                                if let Some(file_ptr) = file_ptr {
+                                    if let Some(data) = data {
+                                        res.get_mut(self).audios.push(file_ptr.clone());
+                                        self.audio_files.insert(file_ptr, data);
+                                    }
+                                }
+                            },
+                            _ => {}
                         }
                     } 
                     if path.is_dir() {
-                        let folder = self.load_folder(&path, res.make_ptr());
+                        let folder = self.load_folder(&path, base_path, res.make_ptr());
                         res.get_mut(self).folders.push(folder);
                     }
                 }
@@ -121,5 +143,24 @@ impl Project {
         }
         res
     } 
+
+    pub fn get_file_ptr<T: FileType>(&mut self, path: &PathBuf, base: &PathBuf) -> Option<FilePtr<T>> {
+        let rel_path = pathdiff::diff_paths(path, base)?; 
+        let mut hash = sha2::Sha256::new();
+        hash.update(fs::read(path).ok()?);
+        let hash = hash.finalize();
+        let mut hash_val: u64 = 0;
+        for i in 0..8 {
+            hash_val <<= 8;
+            hash_val |= hash[i] as u64;
+        }
+
+        let file_ptr = FilePtr::<T>::new(rel_path.clone(), hash_val); 
+    
+        self.path_file_ptr.insert(rel_path, file_ptr.ptr.clone());
+        self.hash_file_ptr.insert(hash_val, file_ptr.ptr.clone());
+
+        Some(file_ptr)
+    }
 
 }

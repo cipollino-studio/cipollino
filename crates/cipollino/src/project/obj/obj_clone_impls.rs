@@ -1,4 +1,6 @@
 
+use std::sync::Arc;
+
 use crate::project::Project;
 use super::{child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjPtr, ObjPtrAny, ObjSerialize};
 use serde_json::json;
@@ -21,11 +23,11 @@ impl<T: ObjSerialize> ObjSerialize for Vec<T> {
     
 }
 
-trait Simple : Clone + serde::Serialize + for<'a> serde::Deserialize<'a> {}
+pub trait PrimitiveObjClone : Clone + serde::Serialize + for<'a> serde::Deserialize<'a> {}
 
-impl<T: Simple> ObjClone for T {}
+impl<T: PrimitiveObjClone> ObjClone for T {}
 
-impl<T: Simple> ObjSerialize for T {
+impl<T: PrimitiveObjClone> ObjSerialize for T {
 
     fn obj_serialize(&self, _project: &Project) -> serde_json::Value {
         json! {self}
@@ -36,15 +38,16 @@ impl<T: Simple> ObjSerialize for T {
     }
 
 }
-impl Simple for bool {}
-impl Simple for u32 {}
-impl Simple for u64 {}
-impl Simple for i32 {}
-impl Simple for f32 {}
-impl Simple for String {}
-impl Simple for glam::Vec2 {}
-impl Simple for glam::Vec3 {}
-impl Simple for glam::Vec4 {}
+impl PrimitiveObjClone for bool {}
+impl PrimitiveObjClone for u32 {}
+impl PrimitiveObjClone for u64 {}
+impl PrimitiveObjClone for i32 {}
+impl PrimitiveObjClone for i64 {}
+impl PrimitiveObjClone for f32 {}
+impl PrimitiveObjClone for String {}
+impl PrimitiveObjClone for glam::Vec2 {}
+impl PrimitiveObjClone for glam::Vec3 {}
+impl PrimitiveObjClone for glam::Vec4 {}
 
 impl<T: Obj> ObjClone for ObjPtr<T> {}
 
@@ -102,3 +105,5 @@ impl<T: ChildObj + ObjSerialize> ObjSerialize for ObjBox<T> {
     }
 
 }
+
+impl<T: serde::Serialize + for<'a> serde::Deserialize<'a>> PrimitiveObjClone for Arc<T> {}

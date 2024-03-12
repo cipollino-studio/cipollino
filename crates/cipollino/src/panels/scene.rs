@@ -71,9 +71,9 @@ impl ScenePanel {
                 .show_inside(ui, |ui| {
                     let mut new_tool = None; 
                     for tool_rc in &state.tools {
-                        let tool = tool_rc.borrow();
+                        let tool = tool_rc.read().unwrap();
                         let resp = ui.add_enabled(
-                            tool.name() != state.curr_tool.borrow().name(),
+                            tool.name() != state.curr_tool.read().unwrap().name(),
                             egui::Button::new(egui::RichText::new(format!("{}", tool.get_icon())).size(20.0)));
                         let shortcut = tool.shortcut();
                         let resp = resp.on_hover_text(format!("{} ({})", tool.name(), ui.ctx().format_shortcut(&shortcut)));
@@ -233,19 +233,19 @@ impl ScenePanel {
             let tool = state.curr_tool.clone();
             let mouse_down = response.is_pointer_button_down_on() || response.clicked();
             if mouse_down && !self.prev_mouse_down {
-                tool.borrow_mut().mouse_click(mouse_pos, state, ui, self, renderer.gl);
+                tool.write().unwrap().mouse_click(mouse_pos, state, ui, self, renderer.gl);
             }
             if mouse_down && self.prev_mouse_down {
-                tool.borrow_mut().mouse_down(mouse_pos, state, self);
+                tool.write().unwrap().mouse_down(mouse_pos, state, self);
             }
             if !mouse_down && self.prev_mouse_down {
-                tool.borrow_mut().mouse_release(mouse_pos, state, ui, self, renderer.gl);
+                tool.write().unwrap().mouse_release(mouse_pos, state, ui, self, renderer.gl);
             }
             self.prev_mouse_down = mouse_down;
             if response.hovered() {
                 ui.ctx().output_mut(|o| {
                     let tool = state.curr_tool.clone();
-                    o.cursor_icon = tool.borrow_mut().mouse_cursor(mouse_pos, state, self, renderer.gl);
+                    o.cursor_icon = tool.write().unwrap().mouse_cursor(mouse_pos, state, self, renderer.gl);
                 });
             }
         }
@@ -323,7 +323,7 @@ impl ScenePanel {
             }
 
             let mut overlay = OverlayRenderer::new(renderer, proj_view, self.cam_size);
-            state.curr_tool.clone().borrow_mut().draw_overlay(&mut overlay, state); 
+            state.curr_tool.clone().write().unwrap().draw_overlay(&mut overlay, state); 
             if let Selection::Scene(strokes) = &state.selection {
                 for stroke in strokes {
                     if let Some(stroke) = state.project.strokes.get(*stroke) {

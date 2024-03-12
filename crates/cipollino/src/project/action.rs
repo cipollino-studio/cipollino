@@ -2,13 +2,13 @@
 use super::Project;
 
 pub struct ObjAction {
-    redo_func: Box<dyn Fn(&mut Project)>,
-    undo_func: Box<dyn Fn(&mut Project)>
+    redo_func: Box<dyn Fn(&mut Project) + Send + Sync>,
+    undo_func: Box<dyn Fn(&mut Project) + Send + Sync>
 }
 
 impl ObjAction {
 
-    pub fn new<T, G>(redo: T, undo: G) -> Self where T: Fn(&mut Project) + 'static, G: Fn(&mut Project) + 'static {
+    pub fn new<T, G>(redo: T, undo: G) -> Self where T: Fn(&mut Project) + Send + Sync + 'static, G: Fn(&mut Project) + Send + Sync + 'static {
         Self {
             redo_func: Box::new(redo),
             undo_func: Box::new(undo)
@@ -28,7 +28,7 @@ impl ObjAction {
 }
 
 pub struct Action {
-    actions: Vec<ObjAction>
+    pub actions: Vec<ObjAction>
 }
 
 impl Action {

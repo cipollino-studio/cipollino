@@ -103,6 +103,7 @@ impl Tool for Line {
     }
 
     fn mouse_release(&mut self, _mouse_pos: glam::Vec2, state: &mut crate::editor::EditorState, _ui: &mut egui::Ui, _scene: &mut ScenePanel, _gl: &Arc<glow::Context>) {
+        state.pause();
         self.reset(state); 
     }
 

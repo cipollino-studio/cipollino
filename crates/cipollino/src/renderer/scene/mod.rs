@@ -6,7 +6,7 @@ use std::sync::Arc;
 use glam::{vec4, Vec4};
 use glow::{Context, HasContext};
 
-use crate::project::{Project, obj::ObjPtr, stroke::Stroke, graphic::Graphic};
+use crate::project::{graphic::Graphic, layer::LayerKind, obj::ObjPtr, stroke::Stroke, Project};
 
 use super::{shader::Shader, fb::Framebuffer, mesh::Mesh};
 
@@ -122,14 +122,15 @@ impl SceneRenderer {
         let mut onion_strokes = Vec::new();
         let mut stroke_keys = Vec::new();
         for layer in project.graphics.get(gfx)?.layers.iter().rev() {
-            if !layer.get(&project).show {
+            let layer = layer.get(project);
+            if !layer.show || layer.kind != LayerKind::Animation {
                 continue;
             }
-            if let Some(frame) = layer.get(project).get_frame_at(project, time) {
+            if let Some(frame) = layer.get_frame_at(project, time) {
                 let mut curr_time = frame.get(project).time;
                 let mut alpha = 0.75;
                 for _i in 0..onion_before {
-                    if let Some(frame) = layer.get(project).get_frame_before(project, curr_time) {
+                    if let Some(frame) = layer.get_frame_before(project, curr_time) {
                         onion_strokes.append(&mut (frame.get(project).strokes
                             .iter()
                             .filter(|stroke| !stroke.get(project).filled) 
@@ -143,7 +144,7 @@ impl SceneRenderer {
                 let mut curr_time = frame.get(project).time;
                 let mut alpha = 0.75;
                 for _i in 0..onion_after {
-                    if let Some(frame) = layer.get(project).get_frame_after(project, curr_time) {
+                    if let Some(frame) = layer.get_frame_after(project, curr_time) {
                         onion_strokes.append(&mut (frame.get(project,).strokes
                             .iter()
                             .filter(|stroke| !stroke.get(project).filled) 

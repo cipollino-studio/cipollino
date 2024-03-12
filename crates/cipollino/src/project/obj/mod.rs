@@ -2,7 +2,7 @@
 use std::{collections::HashMap, marker::PhantomData, sync::{Arc, Mutex}};
 use super::Project;
 
-mod obj_clone_impls;
+pub mod obj_clone_impls;
 pub mod asset;
 pub mod child_obj;
 
@@ -210,7 +210,7 @@ pub trait ObjSerialize : Sized {
 
 }
 
-pub trait Obj: Sized + ObjClone {
+pub trait Obj: Sized + ObjClone + Send + Sync {
 
     fn get_list(project: &Project) -> &ObjList<Self>;
     fn get_list_mut(project: &mut Project) -> &mut ObjList<Self>;

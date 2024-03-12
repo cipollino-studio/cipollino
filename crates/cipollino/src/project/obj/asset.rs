@@ -1,7 +1,7 @@
 
 use std::{path::PathBuf, str::FromStr};
 
-use crate::project::{action::ObjAction, folder::Folder, Project};
+use crate::{project::{action::ObjAction, folder::Folder, Project}, util};
 
 use super::{child_obj::ChildObj, Obj, ObjBox, ObjPtr};
 
@@ -130,18 +130,6 @@ pub trait Asset : Obj + ChildObj<Parent = Folder> {
 }
 
 pub fn next_valid_name<T: Asset>(project: &Project, name: &String, assets: &Vec<ObjBox<T>>) -> String {
-    let names = assets.iter().map(|asset| asset.get(project).name());
-
-    if names.clone().position(|other_name| other_name == name).is_none() {
-        return name.clone();
-    }
-
-    for i in 1.. {
-        let potential_name = format!("{} ({})", name, i);
-        if names.clone().position(|other_name| other_name == &potential_name).is_none() {
-            return potential_name;
-        }
-    }
-
-    "".to_owned()
+    let names = assets.iter().map(|asset| asset.get(project).name().as_str());
+    util::next_unique_name(name, names)
 }

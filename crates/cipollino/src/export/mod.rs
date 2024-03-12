@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use glow::HasContext;
 
-use crate::{renderer::fb::Framebuffer, editor::{EditorState, EditorRenderer}, project::{obj::ObjPtr, graphic::Graphic}};
+use crate::{audio::generate::MAX_AUDIO_CHANNELS, editor::{EditorRenderer, EditorState}, project::{graphic::Graphic, obj::ObjPtr}, renderer::fb::Framebuffer};
 
 pub struct Export {
     fb: Option<(Framebuffer, Framebuffer)>,
@@ -31,8 +31,28 @@ impl Export {
                     .clicked() {
                     if let Some(mut path) = rfd::FileDialog::new().save_file() {
                         path.set_extension("png");
+                        let mut audio_path = path.clone();
                         self.exporting = Some((path, 0, state.open_graphic));
                         close_dialog = true;
+
+                        // TODO: really scuffed, redo the entire export system honestly
+                        let mut audio = Vec::new();
+                        state.time = 0;
+                        state.playing = true;
+                        
+                        let gfx_len = (state.project.graphics.get(state.open_graphic).unwrap().len as f32 * state.frame_len() / state.sample_len()) as usize;
+                        for _i in 0..gfx_len {
+                            let [left, right] = state.next_audio_sample();
+                            audio.push((left * (i16::MAX as f32)) as i16);
+                            audio.push((right * (i16::MAX as f32)) as i16);
+                        }
+
+                        audio_path.set_extension("wav");
+                        if let Ok(mut audio_file) = std::fs::File::create(audio_path) {
+                            wav::write(wav::Header::new(1, MAX_AUDIO_CHANNELS as u16, state.sample_rate() as u32, 16), &wav::BitDepth::Sixteen(audio), &mut audio_file);
+                        }
+
+                        state.playing = false;
                     }
                 }
             });

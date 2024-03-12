@@ -1,6 +1,6 @@
 
 
-use crate::{editor::{selection::Selection, EditorState}, project::{action::Action, frame::Frame, layer::Layer, obj::{child_obj::ChildObj, ObjPtr}}};
+use crate::{editor::{selection::Selection, EditorState}, project::{action::Action, frame::Frame, layer::{Layer, LayerKind}, obj::{child_obj::ChildObj, ObjPtr}, sound_instance::SoundInstance}};
 
 pub mod controls;
 pub mod header;
@@ -25,9 +25,15 @@ pub struct TimelinePanel {
     #[serde(skip)]
     frame_drag_action: Option<Action>,
     #[serde(skip)]
+    sound_drag: f32,
+    #[serde(skip)]
+    sound_drag_action: Option<Action>,
+    #[serde(skip)]
     prev_mouse_down: bool,
     #[serde(skip)]
     mouse_down_frame: ObjPtr<Frame>,
+    #[serde(skip)]
+    mouse_down_sound: ObjPtr<SoundInstance>,
     #[serde(skip)]
     layer_editing_name: ObjPtr<Layer>,
     #[serde(skip)]
@@ -35,7 +41,8 @@ pub struct TimelinePanel {
 }
 
 pub enum FrameGridRowKind {
-    Layer(ObjPtr<Layer>)
+    AnimationLayer(ObjPtr<Layer>),
+    AudioLayer(ObjPtr<Layer>)
 }
 
 pub struct FrameGridRow {
@@ -55,8 +62,11 @@ impl TimelinePanel {
             frame_drag: egui::vec2(0.0, 0.0),
             frame_shift: 0,
             frame_drag_action: None,
+            sound_drag: 0.0,
+            sound_drag_action: None,
             prev_mouse_down: false,
             mouse_down_frame: ObjPtr::null(),
+            mouse_down_sound: ObjPtr::null(),
             layer_editing_name: ObjPtr::null(),
             layer_edit_curr_name: "".to_owned()
         }
@@ -67,7 +77,10 @@ impl TimelinePanel {
         let mut grid_rows = Vec::new();
         for (idx, layer) in gfx.layers.iter().enumerate() {
             grid_rows.push(FrameGridRow {
-                kind: FrameGridRowKind::Layer(layer.make_ptr()),
+                kind: match layer.get(&state.project).kind {
+                    LayerKind::Animation => FrameGridRowKind::AnimationLayer(layer.make_ptr()),
+                    LayerKind::Audio => FrameGridRowKind::AudioLayer(layer.make_ptr()) 
+                }, 
                 idx: idx 
             });
         }
@@ -200,11 +213,16 @@ impl TimelinePanel {
 
         // Deleting frames
         let delete_shortcut = state.delete_shortcut();
-        if let Selection::Frames(frames) = &mut state.selection {
+        if let Selection::Timeline(frames, sounds) = &mut state.selection {
             if ui.input_mut(|i| i.consume_shortcut(&delete_shortcut)) {
                 let mut action = Action::new();
                 for frame_ptr in frames {
                     if let Some(act) = Frame::delete(&mut state.project, *frame_ptr) {
+                        action.add(act);
+                    }
+                }
+                for sound_ptr in sounds {
+                    if let Some(act) = SoundInstance::delete(&mut state.project, *sound_ptr) {
                         action.add(act);
                     }
                 }
@@ -220,6 +238,9 @@ impl TimelinePanel {
 
 pub fn new_frame(state: &mut EditorState) -> Option<()> {
     let layer = state.project.layers.get(state.active_layer)?;
+    if layer.kind != LayerKind::Animation {
+        return None;
+    }
     let time = state.frame();
     if let None = layer.get_frame_exactly_at(&state.project, time) {
         if let Some((_, act)) = Frame::add(&mut state.project, state.active_layer, Frame {
@@ -236,7 +257,7 @@ pub fn new_frame(state: &mut EditorState) -> Option<()> {
 pub fn prev_keyframe(state: &mut EditorState) {
     if let Some(layer) = state.project.layers.get(state.active_layer) {
         if let Some(frame) = layer.get_frame_before(&state.project, state.frame()) {
-            state.time = (frame.get(&state.project).time as f32) * state.frame_len();
+            state.time = ((frame.get(&state.project).time as f32) * state.frame_len() / state.sample_len()).floor() as i64;
         }
     }
 }
@@ -244,7 +265,7 @@ pub fn prev_keyframe(state: &mut EditorState) {
 pub fn next_keyframe(state: &mut EditorState) {
     if let Some(layer) = state.project.layers.get(state.active_layer) {
         if let Some(frame) = layer.get_frame_after(&state.project, state.frame()) {
-            state.time = (frame.get(&state.project).time as f32) * state.frame_len();
+            state.time = ((frame.get(&state.project).time as f32) * state.frame_len() / state.sample_len()).floor() as i64;
         }
     }
 }

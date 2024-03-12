@@ -25,6 +25,7 @@ impl Lasso {
     }
 
     pub fn mouse_release(state: &mut EditorState, select: &mut Select, scene: &mut ScenePanel, gl: &Arc<glow::Context>) {
+        state.pause();
 
         if select.lasso_pts.len() == 1 {
             if let Some(stroke_key) = scene.sample_pick(select.lasso_pts[0], gl) {

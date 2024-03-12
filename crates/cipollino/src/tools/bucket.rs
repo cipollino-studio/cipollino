@@ -23,6 +23,7 @@ impl Bucket {
 impl Tool for Bucket {
 
     fn mouse_click(&mut self, mouse_pos: Vec2, state: &mut EditorState, _ui: &mut egui::Ui, scene: &mut ScenePanel, gl: &Arc<glow::Context>) {
+        state.pause();
 
         // If we click on an existing stroke, let's just change its color
         if let Some(stroke) = scene.sample_pick(mouse_pos, gl) {
