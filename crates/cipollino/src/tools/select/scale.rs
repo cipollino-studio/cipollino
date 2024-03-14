@@ -1,7 +1,7 @@
 
 use glam::{vec3, Mat4, Vec2};
 
-use crate::{editor::EditorState, panels::scene::ScenePanel, util::geo::vec2_to_vec3};
+use crate::{editor::state::EditorState, panels::scene::ScenePanel, util::geo::vec2_to_vec3};
 
 use super::{FreeTransformPoints, Select, SelectState};
 

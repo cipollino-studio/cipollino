@@ -1,7 +1,7 @@
 
 use egui::{vec2, Vec2};
 
-use crate::{editor::{selection::Selection, EditorState}, panels::assets::AssetDragPayload, project::{action::Action, frame::Frame, layer::Layer, obj::{child_obj::ChildObj, ObjPtr}, sound_instance::SoundInstance}};
+use crate::{editor::{selection::Selection, state::EditorState}, panels::assets::AssetDragPayload, project::{action::Action, frame::Frame, layer::Layer, obj::{child_obj::ChildObj, ObjPtr}, sound_instance::SoundInstance}};
 
 use super::{FrameGridRow, FrameGridRowKind, TimelinePanel};
 

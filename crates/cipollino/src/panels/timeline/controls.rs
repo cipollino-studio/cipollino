@@ -1,5 +1,5 @@
 
-use crate::{editor::EditorState, project::{action::Action, graphic::Graphic, layer::{Layer, LayerKind}, obj::child_obj::ChildObj}};
+use crate::{editor::state::EditorState, project::{action::Action, graphic::Graphic, layer::{Layer, LayerKind}, obj::child_obj::ChildObj}};
 
 use super::{next_keyframe, prev_keyframe, TimelinePanel};
 

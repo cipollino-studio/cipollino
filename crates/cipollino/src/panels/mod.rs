@@ -1,4 +1,4 @@
-use crate::editor::{EditorRenderer, EditorState};
+use crate::editor::state::{EditorRenderer, EditorState};
 
 pub mod assets;
 pub mod timeline;

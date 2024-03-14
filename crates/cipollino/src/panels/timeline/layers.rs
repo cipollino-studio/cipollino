@@ -1,7 +1,7 @@
 
 use egui::{vec2, Vec2};
 
-use crate::{editor::EditorState, project::{action::Action, layer::{Layer, LayerKind}, obj::{child_obj::ChildObj, ObjPtr}}, util::ui::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_widget, label_size}};
+use crate::{editor::state::EditorState, project::{action::Action, layer::{Layer, LayerKind}, obj::{child_obj::ChildObj, ObjPtr}}, util::ui::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_widget, label_size}};
 
 use super::{FrameGridRow, FrameGridRowKind, TimelinePanel};
 

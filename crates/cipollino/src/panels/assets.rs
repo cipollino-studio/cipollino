@@ -1,5 +1,5 @@
 
-use crate::{editor::EditorState, project::{action::Action, file::{audio::AudioFile, FilePtr, FileType}, folder::Folder, graphic::Graphic, obj::{asset::Asset, ObjBox, ObjPtr}, palette::Palette}, util::ui::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_label, draggable_widget}};
+use crate::{editor::state::EditorState, project::{action::Action, file::{audio::AudioFile, FilePtr, FileType}, folder::Folder, graphic::Graphic, obj::{asset::Asset, ObjBox, ObjPtr}, palette::Palette}, util::ui::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_label, draggable_widget}};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct AssetsPanel {

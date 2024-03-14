@@ -2,7 +2,7 @@
 use std::{sync::Arc, collections::{VecDeque, HashSet, HashMap}};
 
 use glam::{Vec2, vec2};
-use crate::{editor::EditorState, panels::scene::ScenePanel, project::{action::Action, obj::child_obj::ChildObj, stroke::{Stroke, StrokeMesh, StrokePoint}}, util::{curve::{bezier_bounding_box, bezier_dsample, bezier_sample, bezier_to_discrete_t_vals, fit_curve}, geo::{segment_aabb_intersect, segment_intersect}}};
+use crate::{editor::state::EditorState, panels::scene::ScenePanel, project::{action::Action, obj::child_obj::ChildObj, stroke::{Stroke, StrokeMesh, StrokePoint}}, util::{curve::{bezier_bounding_box, bezier_dsample, bezier_sample, bezier_to_discrete_t_vals, fit_curve}, geo::{segment_aabb_intersect, segment_intersect}}};
 
 use super::{Tool, active_frame};
 
@@ -64,7 +64,7 @@ impl Tool for Bucket {
             [-1,  0],
             [ 0, -1],
         ];
-        let visible_strokes = state.visible_strokes();
+        let visible_strokes = state.visible_strokes(); 
         let mut boundary = HashMap::new(); 
         while let Some(curr) = bfs.pop_front() {
             let curr_unsnapped = unsnap_coords(curr);

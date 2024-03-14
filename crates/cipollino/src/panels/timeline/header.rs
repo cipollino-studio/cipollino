@@ -1,7 +1,7 @@
 
 use egui::Vec2;
 
-use crate::editor::EditorState;
+use crate::editor::state::EditorState;
 
 use super::TimelinePanel;
 
@@ -12,7 +12,7 @@ pub fn header(_timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_w: f32, n_
         if let Some(mouse_pos) = response.hover_pos() {
             let mx = mouse_pos.x - rect.left();
             let frame = (mx / frame_w).floor();
-            state.time = (frame * state.frame_len() / state.sample_len()).floor() as i64;
+            state.time = (frame * state.frame_len() / state.sample_len() + 5.0).floor() as i64;
             state.pause();
         }
     }

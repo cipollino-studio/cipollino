@@ -3,7 +3,7 @@ use std::{mem, sync::Arc};
 
 use glam::vec2;
 
-use crate::{panels::scene::ScenePanel, project::{action::{Action, ObjAction}, frame::Frame, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokeMesh, StrokePoint}}, util::curve};
+use crate::{editor::state::EditorState, panels::scene::ScenePanel, project::{action::{Action, ObjAction}, frame::Frame, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokeMesh, StrokePoint}}, util::curve};
 
 use super::{active_frame, Tool};
 
@@ -41,7 +41,7 @@ impl Pencil {
 
 impl Tool for Pencil {
 
-    fn mouse_click(&mut self, mouse_pos: glam::Vec2, state: &mut crate::editor::EditorState, _ui: &mut egui::Ui, _scene: &mut ScenePanel, _gl: &Arc<glow::Context>) {
+    fn mouse_click(&mut self, mouse_pos: glam::Vec2, state: &mut EditorState, _ui: &mut egui::Ui, _scene: &mut ScenePanel, _gl: &Arc<glow::Context>) {
         state.pause();
         let active_frame = active_frame(state);
         if active_frame.is_none() {
@@ -81,7 +81,7 @@ impl Tool for Pencil {
 
     }
 
-    fn mouse_down(&mut self, mouse_pos: glam::Vec2, state: &mut crate::editor::EditorState, _scene: &mut ScenePanel) {
+    fn mouse_down(&mut self, mouse_pos: glam::Vec2, state: &mut EditorState, _scene: &mut ScenePanel) {
         state.pause();
 
         if let Some((stroke, frame)) = self.curr_stroke_frame {
@@ -123,21 +123,21 @@ impl Tool for Pencil {
         }
     }
 
-    fn mouse_release(&mut self, _mouse_pos: glam::Vec2, state: &mut crate::editor::EditorState, _ui: &mut egui::Ui, _scene: &mut ScenePanel, _gl: &Arc<glow::Context>) {
+    fn mouse_release(&mut self, _mouse_pos: glam::Vec2, state: &mut EditorState, _ui: &mut egui::Ui, _scene: &mut ScenePanel, _gl: &Arc<glow::Context>) {
         state.pause();
         self.reset(state); 
     }
 
-    fn mouse_cursor(&mut self, _mouse_pos: glam::Vec2, _state: &mut crate::editor::EditorState, _scene: &mut ScenePanel, _gl: &Arc<glow::Context>) -> egui::CursorIcon {
+    fn mouse_cursor(&mut self, _mouse_pos: glam::Vec2, _state: &mut EditorState, _scene: &mut ScenePanel, _gl: &Arc<glow::Context>) -> egui::CursorIcon {
         egui::CursorIcon::Crosshair
     }
 
-    fn tool_panel(&mut self, ui: &mut egui::Ui, state: &mut crate::editor::EditorState) {
+    fn tool_panel(&mut self, ui: &mut egui::Ui, state: &mut EditorState) {
         ui.add(egui::Slider::new(&mut state.stroke_r, 1.0..=50.0));
         ui.checkbox(&mut state.stroke_filled, "Filled");
     }
 
-    fn reset(&mut self, state: &mut crate::editor::EditorState) {
+    fn reset(&mut self, state: &mut EditorState) {
         if let Some(_) = self.curr_stroke_frame {
             state.actions.add(self.get_action());
             self.points.clear();

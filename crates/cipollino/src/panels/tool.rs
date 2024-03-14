@@ -1,5 +1,5 @@
 
-use crate::editor::EditorState;
+use crate::editor::state::EditorState;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct ToolPanel {

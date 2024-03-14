@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use glam::Vec2;
 
-use crate::{editor::EditorState, project::{action::ObjAction, frame::Frame, layer::{Layer, LayerKind}, obj::{child_obj::ChildObj, ObjPtr}, Project}};
+use crate::{editor::state::EditorState, project::{action::ObjAction, frame::Frame, layer::{Layer, LayerKind}, obj::{child_obj::ChildObj, ObjPtr}, Project}};
 
 use super::panels::scene::{OverlayRenderer, ScenePanel};
 

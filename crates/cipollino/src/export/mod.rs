@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use glow::HasContext;
 
-use crate::{audio::generate::MAX_AUDIO_CHANNELS, editor::{EditorRenderer, EditorState}, project::{graphic::Graphic, obj::ObjPtr}, renderer::fb::Framebuffer};
+use crate::{audio::generate::MAX_AUDIO_CHANNELS, editor::state::{EditorRenderer, EditorState}, project::{graphic::Graphic, obj::ObjPtr}, renderer::fb::Framebuffer};
 
 pub struct Export {
     fb: Option<(Framebuffer, Framebuffer)>,
@@ -49,7 +49,7 @@ impl Export {
 
                         audio_path.set_extension("wav");
                         if let Ok(mut audio_file) = std::fs::File::create(audio_path) {
-                            wav::write(wav::Header::new(1, MAX_AUDIO_CHANNELS as u16, state.sample_rate() as u32, 16), &wav::BitDepth::Sixteen(audio), &mut audio_file);
+                            let _ = wav::write(wav::Header::new(1, MAX_AUDIO_CHANNELS as u16, state.sample_rate() as u32, 16), &wav::BitDepth::Sixteen(audio), &mut audio_file);
                         }
 
                         state.playing = false;

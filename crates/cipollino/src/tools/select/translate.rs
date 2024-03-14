@@ -1,6 +1,6 @@
 use glam::{Mat4, Vec2};
 
-use crate::editor::EditorState;
+use crate::editor::state::EditorState;
 
 use super::{Select, SelectState};
 

@@ -4,7 +4,7 @@ use glam::Vec2;
 use glow::HasContext;
 
 use crate::{
-    editor::{clipboard::Clipboard, selection::Selection, EditorRenderer, EditorState}, project::{action::Action, graphic::Graphic, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokeColor}}, renderer::{fb::Framebuffer, mesh::Mesh, shader::Shader}, util::{curve, ui::color::color_picker}
+    editor::{clipboard::Clipboard, selection::Selection, state::{EditorRenderer, EditorState}}, project::{action::Action, graphic::Graphic, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokeColor}}, renderer::{fb::Framebuffer, mesh::Mesh, shader::Shader}, util::{curve, ui::color::color_picker}
 };
 
 use super::super::tools::active_frame_proj_layer_frame;
@@ -190,7 +190,7 @@ impl ScenePanel {
 
         // Pasting strokes
         if let Clipboard::Scene(strokes) = &state.clipboard {
-            if state.pasted { 
+            if state.just_pasted { 
                 let frame = state.frame();
                 if let Some((frame, act)) = active_frame_proj_layer_frame(&mut state.project, state.active_layer, frame) {
                     state.selection.clear();

@@ -1,6 +1,8 @@
 
 
-use crate::{editor::{selection::Selection, EditorState}, project::{action::Action, frame::Frame, layer::{Layer, LayerKind}, obj::{child_obj::ChildObj, ObjPtr}, sound_instance::SoundInstance}};
+use egui::{KeyboardShortcut, Modifiers};
+
+use crate::{editor::{selection::Selection, state::EditorState}, project::{action::Action, frame::Frame, layer::{Layer, LayerKind}, obj::{child_obj::ChildObj, ObjPtr}, sound_instance::SoundInstance}};
 
 pub mod controls;
 pub mod header;
@@ -8,6 +10,14 @@ pub mod layers;
 pub mod frame_area;
 
 const HIGHLIGHT: egui::Color32 = egui::Color32::from_rgba_premultiplied(13, 13, 13, 1);
+
+pub const PLAY_SHORTCUT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::NONE, egui::Key::Space);
+pub const FRAME_SHORTCUT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::NONE, egui::Key::K);
+
+pub const PREV_FRAME_SHORTCUT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::NONE, egui::Key::Q);
+pub const NEXT_FRAME_SHORTCUT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::NONE, egui::Key::W);
+pub const PREV_KEYFRAME_SHORTCUT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::SHIFT, egui::Key::Q);
+pub const NEXT_KEYFRAME_SHORTCUT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::SHIFT, egui::Key::W);
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct TimelinePanel {
@@ -95,6 +105,34 @@ impl TimelinePanel {
             });
             return;
         };
+
+        if ui.input_mut(|i| i.consume_shortcut(&PLAY_SHORTCUT)) {
+            if state.playing {
+                state.pause();
+            } else {
+                state.play();
+            }
+        }
+        if ui.input_mut(|i| i.consume_shortcut(&FRAME_SHORTCUT)) {
+            state.pause();
+            new_frame(state);
+        }
+        if ui.input_mut(|i| i.consume_shortcut(&PREV_FRAME_SHORTCUT)) {
+            state.pause();
+            state.time = (((state.frame() - 1) as f32) * state.frame_len() / state.sample_len()).floor() as i64 + 1;
+        }
+        if ui.input_mut(|i| i.consume_shortcut(&NEXT_FRAME_SHORTCUT)) {
+            state.pause();
+            state.time = (((state.frame() + 1) as f32) * state.frame_len() / state.sample_len()).floor() as i64 + 1;
+        }
+        if ui.input_mut(|i| i.consume_shortcut(&PREV_KEYFRAME_SHORTCUT)) {
+            state.pause();
+            prev_keyframe(state); 
+        }
+        if ui.input_mut(|i| i.consume_shortcut(&NEXT_KEYFRAME_SHORTCUT)) {
+            state.pause();
+            next_keyframe(state); 
+        }
 
         let grid_rows = self.calc_grid_rows(state);
 

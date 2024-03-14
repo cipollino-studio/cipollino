@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use glam::Vec2;
 
-use crate::{editor::EditorState, panels::scene::{OverlayRenderer, ScenePanel}};
+use crate::{editor::state::EditorState, panels::scene::{OverlayRenderer, ScenePanel}};
 
 use super::{scale::ScalePivot, FreeTransformPoints, Select, SelectState};
 
