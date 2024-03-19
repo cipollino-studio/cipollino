@@ -1,7 +1,7 @@
 
 use std::{fs, path::PathBuf, sync::{Arc, Mutex}};
 
-use crate::{audio::AudioController, export::Export, panels, project::Project, renderer::scene::SceneRenderer};
+use crate::{export::Export, panels, project::Project, renderer::scene::SceneRenderer};
 use egui::{KeyboardShortcut, Modifiers};
 
 use self::{clipboard::Clipboard, state::{EditorRenderer, EditorState}};
@@ -16,7 +16,6 @@ pub const SAVE_SHORTCUT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COM
 
 pub struct Editor {
     state: Arc<Mutex<EditorState>>,
-    _audio: Option<AudioController>,
     panels: panels::PanelManager,
     config_path: String,
     pub export: Export,
@@ -39,14 +38,8 @@ impl Editor {
         };
         let state = Arc::new(Mutex::new(EditorState::new())); 
 
-        let audio = AudioController::new(state.clone());
-        if audio.is_none() {
-            state.lock().unwrap().error_toast("Could not start audio thread");
-        }
-
         let res = Self {
             state: state.clone(),
-            _audio: audio,
             panels,
             config_path,
             export: Export::new(), 
@@ -68,20 +61,27 @@ impl Editor {
             renderer: scene_renderer.as_mut().unwrap()
         }; 
 
-        if let Some(gfx) = state.project.graphics.get(state.open_graphic) {
-            if state.playing {
-                ctx.request_repaint();
-            }
-            if state.time_secs() >= (gfx.len as f32) * state.frame_len() {
+        if let Some(audio) = &mut state.audio {
+            if let Some(_gfx) = state.project.graphics.get(state.open_graphic) {
+                audio.set_playing(state.playing);
+
+                let audio_state = audio.state.clone();
+                let audio_state = &mut *audio_state.lock().unwrap();
+                state.time = audio_state.time;
+            
+                if state.playing {
+                    ctx.request_repaint();
+                }
+            } else {
+                audio.set_playing(false);
+                state.playing = false;
                 state.time = 0;
-            }
-            if state.time < 0 {
-                state.time = (((gfx.len - 1) as f32) * state.frame_len() / state.sample_len()).floor() as i64;
             }
         }
 
+        let initial_time = state.time;
+
         egui::TopBottomPanel::top("MenuBar").show(ctx, |ui| {
-            ui.set_enabled(self.export.exporting.is_none());
             self.menu_bar(ui, state);
             self.shortcuts(ui, state);
         });
@@ -89,7 +89,7 @@ impl Editor {
         egui::CentralPanel::default()
             .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.))
             .show(ctx, |_ui| {
-                self.panels.render(ctx, self.export.exporting.is_none(), state, &mut renderer);
+                self.panels.render(ctx, !self.export.exporting(), state, &mut renderer);
             });
 
         self.export.render(ctx, state, &mut renderer);
@@ -99,10 +99,28 @@ impl Editor {
         state.toasts.show(ctx);
         state.project.garbage_collect_objs();
 
+        if let Some(gfx) = state.project.graphics.get(state.open_graphic) {
+            let gfx_len_in_samples = ((gfx.len as f32) * state.frame_len() * state.sample_rate()) as i64; 
+            if state.time < 0 {
+                state.time = 0;
+            }
+            if state.time > gfx_len_in_samples {
+                state.time = 0;
+            }
+        }
+        if state.time != initial_time {
+            if let Some(audio) = &mut state.audio {
+                let audio_state = audio.state.clone();
+                let audio_state = &mut *audio_state.lock().unwrap();
+                audio_state.time = state.time;
+            }
+        }
+
     }
 
     fn menu_bar(&mut self, ui: &mut egui::Ui, state: &mut EditorState) {
         egui::menu::bar(ui, |ui| {
+            ui.set_enabled(!self.export.exporting());
             ui.menu_button("File", |ui| {
                 if ui.add(egui::Button::new("Save").shortcut_text(ui.ctx().format_shortcut(&SAVE_SHORTCUT))).clicked() {
                     save(state);
@@ -114,7 +132,7 @@ impl Editor {
                 }
                 if ui.button("Open").clicked() {
                     if let Some(path) = rfd::FileDialog::new().add_filter("Cipollino Project File", &["cip"]).pick_file() {
-                        *self.state.lock().unwrap() = EditorState::new_with_project(Project::load(path));
+                        *state = EditorState::new_with_project(Project::load(path));
                         return;
                     }
                     ui.close_menu();

@@ -1,3 +1,6 @@
 [submodule "libs/curve_fit"]
 	path = libs/curve_fit
 	url = https://github.com/ideasman42/curve-fit-nd.git
+[submodule "libs/bin"]
+	path = libs/bin
+	url = https://github.com/Cipollino-Animator/cipollino-libs.git

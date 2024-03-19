@@ -1,5 +1,6 @@
 
 pub mod color;
+pub mod path;
 
 pub fn draggable_label<P>(ui: &mut egui::Ui, text: &str, payload: P) -> egui::Response where P: std::marker::Send + std::marker::Sync + 'static {
     draggable_widget(ui, payload, |ui| {

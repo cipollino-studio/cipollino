@@ -1,5 +1,5 @@
 
-use std::{fs::File, path::PathBuf};
+use std::{fs::File, path::PathBuf, sync::Arc};
 
 use crate::audio::generate::MAX_AUDIO_CHANNELS;
 
@@ -9,7 +9,7 @@ pub const SAMPLES_PER_VOLUME_SUM: usize = 100;
 
 #[derive(Clone)]
 pub struct AudioFile {
-    pub samples: Vec<[f32; MAX_AUDIO_CHANNELS]>,
+    pub samples: Arc<Vec<[f32; MAX_AUDIO_CHANNELS]>>,
     pub volumes: Vec<f32>
 }
 
@@ -74,7 +74,7 @@ impl AudioFile {
         }
 
         Self {
-            samples,
+            samples: Arc::new(samples),
             volumes
         }
     }

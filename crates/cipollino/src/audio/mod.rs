@@ -3,30 +3,38 @@ use std::sync::{Arc, Mutex};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-use crate::{audio::generate::MAX_AUDIO_CHANNELS, editor::state::EditorState};
+use crate::audio::generate::MAX_AUDIO_CHANNELS;
 
+use self::state::AudioState;
+
+pub mod state;
 pub mod generate;
 
 pub struct AudioController {
     stream: cpal::Stream,
+    pub state: Arc<Mutex<AudioState>>
 }
 
 impl AudioController {
 
-    pub fn new(state: Arc<Mutex<EditorState>>) -> Option<Self> {
+    pub fn new() -> Option<Self> {
         
         let cpal_host = cpal::default_host();
         let device = cpal_host.default_output_device()?;
         let mut config = device.supported_output_configs().ok()?.next()?.with_max_sample_rate().config();
         config.buffer_size = cpal::BufferSize::Fixed(1000);
 
+        let state = Arc::new(Mutex::new(AudioState::new()));
+        let state_clone = state.clone(); 
+
         let channels = config.channels as usize;
         let stream = device.build_output_stream(&config, move |out: &mut [f32], _: &cpal::OutputCallbackInfo| {
+            let state = state.clone();
+            let state = &mut *state.lock().unwrap();
             for i in 0..(out.len() / channels) {
-                let state = &mut *state.lock().unwrap();
                 let sample = state.next_audio_sample();
-                for j in 0..channels.min(MAX_AUDIO_CHANNELS) {
-                    out[i * channels + j] = sample[j]; 
+                for c in 0..channels.min(MAX_AUDIO_CHANNELS) {
+                    out[i * channels + c] = sample[c];
                 }
             }
         }, |_err| {
@@ -35,6 +43,7 @@ impl AudioController {
 
         Some(Self {
             stream,
+            state: state_clone
         })
     }
 

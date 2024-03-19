@@ -1,7 +1,9 @@
 
 use std::sync::{Arc, RwLock};
 
-use crate::{project::{action::ActionManager, graphic::Graphic, layer::{Layer, LayerKind}, obj::ObjPtr, palette::Palette, stroke::{Stroke, StrokeColor}, Project}, renderer::scene::SceneRenderer, tools::{bucket::Bucket, color_picker::ColorPicker, line::Line, pencil::Pencil, select::Select, Tool}};
+use egui_toast::{Toast, ToastKind, ToastOptions};
+
+use crate::{audio::{state::{AudioClip, AudioState}, AudioController}, project::{action::ActionManager, graphic::Graphic, layer::{Layer, LayerKind}, obj::ObjPtr, palette::Palette, stroke::{Stroke, StrokeColor}, Project}, renderer::scene::SceneRenderer, tools::{bucket::Bucket, color_picker::ColorPicker, line::Line, pencil::Pencil, select::Select, Tool}};
 
 use super::{clipboard, selection::{self, Selection}};
 
@@ -15,6 +17,7 @@ pub struct EditorState {
 
     // Subsystems
     pub actions: ActionManager,
+    pub audio: Option<AudioController>,
     pub toasts: egui_toast::Toasts,
    
     // Tools
@@ -50,6 +53,18 @@ pub struct EditorState {
 impl EditorState {
 
     pub fn new_with_project(project: Project) -> Self {
+
+        let mut toasts = egui_toast::Toasts::default().anchor(egui::Align2::RIGHT_BOTTOM, egui::pos2(-10.0, -10.0));
+
+        let audio = AudioController::new();
+        if audio.is_none() {
+            toasts.add(Toast {
+                kind: ToastKind::Error,
+                text: "Could not start audio thread. Playback will not work.".into(),
+                options: ToastOptions::default().show_progress(false),
+            });
+        }
+
         let select = Arc::new(RwLock::new(Select::new()));
         let pencil = Arc::new(RwLock::new(Pencil::new()));
         let bucket = Arc::new(RwLock::new(Bucket::new()));
@@ -59,7 +74,8 @@ impl EditorState {
             project: project, 
 
             actions: ActionManager::new(),
-            toasts: egui_toast::Toasts::default().anchor(egui::Align2::RIGHT_BOTTOM, egui::pos2(-10.0, -10.0)),
+            audio,
+            toasts, 
 
             tools: vec![select.clone(), pencil, bucket, color_picker, line],
             curr_tool: select,
@@ -104,6 +120,12 @@ impl EditorState {
 
     pub fn play(&mut self) {
         self.playing = true;
+        if let Some(audio) = &mut self.audio {
+            let audio_state = audio.state.clone();
+            if let Some(new_state) = self.get_audio_state(self.open_graphic) {
+                *audio_state.lock().unwrap() = new_state;
+            }
+        }
     }
 
     pub fn frame_rate(&self) -> f32 {
@@ -144,6 +166,30 @@ impl EditorState {
             text: message.to_owned().into(),
             options: egui_toast::ToastOptions::default().show_progress(false) 
         });
+    }
+
+    pub fn get_audio_state(&self, graphic: ObjPtr<Graphic>) -> Option<AudioState> {
+        let mut audio = AudioState::new();
+        audio.time = self.time;
+
+        let gfx = self.project.graphics.get(graphic)?;
+        for layer in &gfx.layers {
+            let layer = layer.get(&self.project);
+            if layer.kind != LayerKind::Audio {
+                continue;
+            }
+            for instance in &layer.sound_instances {
+                let instance = instance.get(&self.project);
+                let file = self.project.audio_files.get(&instance.audio.lookup(&self.project))?;
+                audio.clips.push(AudioClip {
+                    begin: instance.begin, 
+                    end: instance.end, 
+                    samples: file.samples.clone(),
+                });
+            }
+        }
+
+        Some(audio)
     }
 
 }

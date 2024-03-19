@@ -31,6 +31,7 @@ fn main() -> Result<(), eframe::Error> {
         ..Default::default()
     };
 
+    ffmpeg::init().unwrap();
     
     eframe::run_native(
         "Cipollino",

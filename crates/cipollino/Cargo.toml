@@ -28,6 +28,7 @@ sha2 = "0.10"
 minimp3_fixed = "0.5.4"
 pathdiff = "0.2.1"
 wav = "1.0.0"
+ffmpeg = {git = "https://github.com/meh/rust-ffmpeg.git", rev = "7c354aa", features = ["build", "build-license-gpl", "build-lib-x264"]}
 
 [build-dependencies]
 cc = "1.0"
