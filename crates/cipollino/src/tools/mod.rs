@@ -5,7 +5,7 @@ use glam::Vec2;
 
 use crate::{editor::state::EditorState, project::{action::ObjAction, frame::Frame, layer::{Layer, LayerKind}, obj::{child_obj::ChildObj, ObjPtr}, Project}};
 
-use super::panels::scene::{OverlayRenderer, ScenePanel};
+use super::panels::scene::{overlay::OverlayRenderer, ScenePanel};
 
 pub mod pencil;
 pub mod select;

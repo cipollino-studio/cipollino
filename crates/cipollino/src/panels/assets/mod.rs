@@ -346,7 +346,6 @@ impl AssetsPanel {
 
 }
 
-
 pub fn graphic_data_editor(ui: &mut egui::Ui, data: &mut Graphic) {
     ui.text_edit_singleline(&mut data.name);
     ui.add(egui::DragValue::new(&mut data.len).clamp_range(1..=100000));

@@ -6,6 +6,8 @@
         "./crates/cipollino/Cargo.toml",
         "./crates/cipollino/Cargo.toml",
         "./crates/cipollino/Cargo.toml",
+        "./crates/cipollino/Cargo.toml",
+        "./crates/cipollino/Cargo.toml",
         "./crates/cipollino/Cargo.toml"
     ]
 }

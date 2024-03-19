@@ -8,6 +8,7 @@ fn to_byte_slice<'a, T>(floats: &'a [T]) -> &'a [u8] {
     }
 }
 
+#[derive(Clone)]
 pub struct Mesh {
 
     vbo: NativeBuffer,
@@ -18,7 +19,6 @@ pub struct Mesh {
 
     attribs: Vec<u32>,
     vals_per_vert: u32
-
 }
 
 impl Mesh {
@@ -101,4 +101,3 @@ impl Mesh {
     }
 
 }
-

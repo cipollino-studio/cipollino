@@ -13,7 +13,13 @@ use super::{shader::Shader, fb::Framebuffer, mesh::Mesh};
 pub struct SceneRenderer {
     pub flat_color_shader: Shader,
     pub circle_shader: Shader,
-    pub quad: Mesh
+    pub quad: Mesh,
+
+    pub clip_shadow_mesh: Mesh, 
+    pub clip_shadow_shader: Shader,
+
+    pub screen_quad: Mesh,
+    pub screen_shader: Shader,
 }
 
 impl SceneRenderer {
@@ -29,54 +35,49 @@ impl SceneRenderer {
             0, 1, 2,
             1, 2, 3
         ], gl);
+
+        let mut clip_shadow_mesh = Mesh::new(vec![2], gl);
+        clip_shadow_mesh.upload(&vec![
+            -1.0,  1.0,
+             1.0,  1.0,
+             1.0, -1.0,
+            -1.0, -1.0,
+            -0.5,  0.5,
+             0.5,  0.5,
+             0.5, -0.5,
+            -0.5, -0.5
+        ], &vec![
+            0, 1, 4,
+            1, 5, 4,
+            1, 2, 5,
+            2, 6, 5,
+            2, 6, 3,
+            3, 6, 7,
+            3, 7, 0,
+            0, 4, 7
+        ], gl);
+
+        let mut screen_quad = Mesh::new(vec![2, 2], gl);
+        screen_quad.upload(&vec![
+            -1.0, -1.0, 0.0, 0.0,
+             1.0, -1.0, 1.0, 0.0,
+            -1.0,  1.0, 0.0, 1.0,
+             1.0,  1.0, 1.0, 1.0
+        ], &vec![
+            0, 1, 2,
+            1, 2, 3
+        ], gl);
+
         Self {
-            flat_color_shader: Shader::new("
-                #version 100\n 
+            flat_color_shader: Shader::new(include_str!("shaders/flat_color_vs.glsl"), include_str!("shaders/flat_color_fs.glsl"), gl),
+            circle_shader: Shader::new(include_str!("shaders/circle_vs.glsl"), include_str!("shaders/circle_fs.glsl"), gl),
+            quad,
 
-                attribute vec2 aPos;
+            clip_shadow_mesh,
+            clip_shadow_shader: Shader::new(include_str!("shaders/clip_shadow_vs.glsl"), include_str!("shaders/clip_shadow_fs.glsl"), gl),
 
-                uniform mat4 uTrans;
-        
-                void main() {
-                    gl_Position = uTrans * vec4(aPos, 0.0, 1.0);                
-                } 
-            ", "
-                #version 100\n 
-
-                uniform highp vec4 uColor;
-
-                void main() {
-                    gl_FragColor = uColor;
-                }
-            ", gl),
-            circle_shader: Shader::new("
-                #version 100\n 
-
-                attribute vec2 aPos;
-
-                uniform mat4 uTrans;
-
-                varying vec2 pUv;
-        
-                void main() {
-                    gl_Position = uTrans * vec4(aPos, 0.0, 1.0);                
-                    pUv = aPos;
-                } 
-            ", "
-                #version 100\n 
-
-                uniform highp vec4 uColor;
-
-                varying mediump vec2 pUv;
-
-                void main() {
-                    gl_FragColor = uColor;
-                    if(length(pUv) > 0.5) {
-                        gl_FragColor = vec4(0.0);
-                    }
-                }
-            ", gl),
-            quad
+            screen_quad,
+            screen_shader: Shader::new(include_str!("shaders/screen_vs.glsl"), include_str!("shaders/screen_fs.glsl"), gl)
         }
     }
 

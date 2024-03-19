@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use glow::{Context, HasContext, NativeShader, NativeProgram};
 
+#[derive(Clone)]
 pub struct Shader {
     program: NativeProgram 
 }

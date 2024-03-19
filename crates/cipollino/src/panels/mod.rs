@@ -75,9 +75,9 @@ impl PanelManager {
         egui_dock::DockArea::new(&mut self.tree)
             .style(egui_dock::Style::from_egui(ctx.style().as_ref()))
             .show(ctx, &mut PanelViewer {
-                state: state,
-                renderer: renderer,
-                enable: enable,
+                state,
+                renderer,
+                enable,
             });
     }
 
