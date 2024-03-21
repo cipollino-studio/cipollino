@@ -1,19 +1,19 @@
 
 use glam::Vec2;
 
-use crate::{editor::{selection::Selection, state::{EditorRenderer, EditorState}}, project::{graphic::Graphic, obj::ObjPtr}, util::curve};
+use crate::{editor::{selection::Selection, EditorSystems, state::EditorState}, project::{graphic::Graphic, obj::ObjPtr}, util::curve};
 use super::ScenePanel;
 use glow::HasContext;
 
 pub struct OverlayRenderer<'a, 'b> {
-    renderer: &'a mut EditorRenderer<'b>,
+    renderer: &'a mut EditorSystems<'b>,
     proj_view: glam::Mat4,
     pub cam_size: f32,
 }
 
 impl<'a, 'b> OverlayRenderer<'a, 'b> {
 
-    pub fn new(renderer: &'a mut EditorRenderer<'b>, proj_view: glam::Mat4, cam_size: f32) -> Self {
+    pub fn new(renderer: &'a mut EditorSystems<'b>, proj_view: glam::Mat4, cam_size: f32) -> Self {
         Self {
             renderer,
             proj_view,
@@ -47,22 +47,22 @@ impl<'a, 'b> OverlayRenderer<'a, 'b> {
 
 impl ScenePanel {
 
-    pub fn render_overlays(&self, gfx: ObjPtr<Graphic>, renderer: &mut EditorRenderer, proj_view: glam::Mat4, state: &mut EditorState) {
+    pub fn render_overlays(&self, gfx: ObjPtr<Graphic>, systems: &mut EditorSystems, proj_view: glam::Mat4, state: &mut EditorState) {
         unsafe {
-            renderer.gl.disable(glow::DEPTH_TEST);
+            systems.gl.disable(glow::DEPTH_TEST);
         }
 
         if let Some(gfx) = state.project.graphics.get(gfx) { 
 
             // Clip shadow
             if gfx.clip {
-                renderer.renderer.clip_shadow_shader.enable(renderer.gl);
+                systems.renderer.clip_shadow_shader.enable(systems.gl);
                 let trans = proj_view * glam::Mat4::from_scale(glam::vec3(gfx.w as f32, gfx.h as f32, 1.0)); 
-                renderer.renderer.clip_shadow_shader.set_mat4("uTrans", &trans, renderer.gl);
-                renderer.renderer.clip_shadow_mesh.render(renderer.gl);
+                systems.renderer.clip_shadow_shader.set_mat4("uTrans", &trans, systems.gl);
+                systems.renderer.clip_shadow_mesh.render(systems.gl);
             }
 
-            let mut overlay = OverlayRenderer::new(renderer, proj_view, self.cam_size);
+            let mut overlay = OverlayRenderer::new(systems, proj_view, self.cam_size);
 
             state.curr_tool.clone().write().unwrap().draw_overlay(&mut overlay, state);
 

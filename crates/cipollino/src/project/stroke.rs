@@ -56,7 +56,7 @@ impl ObjSerialize for StrokeMesh {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum StrokeColor {
     Color(glam::Vec4),
     Palette(ObjPtr<PaletteColor>, glam::Vec4) 

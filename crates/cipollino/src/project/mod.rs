@@ -73,3 +73,11 @@ impl Project {
     }
 
 }
+
+#[derive(PartialEq, Eq, Clone)]
+pub enum TypedAssetPtr {
+    Folder(ObjPtr<Folder>),
+    Graphic(ObjPtr<Graphic>),
+    Palette(ObjPtr<Palette>),
+    Audio(FilePtr<AudioFile>)
+}

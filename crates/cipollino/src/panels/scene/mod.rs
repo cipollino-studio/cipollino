@@ -6,7 +6,7 @@ use glow::HasContext;
 pub mod overlay;
 
 use crate::{
-    editor::{clipboard::Clipboard, selection::Selection, state::{EditorRenderer, EditorState}}, project::{action::Action, graphic::Graphic, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokeColor}}, renderer::fb::Framebuffer, util::ui::color::color_picker
+    editor::{clipboard::Clipboard, selection::Selection, EditorSystems, state::EditorState}, project::{action::Action, graphic::Graphic, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokeColor}}, renderer::fb::Framebuffer, util::ui::color::color_picker
 };
 
 use super::super::tools::active_frame_proj_layer_frame;
@@ -51,7 +51,7 @@ impl ScenePanel {
         }
     }
 
-    pub fn render(&mut self, ui: &mut egui::Ui, state: &mut EditorState, renderer: &mut EditorRenderer) {
+    pub fn render(&mut self, ui: &mut egui::Ui, state: &mut EditorState, systems: &mut EditorSystems) {
         // Hack to get around serde's default stuff
         if self.cam_size == 0.0 {
             self.cam_size = 600.0; 
@@ -79,7 +79,7 @@ impl ScenePanel {
                 .frame(no_margin)
                 .show_inside(ui, |ui| {
                     egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                        self.draw_scene_to_ui(state, ui, renderer);
+                        self.draw_scene_to_ui(state, ui, systems);
                     });
                 }).response;
 
@@ -163,15 +163,15 @@ impl ScenePanel {
         
     }
 
-    fn draw_scene_to_ui(&mut self, state: &mut EditorState, ui: &mut egui::Ui, renderer: &mut EditorRenderer) {
+    fn draw_scene_to_ui(&mut self, state: &mut EditorState, ui: &mut egui::Ui, systems: &mut EditorSystems) {
         let (rect, response) = ui.allocate_exact_size(
             ui.available_size(),
             egui::Sense::click_and_drag(),
         );
 
         let fb_copy = self.fb.clone();
-        let screen_quad_copy = renderer.renderer.screen_quad.clone();
-        let screen_shader_copy = renderer.renderer.screen_shader.clone();
+        let screen_quad_copy = systems.renderer.screen_quad.clone();
+        let screen_shader_copy = systems.renderer.screen_shader.clone();
 
         let cb = egui_glow::CallbackFn::new(move |_info, painter| {
             let gl = painter.gl();
@@ -187,7 +187,7 @@ impl ScenePanel {
             }
         });
 
-        self.render_scene(state, &rect, &response, ui, state.open_graphic, renderer);
+        self.render_scene(state, &rect, &response, ui, state.open_graphic, systems);
 
         let callback = egui::PaintCallback {
             rect,
@@ -197,7 +197,7 @@ impl ScenePanel {
         ui.painter().add(callback);
     }
 
-    fn render_scene(&mut self, state: &mut EditorState, rect: &egui::Rect, response: &egui::Response, ui: &mut egui::Ui, gfx: ObjPtr<Graphic>, renderer: &mut EditorRenderer) {
+    fn render_scene(&mut self, state: &mut EditorState, rect: &egui::Rect, response: &egui::Response, ui: &mut egui::Ui, gfx: ObjPtr<Graphic>, systems: &mut EditorSystems) {
 
         // Tool interaction
         if let Some(mouse_pos) = response.hover_pos() {
@@ -215,19 +215,19 @@ impl ScenePanel {
             let tool = state.curr_tool.clone();
             let mouse_down = response.is_pointer_button_down_on() || response.clicked();
             if mouse_down && !self.prev_mouse_down {
-                tool.write().unwrap().mouse_click(mouse_pos, state, ui, self, renderer.gl);
+                tool.write().unwrap().mouse_click(mouse_pos, state, ui, self, systems.gl);
             }
             if mouse_down && self.prev_mouse_down {
                 tool.write().unwrap().mouse_down(mouse_pos, state, self);
             }
             if !mouse_down && self.prev_mouse_down {
-                tool.write().unwrap().mouse_release(mouse_pos, state, ui, self, renderer.gl);
+                tool.write().unwrap().mouse_release(mouse_pos, state, ui, self, systems.gl);
             }
             self.prev_mouse_down = mouse_down;
             if response.hovered() {
                 ui.ctx().output_mut(|o| {
                     let tool = state.curr_tool.clone();
-                    o.cursor_icon = tool.write().unwrap().mouse_cursor(mouse_pos, state, self, renderer.gl);
+                    o.cursor_icon = tool.write().unwrap().mouse_cursor(mouse_pos, state, self, systems.gl);
                 });
             }
         }
@@ -237,13 +237,13 @@ impl ScenePanel {
         let mut fb = self.fb.lock().unwrap();
         let mut fb_pick = self.fb_pick.lock().unwrap();
         if let None = fb.as_ref() {
-            *fb = Some(Framebuffer::new(100, 100, renderer.gl));
-            *fb_pick = Some(Framebuffer::new(100, 100, renderer.gl));
+            *fb = Some(Framebuffer::new(100, 100, systems.gl));
+            *fb_pick = Some(Framebuffer::new(100, 100, systems.gl));
         }
         let fb = fb.as_mut().unwrap();
         let fb_pick = fb_pick.as_mut().unwrap();
 
-        if let Some(proj_view) = renderer.renderer.render(
+        if let Some(proj_view) = systems.renderer.render(
             fb,
             Some((fb_pick, &mut self.color_key_map)),
             (rect.width() as u32) * 2,
@@ -255,15 +255,15 @@ impl ScenePanel {
             frame,
             if state.playing { 0 } else { state.onion_before },
             if state.playing { 0 } else { state.onion_after },
-            renderer.gl,
+            systems.gl,
         ) {
-            self.render_overlays(gfx, renderer, proj_view, state);
+            self.render_overlays(gfx, systems, proj_view, state);
         }
 
         Framebuffer::render_to_win(
             ui.ctx().screen_rect().width() as u32,
             ui.ctx().screen_rect().height() as u32,
-            renderer.gl,
+            systems.gl,
         );
 
     }

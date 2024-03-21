@@ -4,11 +4,12 @@ use std::{fs, path::PathBuf, sync::{Arc, Mutex}};
 use crate::{export::Export, panels, project::Project, renderer::scene::SceneRenderer};
 use egui::{KeyboardShortcut, Modifiers};
 
-use self::{clipboard::Clipboard, state::{EditorRenderer, EditorState}};
+use self::{clipboard::Clipboard, dialog::DialogManager, state::EditorState};
 
 pub mod selection;
 pub mod clipboard;
 pub mod state;
+pub mod dialog;
 
 pub const UNDO_SHORTCUT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, egui::Key::Z);
 pub const REDO_SHORTCUT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, egui::Key::Y);
@@ -17,8 +18,15 @@ pub const SAVE_SHORTCUT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COM
 pub struct Editor {
     state: Arc<Mutex<EditorState>>,
     panels: panels::PanelManager,
+    dialog: DialogManager,
     config_path: String,
     pub export: Export,
+}
+
+pub struct EditorSystems<'a> {
+    pub gl: &'a Arc<glow::Context>,
+    pub renderer: &'a mut SceneRenderer,
+    pub dialog: &'a mut DialogManager
 }
 
 impl Editor {
@@ -41,6 +49,7 @@ impl Editor {
         let res = Self {
             state: state.clone(),
             panels,
+            dialog: DialogManager::new(),
             config_path,
             export: Export::new(), 
         };
@@ -52,15 +61,7 @@ impl Editor {
         let state = self.state.clone();
         let state = &mut *state.lock().unwrap(); 
 
-        let gl = frame.gl().unwrap();
-        if scene_renderer.is_none() {
-            *scene_renderer = Some(SceneRenderer::new(gl));
-        }
-        let mut renderer = EditorRenderer {
-            gl,
-            renderer: scene_renderer.as_mut().unwrap()
-        }; 
-
+        
         if let Some(audio) = &mut state.audio {
             if let Some(_gfx) = state.project.graphics.get(state.open_graphic) {
                 audio.set_playing(state.playing);
@@ -81,18 +82,33 @@ impl Editor {
 
         let initial_time = state.time;
 
+        // Menu bar
         egui::TopBottomPanel::top("MenuBar").show(ctx, |ui| {
             self.menu_bar(ui, state);
             self.shortcuts(ui, state);
         });
 
+        // Setup systems
+        let gl = frame.gl().unwrap();
+        if scene_renderer.is_none() {
+            *scene_renderer = Some(SceneRenderer::new(gl));
+        }
+        let mut systems = EditorSystems {
+            gl,
+            renderer: scene_renderer.as_mut().unwrap(),
+            dialog: &mut self.dialog
+        }; 
+
+        // Panels
         egui::CentralPanel::default()
             .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.))
             .show(ctx, |_ui| {
-                self.panels.render(ctx, !self.export.exporting(), state, &mut renderer);
+                self.panels.render(ctx, !self.export.exporting(), state, &mut systems);
             });
 
-        self.export.render(ctx, state, &mut renderer);
+        self.export.render(ctx, state, &mut systems);
+
+        self.dialog.render(ctx, state);
 
         let _ = std::fs::write(self.config_path.clone() + "/dock.json", serde_json::json!(self.panels).to_string());
 

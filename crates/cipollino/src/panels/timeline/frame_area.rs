@@ -1,7 +1,7 @@
 
 use egui::{vec2, Vec2};
 
-use crate::{editor::{selection::Selection, state::EditorState}, panels::assets::AssetDragPayload, project::{action::Action, frame::Frame, layer::Layer, obj::{child_obj::ChildObj, ObjPtr}, sound_instance::SoundInstance}};
+use crate::{editor::{selection::Selection, state::EditorState}, project::{action::Action, folder::Folder, frame::Frame, layer::Layer, obj::{child_obj::ChildObj, ObjPtr}, sound_instance::SoundInstance, TypedAssetPtr}};
 
 use super::{FrameGridRow, FrameGridRowKind, TimelinePanel};
 
@@ -107,8 +107,8 @@ impl FrameGridRow {
         if let Some(hover_pos) = ui.input(|i| i.pointer.hover_pos()) {
             if rect.contains(hover_pos) {
                 let begin = (44100.0 * (hover_pos.x - rect.left()) / frame_w / 24.0).floor() as i64;
-                if let Some(payload) = response.dnd_hover_payload::<AssetDragPayload>() {
-                    if let AssetDragPayload::Audio(_, audio) = &*payload {
+                if let Some(payload) = response.dnd_hover_payload::<(TypedAssetPtr, ObjPtr<Folder>)>() {
+                    if let TypedAssetPtr::Audio(audio) = &(*payload).0 {
                         if let Some(audio) = state.project.audio_files.get(audio) {
                             ui.painter().rect_stroke(
                                 egui::Rect::from_min_size(
@@ -118,8 +118,8 @@ impl FrameGridRow {
                         }
                     }
                 }
-                if let Some(payload) = response.dnd_release_payload::<AssetDragPayload>() {
-                    if let AssetDragPayload::Audio(_, audio_file_ptr) = &*payload {
+                if let Some(payload) = response.dnd_release_payload::<(TypedAssetPtr, ObjPtr<Folder>)>() {
+                    if let TypedAssetPtr::Audio(audio_file_ptr) = &(*payload).0 {
                         if let Some(audio) = state.project.audio_files.get(audio_file_ptr) {
                             let length = audio.samples.len() as i64;
                             SoundInstance::add(&mut state.project, layer_ptr, SoundInstance {

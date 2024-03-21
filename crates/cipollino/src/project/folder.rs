@@ -11,6 +11,7 @@ use super::obj::child_obj::ChildObj;
 use super::obj::{ObjBox, ObjClone, ObjPtr};
 use super::action::ObjAction;
 use super::palette::Palette;
+use super::TypedAssetPtr;
 
 #[derive(Object, Clone, ObjClone)]
 pub struct Folder {
@@ -62,6 +63,15 @@ impl Asset for Folder {
     fn folder_mut(&mut self) -> &mut ObjPtr<Folder> {
         &mut self.folder
     }
+
+    fn make_typed_asset_ptr(ptr: ObjPtr<Self>) -> TypedAssetPtr {
+        TypedAssetPtr::Folder(ptr)
+    }
+
+    fn icon() -> &'static str {
+        egui_phosphor::regular::FOLDER
+    }
+
 }
 
 impl Folder {

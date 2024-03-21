@@ -1,6 +1,6 @@
 
 use project_macros::{ObjClone, ObjSerialize, Object};
-use super::{action::ObjAction, folder::Folder, obj::{asset::Asset, child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjPtrAny, ObjSerialize}, Project};
+use super::{action::ObjAction, folder::Folder, obj::{asset::Asset, child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjPtrAny, ObjSerialize}, Project, TypedAssetPtr};
 
 #[derive(Object, Clone, ObjClone, ObjSerialize)]
 pub struct PaletteColor {
@@ -103,6 +103,14 @@ impl Asset for Palette {
 
     fn folder_mut(&mut self) -> &mut ObjPtr<Folder> {
         &mut self.folder 
+    }
+    
+    fn make_typed_asset_ptr(ptr: ObjPtr<Self>) -> TypedAssetPtr {
+        TypedAssetPtr::Palette(ptr)
+    }
+
+    fn icon() -> &'static str {
+        egui_phosphor::regular::PALETTE
     }
 
 }

@@ -3,7 +3,7 @@ use project_macros::{ObjClone, ObjSerialize, Object};
 
 use super::{action::ObjAction, frame::Frame, graphic::Graphic, obj::{child_obj::ChildObj, obj_clone_impls::PrimitiveObjClone, Obj, ObjClone, ObjList, ObjPtr, ObjPtrAny, ObjSerialize}, sound_instance::SoundInstance, ObjBox, Project};
 
-#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Debug)]
 pub enum LayerKind {
     Animation,
     Audio

@@ -3,14 +3,9 @@ use std::sync::{Arc, RwLock};
 
 use egui_toast::{Toast, ToastKind, ToastOptions};
 
-use crate::{audio::{state::{AudioClip, AudioState}, AudioController}, project::{action::ActionManager, graphic::Graphic, layer::{Layer, LayerKind}, obj::ObjPtr, palette::Palette, stroke::{Stroke, StrokeColor}, Project}, renderer::scene::SceneRenderer, tools::{bucket::Bucket, color_picker::ColorPicker, line::Line, pencil::Pencil, select::Select, Tool}};
+use crate::{audio::{state::{AudioClip, AudioState}, AudioController}, project::{action::ActionManager, graphic::Graphic, layer::{Layer, LayerKind}, obj::ObjPtr, palette::Palette, stroke::{Stroke, StrokeColor}, Project}, tools::{bucket::Bucket, color_picker::ColorPicker, line::Line, pencil::Pencil, select::Select, Tool}};
 
 use super::{clipboard, selection::{self, Selection}};
-
-pub struct EditorRenderer<'a> {
-    pub gl: &'a Arc<glow::Context>,
-    pub renderer: &'a mut SceneRenderer,
-}
 
 pub struct EditorState {
     pub project: Project, 

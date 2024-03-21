@@ -1,5 +1,6 @@
 
 use std::{collections::HashMap, marker::PhantomData, sync::{Arc, Mutex}};
+
 use super::Project;
 
 pub mod obj_clone_impls;
@@ -108,6 +109,14 @@ impl<T: Obj> ObjPtr<T> {
         }
         let obj = obj.unwrap();
         Some(obj.clone().obj_clone(project))
+    }
+
+}
+
+impl<T: Obj> std::fmt::Debug for ObjPtr<T> {
+
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("ObjPtr").field(&self.key).finish()
     }
 
 }

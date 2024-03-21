@@ -1,9 +1,10 @@
 
 use std::{path::PathBuf, str::FromStr};
 
-use crate::{project::{action::ObjAction, folder::Folder, Project}, util};
+use crate::{project::{action::ObjAction, folder::Folder, Project, TypedAssetPtr}, util};
 
 use super::{child_obj::ChildObj, Obj, ObjBox, ObjPtr};
+
 
 pub trait Asset : Obj + ChildObj<Parent = Folder> {
 
@@ -12,6 +13,10 @@ pub trait Asset : Obj + ChildObj<Parent = Folder> {
     fn extension(&self) -> &str;
     fn folder(&self) -> ObjPtr<Folder>;
     fn folder_mut(&mut self) -> &mut ObjPtr<Folder>;
+
+    fn make_typed_asset_ptr(ptr: ObjPtr<Self>) -> TypedAssetPtr;
+    
+    fn icon() -> &'static str;
 
     fn file_path(&self, project: &Project) -> Option<PathBuf> {
         let folder = project.folders.get(self.folder().clone())?;

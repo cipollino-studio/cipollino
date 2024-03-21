@@ -1,4 +1,4 @@
-use crate::editor::state::{EditorRenderer, EditorState};
+use crate::editor::{EditorSystems, state::EditorState};
 
 pub mod assets;
 pub mod timeline;
@@ -17,7 +17,7 @@ pub enum Panel {
 
 pub struct PanelViewer<'a, 'b> {
     state: &'a mut EditorState,
-    renderer: &'a mut EditorRenderer<'b>,
+    systems: &'a mut EditorSystems<'b>,
     enable: bool
 }
 
@@ -41,9 +41,9 @@ impl egui_dock::TabViewer for PanelViewer<'_, '_> {
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
         ui.set_enabled(self.enable);
         match &mut tab.1 {
-            Panel::Assets(assets) => assets.render(ui, &mut self.state),
+            Panel::Assets(assets) => assets.render(ui, &mut self.state, self.systems),
             Panel::Timeline(timeline) => timeline.render(ui, &mut self.state), 
-            Panel::Scene(scene) => scene.render(ui, &mut self.state, &mut self.renderer),
+            Panel::Scene(scene) => scene.render(ui, &mut self.state, &mut self.systems),
             Panel::Tool(tool) => tool.render(ui, &mut self.state),
             Panel::Color(color) => color.render(ui, &mut self.state)
         }
@@ -71,12 +71,12 @@ impl PanelManager {
         self.curr_id += 1;
     }
 
-    pub fn render(&mut self, ctx: &egui::Context, enable: bool, state: &mut EditorState, renderer: &mut EditorRenderer) {
+    pub fn render(&mut self, ctx: &egui::Context, enable: bool, state: &mut EditorState, systems: &mut EditorSystems) {
         egui_dock::DockArea::new(&mut self.tree)
             .style(egui_dock::Style::from_egui(ctx.style().as_ref()))
             .show(ctx, &mut PanelViewer {
                 state,
-                renderer,
+                systems,
                 enable,
             });
     }

@@ -6,7 +6,7 @@ mod video_writer;
 use egui::ProgressBar;
 use glow::HasContext;
 
-use crate::{audio::generate::MAX_AUDIO_CHANNELS, editor::state::{EditorRenderer, EditorState}, project::{graphic::Graphic, obj::ObjPtr}, renderer::fb::Framebuffer, util::ui::path::path_selector};
+use crate::{audio::generate::MAX_AUDIO_CHANNELS, editor::{state::EditorState, EditorSystems}, project::{graphic::Graphic, obj::ObjPtr}, renderer::fb::Framebuffer, util::ui::path::path_selector};
 
 use self::video_writer::VideoWriter;
 
@@ -48,9 +48,9 @@ impl Export {
         }
     }
 
-    pub fn render(&mut self, ctx: &egui::Context, state: &mut EditorState, renderer: &mut EditorRenderer) {
+    pub fn render(&mut self, ctx: &egui::Context, state: &mut EditorState, systems: &mut EditorSystems) {
         self.export_dialog(ctx, state);
-        self.render_frames(ctx, state, renderer);
+        self.render_frames(ctx, state, systems);
         self.render_progress(ctx, state);
 
         if let ExportStatus::ExportingFrames { encoding_thread, .. } = &self.status {
@@ -185,7 +185,7 @@ impl Export {
         };
     }
 
-    fn render_frames(&mut self, ctx: &egui::Context, state: &mut EditorState, renderer: &mut EditorRenderer) {
+    fn render_frames(&mut self, ctx: &egui::Context, state: &mut EditorState, systems: &mut EditorSystems) {
 
         match &self.status {
             ExportStatus::NotExporting => return,
@@ -196,14 +196,14 @@ impl Export {
 
                 let time = SystemTime::now();
                 while time.elapsed().map(|elapsed| elapsed.as_secs_f32() < 0.05).unwrap_or(false) {
-                    self.render_frame(ctx, state, renderer);
+                    self.render_frame(ctx, state, systems);
                 }
             }
         } 
 
     }
 
-    fn render_frame(&mut self, ctx: &egui::Context, state: &mut EditorState, renderer: &mut EditorRenderer) {
+    fn render_frame(&mut self, ctx: &egui::Context, state: &mut EditorState, systems: &mut EditorSystems) {
         if let ExportStatus::ExportingFrames {
             graphic,
             thread_tx,
@@ -217,8 +217,8 @@ impl Export {
 
                 if let None = self.fb {
                     self.fb = Some((
-                        Framebuffer::new(1920, 1080, renderer.gl),
-                        Framebuffer::new(1920, 1080, renderer.gl)
+                        Framebuffer::new(1920, 1080, systems.gl),
+                        Framebuffer::new(1920, 1080, systems.gl)
                     ));
                 } 
                 if let Some((fb, aa_fb)) = self.fb.as_mut() {
@@ -227,22 +227,22 @@ impl Export {
                     let w = gfx.w;
                     let h = gfx.h;
                     let gfx_len = gfx.len;
-                    renderer.renderer.render(fb, None, w * aa_scl, h * aa_scl, glam::Vec2::ZERO, h as f32 / 2.0, &mut state.project, *graphic, *curr_frame, 0, 0, renderer.gl);
-                    aa_fb.resize(w, h, renderer.gl);
+                    systems.renderer.render(fb, None, w * aa_scl, h * aa_scl, glam::Vec2::ZERO, h as f32 / 2.0, &mut state.project, *graphic, *curr_frame, 0, 0, systems.gl);
+                    aa_fb.resize(w, h, systems.gl);
                     unsafe {
-                        renderer.gl.bind_framebuffer(glow::FRAMEBUFFER, Some(aa_fb.fbo));
-                        renderer.gl.bind_framebuffer(glow::READ_FRAMEBUFFER, Some(fb.fbo));
-                        renderer.gl.blit_framebuffer(0, (h * aa_scl - 1) as i32, (w * aa_scl) as i32, 0, 0, 0, w as i32, h as i32, glow::COLOR_BUFFER_BIT, glow::LINEAR);
+                        systems.gl.bind_framebuffer(glow::FRAMEBUFFER, Some(aa_fb.fbo));
+                        systems.gl.bind_framebuffer(glow::READ_FRAMEBUFFER, Some(fb.fbo));
+                        systems.gl.blit_framebuffer(0, (h * aa_scl - 1) as i32, (w * aa_scl) as i32, 0, 0, 0, w as i32, h as i32, glow::COLOR_BUFFER_BIT, glow::LINEAR);
                     }
 
                     let mut pixel_data = vec![0; (w * h * 3) as usize]; 
 
                     unsafe {
-                        renderer.gl.bind_framebuffer(glow::READ_FRAMEBUFFER, Some(aa_fb.fbo));
-                        renderer.gl.read_pixels(0, 0, w as i32, h as i32, glow::RGB, glow::UNSIGNED_BYTE, glow::PixelPackData::Slice(&mut pixel_data[0..((w * h * 3) as usize)]));
+                        systems.gl.bind_framebuffer(glow::READ_FRAMEBUFFER, Some(aa_fb.fbo));
+                        systems.gl.read_pixels(0, 0, w as i32, h as i32, glow::RGB, glow::UNSIGNED_BYTE, glow::PixelPackData::Slice(&mut pixel_data[0..((w * h * 3) as usize)]));
                     }
 
-                    Framebuffer::render_to_win(ctx.screen_rect().width() as u32, ctx.screen_rect().height() as u32, renderer.gl);
+                    Framebuffer::render_to_win(ctx.screen_rect().width() as u32, ctx.screen_rect().height() as u32, systems.gl);
 
                     let _ = thread_tx.send(ExportThreadMessage::Frame(pixel_data));
 
