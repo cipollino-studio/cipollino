@@ -10,7 +10,7 @@ pub trait Dialog: UniqueTypeId<u64> {
     }
 
     fn render(&mut self, ui: &mut egui::Ui, state: &mut EditorState) -> bool;
-    fn title(&self) -> String;
+    fn title(&self, state: &EditorState) -> String;
 
 }
 
@@ -18,7 +18,7 @@ pub trait Dialog: UniqueTypeId<u64> {
 trait DialogDyn {
 
     fn render_dyn(&mut self, ui: &mut egui::Ui, state: &mut EditorState) -> bool;
-    fn title_dyn(&self) -> String;
+    fn title_dyn(&self, state: &EditorState) -> String;
     fn type_id_dyn(&self) -> TypeId<u64>;
 
 }
@@ -29,8 +29,8 @@ impl<T: Dialog> DialogDyn for T {
         self.render(ui, state)
     }
 
-    fn title_dyn(&self) -> String {
-        self.title()
+    fn title_dyn(&self, state: &EditorState) -> String {
+        self.title(state)
     }
 
     fn type_id_dyn(&self) -> TypeId<u64> {
@@ -39,15 +39,22 @@ impl<T: Dialog> DialogDyn for T {
 
 }
 
+struct DialogInstance {
+    pub dialog: Box<dyn DialogDyn>,
+    pub id: egui::Id
+}
+
 pub struct DialogManager {
-    dialogs: Vec<Box<dyn DialogDyn>>
+    dialogs: Vec<DialogInstance>,
+    id_counter: u64
 }
 
 impl DialogManager {
 
     pub fn new() -> Self {
         Self {
-            dialogs: Vec::new()
+            dialogs: Vec::new(),
+            id_counter: 0
         }
     }
 
@@ -55,12 +62,17 @@ impl DialogManager {
         if T::unique_dialog() {
             let new_type_id = T::id();
             for dialog in &self.dialogs {
-                if dialog.type_id_dyn() == new_type_id {
+                if dialog.dialog.type_id_dyn() == new_type_id {
                     return;
                 }
             }
         }
-        self.dialogs.push(Box::new(dialog));
+        self.dialogs.push(DialogInstance {
+            id: egui::Id::new(self.id_counter),
+            dialog: Box::new(dialog)
+        });
+
+        self.id_counter += 1;
     }
 
     pub fn render(&mut self, ctx: &egui::Context, state: &mut EditorState) {
@@ -69,11 +81,12 @@ impl DialogManager {
         for (idx, dialog) in &mut self.dialogs.iter_mut().enumerate() {
             let mut open = true;
             let mut close = false;
-            egui::Window::new(dialog.title_dyn())
+            egui::Window::new(dialog.dialog.title_dyn(&state))
+                .id(dialog.id)
                 .open(&mut open)
                 .collapsible(false)
                 .show(ctx, |ui| {
-                    if dialog.render_dyn(ui, state) {
+                    if dialog.dialog.render_dyn(ui, state) {
                         close = true; 
                     }
             });

@@ -46,7 +46,7 @@ impl Dialog for NewGraphicDialog {
         close_dialog 
     }
 
-    fn title(&self) -> String {
+    fn title(&self, _: &EditorState) -> String {
         "New Graphic".to_owned()
     }
 
@@ -148,9 +148,14 @@ impl Dialog for GraphicPropertiesDialog {
         false
     }
 
-    fn title(&self) -> String {
-        "Graphic Properties".to_owned()
+    fn title(&self, state: &EditorState) -> String {
+        format!("{} Properties", state.project.graphics.get(self.gfx_ptr).map(|gfx| gfx.name.as_str()).unwrap_or(""))
     }
+
+    fn unique_dialog() -> bool {
+        true        
+    }
+
 }
 
 fn gfx_properties_ui(ui: &mut egui::Ui, len: &mut u32, change_len: Option<&mut (bool, bool)>, clip: &mut bool, w: &mut u32, change_w: Option<&mut (bool, bool)>, h: &mut u32, change_h: Option<&mut (bool, bool)>) {
