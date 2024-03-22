@@ -131,7 +131,7 @@ fn filled_mesh(project: &Project, stroke_ptr: ObjPtr<Stroke>, gl: &Arc<glow::Con
 }
 
 pub fn get_mesh<'a>(project: &'a mut Project, stroke_ptr: ObjPtr<Stroke>, gl: &Arc<glow::Context>) -> Option<&'a Mesh> {
-    let stroke = project.strokes.get_mut(stroke_ptr)?;
+    let stroke = project.strokes.get(stroke_ptr)?;
     if stroke.mesh.need_remesh {
         let stroke_filled = stroke.filled;
         let mesh = if stroke_filled { filled_mesh(project, stroke_ptr, gl) } else { unfilled_mesh(project, stroke_ptr, gl) };

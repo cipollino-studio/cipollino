@@ -97,7 +97,7 @@ impl EditorState {
     }
 
     pub fn new() -> Self {
-        EditorState::new_with_project(Project::new())
+        EditorState::new_with_project(Project::new("".into(), 24.0, 44100.0))
     }
 
     pub fn visible_strokes(&self) -> Vec<ObjPtr<Stroke>> {
@@ -124,7 +124,7 @@ impl EditorState {
     }
 
     pub fn frame_rate(&self) -> f32 {
-        24.0
+        self.project.fps
     }
 
     pub fn frame_len(&self) -> f32 {
@@ -132,7 +132,7 @@ impl EditorState {
     }
 
     pub fn sample_rate(&self) -> f32 {
-        44100.0
+        self.project.sample_rate
     }
 
     pub fn sample_len(&self) -> f32 {

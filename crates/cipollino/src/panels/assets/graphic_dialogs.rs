@@ -1,7 +1,7 @@
 
 use unique_type_id::UniqueTypeId;
 
-use crate::{editor::{dialog::Dialog, state::EditorState}, project::{action::Action, graphic::Graphic, obj::{asset::Asset, ObjPtr}}, util::ui::drag_value};
+use crate::{editor::{dialog::Dialog, state::EditorState, EditorSystems}, project::{action::Action, graphic::Graphic, obj::{asset::Asset, ObjPtr}}, util::ui::drag_value};
 
 #[derive(UniqueTypeId)]
 pub struct NewGraphicDialog {
@@ -20,7 +20,7 @@ impl NewGraphicDialog {
 
 impl Dialog for NewGraphicDialog {
 
-    fn render(&mut self, ui: &mut egui::Ui, state: &mut EditorState) -> bool {
+    fn render(&mut self, ui: &mut egui::Ui, state: &mut EditorState, _systems: &mut EditorSystems) -> bool {
         ui.horizontal(|ui| {
             ui.label("Graphic name:");
             ui.text_edit_singleline(&mut self.create_graphic_data.name);
@@ -79,7 +79,7 @@ impl GraphicPropertiesDialog {
 
 impl Dialog for GraphicPropertiesDialog {
 
-    fn render(&mut self, ui: &mut egui::Ui, state: &mut EditorState) -> bool {
+    fn render(&mut self, ui: &mut egui::Ui, state: &mut EditorState, _systems: &mut EditorSystems) -> bool {
         let gfx = if let Some(gfx) = state.project.graphics.get_mut(self.gfx_ptr) {
             gfx
         } else {

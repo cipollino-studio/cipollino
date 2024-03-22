@@ -14,6 +14,7 @@ pub struct ObjList<T: Obj> {
         A reference to list is given to each ObjBox, allowing the list to "garbage collect" deleted objects.
     */
     dropped: Arc<Mutex<Vec<u64>>>,
+    pub mutated: bool,
     pub curr_key: u64
 }
 
@@ -23,6 +24,7 @@ impl<T: Obj> ObjList<T> {
         Self {
             objs: HashMap::new(),
             dropped: Arc::new(Mutex::new(Vec::new())),
+            mutated: true,
             curr_key: 1
         }
     }
@@ -60,6 +62,7 @@ impl<T: Obj> ObjList<T> {
     }
 
     pub fn get_mut(&mut self, ptr: ObjPtr<T>) -> Option<&mut T> {
+        self.mutated = true;
         self.objs.get_mut(&ptr.key)
     }
 
@@ -77,6 +80,8 @@ impl<T: Obj> ObjList<T> {
             self.objs.remove(key);
         }
         dropped.clear();
+
+        self.mutated = false;
     } 
 
 }

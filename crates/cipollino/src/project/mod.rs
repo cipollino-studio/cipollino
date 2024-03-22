@@ -13,9 +13,16 @@ pub mod file;
 
 use std::{collections::{HashMap, HashSet}, path::PathBuf};
 
+use serde_json::json;
+
+use crate::util::fs::write_json_file;
+
 use self::{file::{audio::AudioFile, FilePtr, FilePtrAny}, folder::Folder, frame::Frame, graphic::Graphic, layer::Layer, obj::{ObjBox, ObjList, ObjPtr}, palette::{Palette, PaletteColor}, sound_instance::SoundInstance, stroke::Stroke};
 
 pub struct Project {
+    pub fps: f32,
+    pub sample_rate: f32,
+
     pub folders: ObjList<Folder>,
     pub graphics: ObjList<Graphic>,
     pub layers: ObjList<Layer>,
@@ -32,17 +39,28 @@ pub struct Project {
 
     pub root_folder: ObjBox<Folder>,
 
-    pub save_path: Option<PathBuf>,
+    pub save_path: PathBuf, 
     pub files_to_delete: HashSet<PathBuf>,
     pub files_to_move: Vec<(PathBuf, PathBuf)> 
 }
 
 impl Project {
 
-    pub fn new() -> Self {
+    pub fn create(path: PathBuf, fps: f32, sample_rate: f32) -> Self {
+        let _ = std::fs::create_dir_all(path.parent().unwrap());
+        write_json_file(&path, json!({
+            "fps": fps,
+            "sample_rate": sample_rate
+        }));
+        Self::load(path)
+    }
+
+    pub fn new(path: PathBuf, fps: f32, sample_rate: f32) -> Self {
         let mut folder_list = ObjList::new();
         let root = folder_list.add(Folder::new(ObjPtr::null()));
         Self {
+            fps,
+            sample_rate,
             folders: folder_list,
             graphics: ObjList::new(),
             layers: ObjList::new(),
@@ -55,10 +73,14 @@ impl Project {
             path_file_ptr: HashMap::new(),
             hash_file_ptr: HashMap::new(),
             root_folder: root,
-            save_path: None,
+            save_path: path,
             files_to_delete: HashSet::new(),
             files_to_move: Vec::new()
         }
+    }
+
+    pub fn mutated(&self) -> bool {
+        self.folders.mutated || self.graphics.mutated || self.layers.mutated || self.frames.mutated || self.strokes.mutated || self.palettes.mutated || self.palette_colors.mutated || self.sound_instances.mutated
     }
 
     pub fn garbage_collect_objs(&mut self) {

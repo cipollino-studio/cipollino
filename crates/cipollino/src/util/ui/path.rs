@@ -1,7 +1,7 @@
 
 use std::{path::PathBuf, str::FromStr};
 
-pub fn path_selector<F>(ui: &mut egui::Ui, path: &mut PathBuf, correct_path: F) 
+pub fn path_selector<F>(ui: &mut egui::Ui, path: &mut PathBuf, pick_folder: bool, correct_path: F) 
     where F: Fn(&mut PathBuf) {
     ui.horizontal(|ui| {
         let mut path_as_string = path.to_str().unwrap().to_owned();
@@ -12,9 +12,16 @@ pub fn path_selector<F>(ui: &mut egui::Ui, path: &mut PathBuf, correct_path: F)
         }
 
         if ui.button(egui_phosphor::regular::FOLDER).clicked() {
-            if let Some(mut new_path) = rfd::FileDialog::new().save_file() {
-                correct_path(&mut new_path);
-                *path = new_path;
+            if pick_folder {
+                if let Some(mut new_path) = rfd::FileDialog::new().pick_folder() {
+                    correct_path(&mut new_path);
+                    *path = new_path;
+                }
+            } else {
+                if let Some(mut new_path) = rfd::FileDialog::new().save_file() {
+                    correct_path(&mut new_path);
+                    *path = new_path;
+                }
             }
         }
     });

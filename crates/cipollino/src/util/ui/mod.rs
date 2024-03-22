@@ -2,6 +2,7 @@
 pub mod color;
 pub mod path;
 pub mod dnd;
+pub mod layout;
 
 pub fn label_size(ui: &mut egui::Ui, label: egui::Label) -> egui::Vec2 {
     let (_, galley, _) = label.layout_in_ui(ui);

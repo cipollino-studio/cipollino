@@ -93,7 +93,7 @@ impl Folder {
             path.push(self.name.as_str());
             Some(path)
         } else {
-            let mut path = project.save_path.clone()?;
+            let mut path = project.save_path.clone();
             path.pop();
             Some(path)
         }

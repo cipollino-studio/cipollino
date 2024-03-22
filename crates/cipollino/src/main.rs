@@ -62,6 +62,8 @@ impl Cipollino {
 
         cc.egui_ctx.set_fonts(fonts);
         
+        egui_extras::install_image_loaders(&cc.egui_ctx);
+
         Self {
             editor: Editor::new(),
             scene_renderer: None

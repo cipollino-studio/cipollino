@@ -4,38 +4,44 @@ use std::{fs, path::PathBuf, sync::{Arc, Mutex}};
 use crate::{export::Export, panels, project::Project, renderer::scene::SceneRenderer};
 use egui::{KeyboardShortcut, Modifiers};
 
-use self::{clipboard::Clipboard, dialog::DialogManager, state::EditorState};
+use self::{clipboard::Clipboard, dialog::{DialogManager, DialogsToOpen}, prefs::UserPrefs, splash_screen::SplashScreen, state::EditorState};
 
 pub mod selection;
 pub mod clipboard;
 pub mod state;
 pub mod dialog;
+pub mod splash_screen;
+pub mod new_project;
+pub mod prefs;
 
 pub const UNDO_SHORTCUT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, egui::Key::Z);
 pub const REDO_SHORTCUT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, egui::Key::Y);
-pub const SAVE_SHORTCUT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, egui::Key::S);
 
 pub struct Editor {
     state: Arc<Mutex<EditorState>>,
     panels: panels::PanelManager,
     dialog: DialogManager,
-    config_path: String,
+    prefs: UserPrefs,
+    config_path: PathBuf,
     pub export: Export,
+
+    project_open: bool
 }
 
 pub struct EditorSystems<'a> {
     pub gl: &'a Arc<glow::Context>,
     pub renderer: &'a mut SceneRenderer,
-    pub dialog: &'a mut DialogManager
+    pub dialog: DialogsToOpen,
+    pub prefs: &'a mut UserPrefs
 }
 
 impl Editor {
     
     pub fn new() -> Self {
-        let config_path = directories::ProjectDirs::from("com", "Cipollino", "Cipollino").unwrap().config_dir().to_str().unwrap().to_owned();
-        let _ = fs::create_dir(config_path.clone());
+        let config_path = directories::ProjectDirs::from("com", "Cipollino", "Cipollino").unwrap().config_dir().to_owned();
+        let _ = fs::create_dir_all(config_path.clone());
 
-        let panels = if let Ok(data) = std::fs::read(config_path.clone() + "/dock.json") {
+        let panels = if let Ok(data) = std::fs::read(config_path.join("dock.json")) {
             if let Ok(panels) = serde_json::from_slice::<panels::PanelManager>(data.as_slice()) {
                 panels
             } else {
@@ -46,21 +52,36 @@ impl Editor {
         };
         let state = Arc::new(Mutex::new(EditorState::new())); 
 
+        let mut dialog = DialogManager::new();
+        let mut dialogs_to_open = DialogsToOpen::new();
+        dialogs_to_open.open_dialog(SplashScreen::new());
+        dialog.open_dialogs(dialogs_to_open);
+
+        let prefs = UserPrefs::new(config_path.join("prefs.json"));
+
         let res = Self {
             state: state.clone(),
             panels,
-            dialog: DialogManager::new(),
+            dialog,
+            prefs,
             config_path,
             export: Export::new(), 
+            project_open: false
         };
         
         res
     }
 
     pub fn render(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame, scene_renderer: &mut Option<SceneRenderer>) {
+
         let state = self.state.clone();
         let state = &mut *state.lock().unwrap(); 
 
+        if !self.project_open && state.project.save_path.to_str().unwrap().len() > 0 {
+            self.project_open = true;
+        }
+
+        let editor_disabled = self.editor_disabled();
         
         if let Some(audio) = &mut state.audio {
             if let Some(_gfx) = state.project.graphics.get(state.open_graphic) {
@@ -96,23 +117,29 @@ impl Editor {
         let mut systems = EditorSystems {
             gl,
             renderer: scene_renderer.as_mut().unwrap(),
-            dialog: &mut self.dialog
+            dialog: DialogsToOpen::new(),
+            prefs: &mut self.prefs
         }; 
 
         // Panels
         egui::CentralPanel::default()
             .frame(egui::Frame::central_panel(&ctx.style()).inner_margin(0.))
             .show(ctx, |_ui| {
-                self.panels.render(ctx, !self.export.exporting(), state, &mut systems);
+                self.panels.render(ctx, !editor_disabled, state, &mut systems);
             });
 
         self.export.render(ctx, state, &mut systems);
 
-        self.dialog.render(ctx, state);
+        self.dialog.render(ctx, state, &mut systems);
 
-        let _ = std::fs::write(self.config_path.clone() + "/dock.json", serde_json::json!(self.panels).to_string());
+        let _ = std::fs::write(self.config_path.join("dock.json"), serde_json::json!(self.panels).to_string());
 
         state.toasts.show(ctx);
+
+        if self.project_open && state.project.mutated() {
+            state.project.save();
+        }
+
         state.project.garbage_collect_objs();
 
         if let Some(gfx) = state.project.graphics.get(state.open_graphic) {
@@ -132,20 +159,14 @@ impl Editor {
             }
         }
 
+        self.dialog.open_dialogs(systems.dialog);
+
     }
 
     fn menu_bar(&mut self, ui: &mut egui::Ui, state: &mut EditorState) {
         egui::menu::bar(ui, |ui| {
-            ui.set_enabled(!self.export.exporting());
+            ui.set_enabled(!self.editor_disabled());
             ui.menu_button("File", |ui| {
-                if ui.add(egui::Button::new("Save").shortcut_text(ui.ctx().format_shortcut(&SAVE_SHORTCUT))).clicked() {
-                    save(state);
-                    ui.close_menu();
-                }
-                if ui.button("Save As").clicked() {
-                    save_as(state);
-                    ui.close_menu();
-                }
                 if ui.button("Open").clicked() {
                     if let Some(path) = rfd::FileDialog::new().add_filter("Cipollino Project File", &["cip"]).pick_file() {
                         *state = EditorState::new_with_project(Project::load(path));
@@ -221,33 +242,10 @@ impl Editor {
             }
         }
 
-        if ui.input_mut(|i| i.consume_shortcut(&SAVE_SHORTCUT)) {
-            save(state);
-        }
     }
 
-}
-
-fn save(state: &mut EditorState) {
-    if let Some(path) = &state.project.save_path {
-        save_project(state, path.clone());
-    } else {
-        save_as(state);
+    fn editor_disabled(&self) -> bool {
+        !self.project_open || self.export.exporting()
     }
-}
 
-pub fn save_as(state: &mut EditorState) {
-    if let Some(path) = rfd::FileDialog::new().pick_folder() {
-        if let Ok(dir) = fs::read_dir(path.clone()) {
-            if dir.count() == 0 {
-                save_project(state, path);
-            } else {
-                state.error_toast("Cannot save project to non-empty directory.");
-            }
-        }
-    }
-}
-
-pub fn save_project(state: &mut EditorState, path: PathBuf) {
-    state.project.save(path); 
 }

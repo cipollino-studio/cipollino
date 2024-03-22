@@ -1,34 +1,18 @@
 
-use std::{fs, io::{Read, Write}, path::PathBuf};
+use std::{fs, path::PathBuf};
 
 use serde_json::json;
 
-use crate::project::{graphic::Graphic, obj::ObjBox};
+use crate::{project::{graphic::Graphic, obj::ObjBox}, util::fs::{read_json_file, write_json_file}};
 use sha2::Digest;
 
 use super::{file::{audio::AudioFile, FilePtr, FileType}, folder::Folder, obj::{asset::Asset, ObjPtr, ObjSerialize}, palette::Palette, Project};
 
-pub fn read_json_file(path: &PathBuf) -> Option<serde_json::Value> {
-    let mut file = fs::File::open(path).ok()?;
-    let mut str = "".to_owned();
-    file.read_to_string(&mut str).ok()?;
-    serde_json::from_str::<serde_json::Value>(str.as_str()).ok()
-}
-
-pub fn write_json_file(path: &PathBuf, data: serde_json::Value) -> Option<()> {
-    let str = data.to_string();
-    let mut file = fs::File::create(path).ok()?;
-    file.write(str.as_bytes()).ok()?;
-    Some(())
-}
 
 
 impl Project {
 
-    pub fn save(&mut self, mut folder_path: PathBuf) {
-        if folder_path.is_dir() {
-            folder_path.push("a");
-        }
+    pub fn save(&mut self) {
 
         for (from, to) in &self.files_to_move {
             let _ = std::fs::rename(from, to);
@@ -36,7 +20,7 @@ impl Project {
         self.files_to_move.clear();
 
         for file in &self.files_to_delete {
-            let path = folder_path.with_file_name(file.clone());
+            let path = self.save_path.clone().with_file_name(file.clone());
             if path.is_dir() {
                 let _ = fs::remove_dir_all(path);
             } else {
@@ -45,11 +29,14 @@ impl Project {
         }
         self.files_to_delete.clear();
 
-        self.save_folder(self.root_folder.make_ptr(), &folder_path);
+        self.save_folder(self.root_folder.make_ptr(), &self.save_path.clone());
         
-        write_json_file(&folder_path.with_file_name("proj.cip"), json!({}));
+        write_json_file(&self.save_path.clone().with_file_name("proj.cip"), json!({
+            "fps": self.fps,
+            "sample_rate": self.sample_rate
+        }));
 
-        self.save_path = Some(folder_path.with_file_name("proj.cip"));
+        self.save_path = self.save_path.clone().with_file_name("proj.cip");
     }
 
     pub fn save_folder(&mut self, folder: ObjPtr<Folder>, path: &PathBuf) {
@@ -78,17 +65,23 @@ impl Project {
     }
 
     pub fn load(proj_file_path: PathBuf) -> Self {
-        let mut res = Self::new();
+        let mut fps = 24.0;
+        let mut sample_rate = 44100.0;
+        if let Some(proj_data) = read_json_file(&proj_file_path) {
+            if let Some(new_fps) = proj_data.get("fps").map_or(None, |val| val.as_f64()) {
+                fps = new_fps as f32;
+            }
+            if let Some(new_sample_rate) = proj_data.get("sample_rate").map_or(None, |val| val.as_f64()) {
+                sample_rate = new_sample_rate as f32;
+            }
+        }
+
+        let mut res = Self::new(proj_file_path.clone(), fps, sample_rate);
 
         let mut base_folder_path = proj_file_path.clone();
         base_folder_path.pop();
 
-        if let Some(_proj_data) = read_json_file(&proj_file_path) {
-            
-        }
-
         let folder_path = proj_file_path.parent().unwrap();
-        res.save_path = Some(proj_file_path.clone());
         res.root_folder = res.load_folder(&folder_path.to_owned(), &base_folder_path, ObjPtr::null()); 
 
         res

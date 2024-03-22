@@ -80,7 +80,7 @@ impl Export {
                     });
                     return;
                 }
-                path_selector(ui, &mut self.path, |path| {
+                path_selector(ui, &mut self.path, false, |path| {
                     path.set_extension("mp4");
                 });
                 if ui.button("Export").clicked() {
