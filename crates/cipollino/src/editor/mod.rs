@@ -1,10 +1,10 @@
 
 use std::{fs, path::PathBuf, sync::{Arc, Mutex}};
 
-use crate::{export::Export, panels, project::Project, renderer::scene::SceneRenderer};
+use crate::{audio::AudioController, export::Export, panels, project::{graphic::Graphic, obj::ObjPtr, Project}, renderer::scene::SceneRenderer};
 use egui::{KeyboardShortcut, Modifiers};
 
-use self::{clipboard::Clipboard, dialog::{DialogManager, DialogsToOpen}, prefs::UserPrefs, splash_screen::SplashScreen, state::EditorState};
+use self::{clipboard::Clipboard, dialog::{DialogManager, DialogsToOpen}, dropped_files::handle_dropped_files, prefs::UserPrefs, splash_screen::SplashScreen, state::EditorState, toasts::Toasts};
 
 pub mod selection;
 pub mod clipboard;
@@ -13,6 +13,8 @@ pub mod dialog;
 pub mod splash_screen;
 pub mod new_project;
 pub mod prefs;
+pub mod dropped_files;
+pub mod toasts;
 
 pub const UNDO_SHORTCUT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, egui::Key::Z);
 pub const REDO_SHORTCUT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, egui::Key::Y);
@@ -22,17 +24,25 @@ pub struct Editor {
     panels: panels::PanelManager,
     dialog: DialogManager,
     prefs: UserPrefs,
+    toasts: Toasts,
     config_path: PathBuf,
     pub export: Export,
 
-    project_open: bool
+    project_open: bool,
+
+    autosave_debounce_timer: f32,
+
+    audio: Option<AudioController>,
+    prev_open_graphic: ObjPtr<Graphic>,
+    prev_playing: bool
 }
 
 pub struct EditorSystems<'a> {
     pub gl: &'a Arc<glow::Context>,
     pub renderer: &'a mut SceneRenderer,
     pub dialog: DialogsToOpen,
-    pub prefs: &'a mut UserPrefs
+    pub prefs: &'a mut UserPrefs,
+    pub toasts: &'a mut Toasts 
 }
 
 impl Editor {
@@ -64,9 +74,15 @@ impl Editor {
             panels,
             dialog,
             prefs,
+            toasts: Toasts::new(),
             config_path,
             export: Export::new(), 
-            project_open: false
+            project_open: false,
+            autosave_debounce_timer: -1.0,
+
+            audio: AudioController::new(),
+            prev_open_graphic: ObjPtr::null(),
+            prev_playing: false
         };
         
         res
@@ -83,7 +99,7 @@ impl Editor {
 
         let editor_disabled = self.editor_disabled();
         
-        if let Some(audio) = &mut state.audio {
+        if let Some(audio) = &mut self.audio {
             if let Some(_gfx) = state.project.graphics.get(state.open_graphic) {
                 audio.set_playing(state.playing);
 
@@ -118,7 +134,8 @@ impl Editor {
             gl,
             renderer: scene_renderer.as_mut().unwrap(),
             dialog: DialogsToOpen::new(),
-            prefs: &mut self.prefs
+            prefs: &mut self.prefs,
+            toasts: &mut self.toasts
         }; 
 
         // Panels
@@ -134,11 +151,25 @@ impl Editor {
 
         let _ = std::fs::write(self.config_path.join("dock.json"), serde_json::json!(self.panels).to_string());
 
-        state.toasts.show(ctx);
+        systems.toasts.render(ctx);
 
-        if self.project_open && state.project.mutated() {
-            state.project.save();
+        if self.project_open {
+            if self.project_open && state.project.mutated() {
+                self.autosave_debounce_timer = 1.0;
+            }
+            let dt = ctx.input(|i| i.predicted_dt);
+            if self.autosave_debounce_timer > 0.0 && self.autosave_debounce_timer < dt {
+                state.project.save();
+            }
+            self.autosave_debounce_timer -= dt;
         }
+
+        if state.project.graphics.mutated || state.project.layers.mutated || state.project.sound_instances.mutated
+           || self.prev_open_graphic != state.open_graphic || self.prev_playing != state.playing {
+            set_audio_data(state, &mut self.audio); 
+        }
+        self.prev_open_graphic = state.open_graphic; 
+        self.prev_playing = state.playing;
 
         state.project.garbage_collect_objs();
 
@@ -152,12 +183,14 @@ impl Editor {
             }
         }
         if state.time != initial_time {
-            if let Some(audio) = &mut state.audio {
+            if let Some(audio) = &mut self.audio {
                 let audio_state = audio.state.clone();
                 let audio_state = &mut *audio_state.lock().unwrap();
                 audio_state.time = state.time;
             }
         }
+
+        handle_dropped_files(ctx, state, &mut systems);
 
         self.dialog.open_dialogs(systems.dialog);
 
@@ -248,4 +281,13 @@ impl Editor {
         !self.project_open || self.export.exporting()
     }
 
+}
+
+fn set_audio_data(state: &EditorState, audio_controller: &mut Option<AudioController>) {
+    if let Some(audio) = audio_controller {
+        let audio_state = audio.state.clone();
+        if let Some(new_state) = state.get_audio_state(state.open_graphic) {
+            *audio_state.lock().unwrap() = new_state;
+        }
+    }
 }

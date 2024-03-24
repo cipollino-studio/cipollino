@@ -14,3 +14,11 @@ pub fn write_json_file(path: &PathBuf, data: serde_json::Value) -> Option<()> {
     file.write(str.as_bytes()).ok()?;
     Some(())
 }
+
+pub fn remove(path: &PathBuf) {
+    if path.is_dir() {
+        let _ = fs::remove_dir_all(path);
+    } else {
+        let _ = fs::remove_file(path);
+    }
+}

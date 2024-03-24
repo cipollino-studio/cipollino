@@ -12,8 +12,6 @@ pub struct EditorState {
 
     // Subsystems
     pub actions: ActionManager,
-    pub audio: Option<AudioController>,
-    pub toasts: egui_toast::Toasts,
    
     // Tools
     pub tools: Vec<Arc<RwLock<dyn Tool + Send + Sync>>>,
@@ -69,9 +67,6 @@ impl EditorState {
             project: project, 
 
             actions: ActionManager::new(),
-            audio,
-            toasts, 
-
             tools: vec![select.clone(), pencil, bucket, color_picker, line],
             curr_tool: select,
 
@@ -115,12 +110,7 @@ impl EditorState {
 
     pub fn play(&mut self) {
         self.playing = true;
-        if let Some(audio) = &mut self.audio {
-            let audio_state = audio.state.clone();
-            if let Some(new_state) = self.get_audio_state(self.open_graphic) {
-                *audio_state.lock().unwrap() = new_state;
-            }
-        }
+        
     }
 
     pub fn frame_rate(&self) -> f32 {
@@ -155,13 +145,6 @@ impl EditorState {
         self.curr_tool.clone().write().unwrap().reset(self);
     }
 
-    pub fn error_toast(&mut self, message: &str) {
-        self.toasts.add(egui_toast::Toast {
-            kind: egui_toast::ToastKind::Error,
-            text: message.to_owned().into(),
-            options: egui_toast::ToastOptions::default().show_progress(false) 
-        });
-    }
 
     pub fn get_audio_state(&self, graphic: ObjPtr<Graphic>) -> Option<AudioState> {
         let mut audio = AudioState::new();
@@ -172,6 +155,9 @@ impl EditorState {
             let layer = layer.get(&self.project);
             if layer.kind != LayerKind::Audio {
                 continue;
+            }
+            if !layer.show {
+                continue; // Layer muted
             }
             for instance in &layer.sound_instances {
                 let instance = instance.get(&self.project);

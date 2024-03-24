@@ -5,9 +5,11 @@ use serde_json::json;
 
 use crate::util::next_unique_name;
 
-use super::{action::ObjAction, folder::Folder, obj::{obj_clone_impls::PrimitiveObjClone, ObjClone, ObjPtr, ObjSerialize}, Project};
+use super::{action::ObjAction, folder::Folder, obj::{obj_clone_impls::PrimitiveObjClone, ObjClone, ObjPtr, ObjSerialize}, AssetPtr, Project};
 
 pub mod audio;
+
+// TODO: This system has no chance of functioning. Rewrite.
 
 #[derive(Clone, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct FilePtrAny {
@@ -55,11 +57,63 @@ pub trait FileType: Sized + Send + Sync + Clone {
     fn list_in_folder(folder: &Folder) -> &Vec<FilePtr<Self>>;
     fn list_in_folder_mut(folder: &mut Folder) -> &mut Vec<FilePtr<Self>>;
 
+    fn make_asset_ptr(ptr: &FilePtr<Self>) -> AssetPtr;
+
+    fn icon() -> &'static str;
+    
+    fn rename(project: &mut Project, mut ptr: FilePtr<Self>, folder_ptr: ObjPtr<Folder>, name: String) -> Option<ObjAction> where Self: 'static {
+        let old_ptr = ptr.clone();
+        let from_path = project.base_path().join(&ptr.ptr.path);
+
+        let folder = project.folders.get(folder_ptr)?;
+        let idx = Self::list_in_folder(folder).iter().position(|other| *other == ptr)?;
+        let new_name = next_unique_name(&name, folder.audios.iter().map(|audio| audio.name()));
+        let to_path = from_path.with_file_name(format!("{}.{}", new_name, from_path.extension().unwrap().to_str().unwrap()));
+
+        std::fs::rename(from_path.clone(), to_path.clone()).ok()?;
+
+        ptr.ptr.path = to_path.clone();
+        let new_ptr = ptr.clone();
+        let folder = project.folders.get_mut(folder_ptr)?;
+        let list = Self::list_in_folder_mut(folder);
+        list.remove(idx);
+        list.push(ptr.clone());
+
+        let redo = {
+            let from_path = from_path.clone();
+            let to_path = to_path.clone();
+            let old_ptr = old_ptr.clone();
+            let new_ptr = new_ptr.clone();
+            move |proj: &mut Project| {
+                let _ = std::fs::rename(from_path.clone(), to_path.clone());
+                if let Some(folder) = proj.folders.get_mut(folder_ptr) {
+                    let list = Self::list_in_folder_mut(folder); 
+                    if let Some(idx) = list.iter().position(|other| other == &old_ptr) {
+                        list.remove(idx);
+                    } 
+                    list.push(new_ptr.clone());
+                }
+            }
+        };
+
+        let undo = {
+            move |proj: &mut Project| {
+                let _ = std::fs::rename(to_path.clone(), from_path.clone());
+                if let Some(folder) = proj.folders.get_mut(folder_ptr) {
+                    let list = Self::list_in_folder_mut(folder); 
+                    if let Some(idx) = list.iter().position(|other| other == &new_ptr) {
+                        list.remove(idx);
+                    } 
+                    list.push(old_ptr.clone());
+                }
+            }
+        };
+
+        Some(ObjAction::new(redo, undo))
+    }
+
     fn transfer(project: &mut Project, mut ptr: FilePtr<Self>, from: ObjPtr<Folder>, to: ObjPtr<Folder>) -> Option<ObjAction> where Self: 'static {
-        // TODO: Fix undo when file is forcefully renamed
-
-        let _old_name = ptr.name().to_owned();
-
+        let old_ptr = ptr.clone();
         let from_folder = project.folders.get(from)?;
         let mut from_path = from_folder.file_path(project)?;
         from_path.push(ptr.ptr.path.file_name()?);
@@ -69,6 +123,7 @@ pub trait FileType: Sized + Send + Sync + Clone {
         let mut to_path = to_folder.file_path(project)?;
         let new_name = next_unique_name(&ptr.name().to_owned(), Self::list_in_folder(to_folder).iter().map(|ptr| ptr.name()));
         ptr.set_name(new_name);
+        let new_ptr = ptr.clone();
         to_path.push(ptr.ptr.path.file_name()?);
 
         let to_folder = project.folders.get_mut(to)?;
@@ -77,14 +132,49 @@ pub trait FileType: Sized + Send + Sync + Clone {
         let from_folder = project.folders.get_mut(from)?;
         Self::list_in_folder_mut(from_folder).remove(idx);
 
-        project.files_to_move.push((from_path, to_path));
+        let _ = std::fs::rename(from_path.clone(), to_path.clone());
 
-        let ptr_1 = ptr.clone();
-        Some(ObjAction::new(move |proj| {
-            Self::transfer(proj, ptr_1.clone(), from, to);
-        }, move |proj| {
-            Self::transfer(proj, ptr.clone(), to, from);
-        })) 
+        let redo = {
+            let from_path = from_path.clone();
+            let to_path = to_path.clone();
+            let old_ptr = old_ptr.clone();
+            let new_ptr = new_ptr.clone();
+            move |proj: &mut Project| {
+                let _ = std::fs::rename(from_path.clone(), to_path.clone());
+                if let Some(from_folder) = proj.folders.get_mut(from) {
+                    let list = Self::list_in_folder_mut(from_folder);
+                    if let Some(idx) = list.iter().position(|other| other == &old_ptr) {
+                        list.remove(idx);
+                    }
+                }
+                if let Some(to_folder) = proj.folders.get_mut(to) {
+                    let list = Self::list_in_folder_mut(to_folder);
+                    list.push(new_ptr.clone()); 
+                }
+            }
+        };
+
+        let undo = {
+            let from_path = from_path.clone();
+            let to_path = to_path.clone();
+            let old_ptr = old_ptr.clone();
+            let new_ptr = new_ptr.clone();
+            move |proj: &mut Project| {
+                let _ = std::fs::rename(to_path.clone(), from_path.clone());
+                if let Some(to_folder) = proj.folders.get_mut(to) {
+                    let list = Self::list_in_folder_mut(to_folder);
+                    if let Some(idx) = list.iter().position(|other| other == &new_ptr) {
+                        list.remove(idx);
+                    }
+                }
+                if let Some(from_folder) = proj.folders.get_mut(from) {
+                    let list = Self::list_in_folder_mut(from_folder);
+                    list.push(old_ptr.clone()); 
+                }
+            }
+        };
+
+        Some(ObjAction::new(redo, undo)) 
     }
 
 }

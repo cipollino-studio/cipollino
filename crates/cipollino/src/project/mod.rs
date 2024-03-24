@@ -11,7 +11,7 @@ pub mod palette;
 pub mod sound_instance;
 pub mod file;
 
-use std::{collections::{HashMap, HashSet}, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf};
 
 use serde_json::json;
 
@@ -39,9 +39,8 @@ pub struct Project {
 
     pub root_folder: ObjBox<Folder>,
 
-    pub save_path: PathBuf, 
-    pub files_to_delete: HashSet<PathBuf>,
-    pub files_to_move: Vec<(PathBuf, PathBuf)> 
+    // Path to the proj.cip file at the root of the project folder
+    pub save_path: PathBuf,
 }
 
 impl Project {
@@ -58,6 +57,7 @@ impl Project {
     pub fn new(path: PathBuf, fps: f32, sample_rate: f32) -> Self {
         let mut folder_list = ObjList::new();
         let root = folder_list.add(Folder::new(ObjPtr::null()));
+
         Self {
             fps,
             sample_rate,
@@ -74,8 +74,6 @@ impl Project {
             hash_file_ptr: HashMap::new(),
             root_folder: root,
             save_path: path,
-            files_to_delete: HashSet::new(),
-            files_to_move: Vec::new()
         }
     }
 
@@ -97,7 +95,7 @@ impl Project {
 }
 
 #[derive(PartialEq, Eq, Clone)]
-pub enum TypedAssetPtr {
+pub enum AssetPtr {
     Folder(ObjPtr<Folder>),
     Graphic(ObjPtr<Graphic>),
     Palette(ObjPtr<Palette>),

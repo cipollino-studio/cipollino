@@ -11,7 +11,7 @@ use super::obj::child_obj::ChildObj;
 use super::obj::{ObjBox, ObjClone, ObjPtr};
 use super::action::ObjAction;
 use super::palette::Palette;
-use super::TypedAssetPtr;
+use super::AssetPtr;
 
 #[derive(Object, Clone, ObjClone)]
 pub struct Folder {
@@ -64,8 +64,8 @@ impl Asset for Folder {
         &mut self.folder
     }
 
-    fn make_typed_asset_ptr(ptr: ObjPtr<Self>) -> TypedAssetPtr {
-        TypedAssetPtr::Folder(ptr)
+    fn make_asset_ptr(ptr: ObjPtr<Self>) -> AssetPtr {
+        AssetPtr::Folder(ptr)
     }
 
     fn icon() -> &'static str {

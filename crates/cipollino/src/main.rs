@@ -27,7 +27,7 @@ fn main() -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
         multisampling: 4,
         renderer: eframe::Renderer::Glow,
-        viewport: egui::ViewportBuilder::default().with_title("Cipollino").with_maximized(true).with_icon(icon_data),
+        viewport: egui::ViewportBuilder::default().with_title("Cipollino").with_maximized(true).with_icon(icon_data).with_drag_and_drop(true),
         ..Default::default()
     };
 

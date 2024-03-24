@@ -13,22 +13,6 @@ use super::{file::{audio::AudioFile, FilePtr, FileType}, folder::Folder, obj::{a
 impl Project {
 
     pub fn save(&mut self) {
-
-        for (from, to) in &self.files_to_move {
-            let _ = std::fs::rename(from, to);
-        }
-        self.files_to_move.clear();
-
-        for file in &self.files_to_delete {
-            let path = self.save_path.clone().with_file_name(file.clone());
-            if path.is_dir() {
-                let _ = fs::remove_dir_all(path);
-            } else {
-                let _ = fs::remove_file(path);
-            }
-        }
-        self.files_to_delete.clear();
-
         self.save_folder(self.root_folder.make_ptr(), &self.save_path.clone());
         
         write_json_file(&self.save_path.clone().with_file_name("proj.cip"), json!({
@@ -82,12 +66,12 @@ impl Project {
         base_folder_path.pop();
 
         let folder_path = proj_file_path.parent().unwrap();
-        res.root_folder = res.load_folder(&folder_path.to_owned(), &base_folder_path, ObjPtr::null()); 
+        res.root_folder = res.load_folder(&folder_path.to_owned(), ObjPtr::null()); 
 
         res
     }
 
-    fn load_folder(&mut self, path: &PathBuf, base_path: &PathBuf, parent: ObjPtr<Folder>) -> ObjBox<Folder> {
+    fn load_folder(&mut self, path: &PathBuf, parent: ObjPtr<Folder>) -> ObjBox<Folder> {
         let res = self.folders.add(Folder::new(parent));
         res.get_mut(self).name = path.file_name().unwrap().to_str().unwrap().to_owned();
 
@@ -95,47 +79,63 @@ impl Project {
             for path in paths {
                 if let Ok(path) = path {
                     let path = path.path();
-                    if let Some(ext) = path.extension() {
-                        match ext.to_str().unwrap() {
-                            "cipgfx" => {
-                                if let Some(data) = read_json_file(&path) { 
-                                    if let Some(gfx) = ObjBox::<Graphic>::obj_deserialize(self, &data, res.make_ptr().into()) {
-                                        gfx.get_mut(self).name = path.file_stem().unwrap().to_str().unwrap().to_owned();
-                                        res.get_mut(self).graphics.push(gfx);
-                                    }
-                                }
-                            },
-                            "cippal" => {
-                                if let Some(data) = read_json_file(&path) { 
-                                    if let Some(palette) = ObjBox::<Palette>::obj_deserialize(self, &data, res.make_ptr().into()) {
-                                        let name = path.file_stem().unwrap().to_str().unwrap().to_owned();
-                                        palette.get_mut(self).name = name; 
-                                        res.get_mut(self).palettes.push(palette);
-                                    }
-                                }
-                            },
-                            "mp3" => {
-                                let file_ptr = self.get_file_ptr(&path, base_path);
-                                let data = AudioFile::load(&path);
-                                if let Some(file_ptr) = file_ptr {
-                                    if let Some(data) = data {
-                                        res.get_mut(self).audios.push(file_ptr.clone());
-                                        self.audio_files.insert(file_ptr, data);
-                                    }
-                                }
-                            },
-                            _ => {}
-                        }
-                    } 
-                    if path.is_dir() {
-                        let folder = self.load_folder(&path, base_path, res.make_ptr());
-                        res.get_mut(self).folders.push(folder);
-                    }
+                    self.load_file(path, res.make_ptr());
                 }
             }
         }
         res
     } 
+
+    fn load_file(&mut self, path: PathBuf, folder_ptr: ObjPtr<Folder>) { 
+        if self.folders.get_mut(folder_ptr).is_none() {
+            return;
+        }
+
+        if let Some(ext) = path.extension() {
+            match ext.to_str().unwrap() {
+                "cipgfx" => {
+                    if let Some(data) = read_json_file(&path) { 
+                        if let Some(gfx) = ObjBox::<Graphic>::obj_deserialize(self, &data, folder_ptr.into()) {
+                            gfx.get_mut(self).name = path.file_stem().unwrap().to_str().unwrap().to_owned();
+                            let folder = self.folders.get_mut(folder_ptr).unwrap();
+                            folder.graphics.push(gfx);
+                        }
+                    }
+                },
+                "cippal" => {
+                    if let Some(data) = read_json_file(&path) { 
+                        if let Some(palette) = ObjBox::<Palette>::obj_deserialize(self, &data, folder_ptr.into()) {
+                            let name = path.file_stem().unwrap().to_str().unwrap().to_owned();
+                            palette.get_mut(self).name = name; 
+                            let folder = self.folders.get_mut(folder_ptr).unwrap();
+                            folder.palettes.push(palette);
+                        }
+                    }
+                },
+                "mp3" => {
+                    let file_ptr = self.get_file_ptr(&path, &self.base_path());
+                    let data = AudioFile::load(&path);
+                    if let Some(file_ptr) = file_ptr {
+                        if let Some(data) = data {
+                            let folder = self.folders.get_mut(folder_ptr).unwrap();
+                            folder.audios.push(file_ptr.clone());
+                            self.audio_files.insert(file_ptr, data);
+                        }
+                    }
+                },
+                _ => {}
+            }
+        } 
+        if path.is_dir() {
+            let sub_folder = self.load_folder(&path, folder_ptr);
+            let folder = self.folders.get_mut(folder_ptr).unwrap();
+            folder.folders.push(sub_folder);
+        }
+    }
+
+    pub fn load_file_to_root_folder(&mut self, path: PathBuf) {
+        self.load_file(path, self.root_folder.make_ptr());
+    }
 
     pub fn get_file_ptr<T: FileType>(&mut self, path: &PathBuf, base: &PathBuf) -> Option<FilePtr<T>> {
         let rel_path = pathdiff::diff_paths(path, base)?; 
@@ -154,6 +154,10 @@ impl Project {
         self.hash_file_ptr.insert(hash_val, file_ptr.ptr.clone());
 
         Some(file_ptr)
+    }
+
+    pub fn base_path(&self) -> PathBuf {
+        self.save_path.parent().unwrap().to_owned()
     }
 
 }

@@ -1,13 +1,13 @@
 
-use crate::{editor::{state::EditorState, EditorSystems}, project::{action::Action, file::{audio::AudioFile, FileType}, folder::Folder, graphic::Graphic, obj::{asset::Asset, ObjBox, ObjPtr}, palette::Palette}, util::ui::dnd::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_label, draggable_widget}};
-use crate::project::TypedAssetPtr;
+use crate::{editor::{state::EditorState, EditorSystems}, project::{action::Action, file::{audio::AudioFile, FilePtr, FileType}, folder::Folder, graphic::Graphic, obj::{asset::Asset, ObjBox, ObjPtr}, palette::Palette}, util::ui::dnd::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_label, draggable_widget}};
+use crate::project::AssetPtr;
 
 use self::graphic_dialogs::{GraphicPropertiesDialog, NewGraphicDialog};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct AssetsPanel {
     #[serde(skip)]
-    editing_name: Option<(TypedAssetPtr, String)>
+    editing_name: Option<(AssetPtr, ObjPtr<Folder>, String)>
 }
 
 mod graphic_dialogs;
@@ -62,7 +62,7 @@ impl AssetsPanel {
         let colors = dnd_drop_zone_setup_colors(ui);
 
         self.render_folder_contents(ui, state, systems, state.project.root_folder.make_ptr(), &mut open, &mut delete, &mut rename, &mut asset_transfer);
-        let (_, root_payload) = ui.dnd_drop_zone::<(TypedAssetPtr, ObjPtr<Folder>)>(egui::Frame::default(), |ui| {
+        let (_, root_payload) = ui.dnd_drop_zone::<(AssetPtr, ObjPtr<Folder>)>(egui::Frame::default(), |ui| {
             ui.allocate_exact_size(ui.available_size(), egui::Sense::hover());
         });
         if let Some(root_payload) = root_payload {
@@ -74,7 +74,7 @@ impl AssetsPanel {
 
         if let Some(asset) = open {
             match asset {
-                TypedAssetPtr::Graphic(gfx_ptr) => {
+                AssetPtr::Graphic(gfx_ptr) => {
                     if let Some(gfx) = state.project.graphics.get(gfx_ptr) { 
                         state.open_graphic = gfx_ptr; 
                         state.selection.clear();
@@ -83,7 +83,7 @@ impl AssetsPanel {
                         }
                     }
                 },
-                TypedAssetPtr::Palette(palette_ptr) => {
+                AssetPtr::Palette(palette_ptr) => {
                     if let Some(_) = state.project.palettes.get(palette_ptr) {
                         state.open_palette = palette_ptr;
                     }
@@ -94,39 +94,41 @@ impl AssetsPanel {
 
         if let Some(asset) = delete {
             if let Some(acts) = match asset {
-                TypedAssetPtr::Folder(folder) => Folder::asset_delete(&mut state.project, folder),
-                TypedAssetPtr::Graphic(graphic) => Graphic::asset_delete(&mut state.project, graphic),
-                TypedAssetPtr::Palette(palette) => Palette::asset_delete(&mut state.project, palette),
-                TypedAssetPtr::Audio(_) => todo!(),
+                AssetPtr::Folder(folder) => Folder::asset_delete(&mut state.project, folder),
+                AssetPtr::Graphic(graphic) => Graphic::asset_delete(&mut state.project, graphic),
+                AssetPtr::Palette(palette) => Palette::asset_delete(&mut state.project, palette),
+                AssetPtr::Audio(_) => todo!(),
             } {
                 state.actions.add(Action::from_list(acts));
             }
         }
 
         if rename {
-            let (asset, name) = std::mem::replace(&mut self.editing_name, None).unwrap();
-            if let Some(act) = match asset {
-                TypedAssetPtr::Folder(folder) => Folder::rename(&mut state.project, folder, name),
-                TypedAssetPtr::Graphic(graphic) => Graphic::rename(&mut state.project, graphic, name),
-                TypedAssetPtr::Palette(palette) => Palette::rename(&mut state.project, palette, name),
-                TypedAssetPtr::Audio(_) => todo!(),
-            } {
-                state.actions.add(Action::from_single(act));
+            let (asset, folder, name) = std::mem::replace(&mut self.editing_name, None).unwrap();
+            if !name.is_empty() {
+                if let Some(act) = match asset {
+                    AssetPtr::Folder(folder) => Folder::rename(&mut state.project, folder, name),
+                    AssetPtr::Graphic(graphic) => Graphic::rename(&mut state.project, graphic, name),
+                    AssetPtr::Palette(palette) => Palette::rename(&mut state.project, palette, name),
+                    AssetPtr::Audio(audio) => AudioFile::rename(&mut state.project, audio, folder, name),
+                } {
+                    state.actions.add(Action::from_single(act));
+                }
             }
         }
 
         if let Some((folder, asset, from_folder)) = asset_transfer {
             if let Some(acts) = match asset {
-                TypedAssetPtr::Graphic(gfx) => {
+                AssetPtr::Graphic(gfx) => {
                     Graphic::asset_transfer(&mut state.project, gfx, folder) 
                 },
-                TypedAssetPtr::Palette(palette) => {
+                AssetPtr::Palette(palette) => {
                     Palette::asset_transfer(&mut state.project, palette, folder)
                 },
-                TypedAssetPtr::Folder(subfolder) => {
+                AssetPtr::Folder(subfolder) => {
                     Folder::asset_transfer(&mut state.project, subfolder, folder) 
                 },
-                TypedAssetPtr::Audio(audio) => {
+                AssetPtr::Audio(audio) => {
                     AudioFile::transfer(&mut state.project, audio, from_folder, folder).map(|act| vec![act])
                 }
             } {
@@ -135,41 +137,67 @@ impl AssetsPanel {
         }
     }
 
-    fn render_asset<T, F>(&mut self, ui: &mut egui::Ui, state: &EditorState, obj: &ObjBox<T>, folder: ObjPtr<Folder>, open: &mut Option<TypedAssetPtr>, delete: &mut Option<TypedAssetPtr>, rename: &mut bool, context_menu: F) where T: Asset, F: FnOnce(&mut egui::Ui) {
-        if self.editing_name.is_none() || T::make_typed_asset_ptr(obj.make_ptr()) != self.editing_name.as_ref().unwrap().0 {
-            let gfx_text = format!("{} {}", T::icon(), obj.get(&state.project).name().as_str());
-            let resp = draggable_label(ui, gfx_text.as_str(), (T::make_typed_asset_ptr(obj.make_ptr()), folder));
+    fn begin_rename(&mut self, asset: AssetPtr, folder: ObjPtr<Folder>, name: String) {
+        self.editing_name = Some((asset, folder, name.clone()));
+    }
+
+    fn render_asset<T, F>(&mut self, ui: &mut egui::Ui, state: &EditorState, obj: &ObjBox<T>, folder: ObjPtr<Folder>, open: &mut Option<AssetPtr>, delete: &mut Option<AssetPtr>, rename: &mut bool, context_menu: F) where T: Asset, F: FnOnce(&mut egui::Ui) {
+        if self.editing_name.is_none() || T::make_asset_ptr(obj.make_ptr()) != self.editing_name.as_ref().unwrap().0 {
+            let asset_text = format!("{} {}", T::icon(), obj.get(&state.project).name().as_str());
+            let resp = draggable_label(ui, asset_text.as_str(), (T::make_asset_ptr(obj.make_ptr()), folder));
             if resp.double_clicked() {
-                *open = Some(T::make_typed_asset_ptr(obj.make_ptr()));
+                *open = Some(T::make_asset_ptr(obj.make_ptr()));
             }
             resp.context_menu(|ui| {
                 context_menu(ui);
                 if ui.button("Rename").clicked() {
-                    self.editing_name = Some((T::make_typed_asset_ptr(obj.make_ptr()), obj.get(&state.project).name().clone()));
+                    self.begin_rename(T::make_asset_ptr(obj.make_ptr()), folder, obj.get(&state.project).name().clone());
                     ui.close_menu();
                 }
                 if ui.button("Delete").clicked() {
-                    *delete = Some(T::make_typed_asset_ptr(obj.make_ptr()));
+                    *delete = Some(T::make_asset_ptr(obj.make_ptr()));
                     ui.close_menu();
                 }
             });
         } else {
-            let (_, name) = self.editing_name.as_mut().unwrap();
+            let (_, _, name) = self.editing_name.as_mut().unwrap();
             if ui.text_edit_singleline(name).lost_focus() {
                 *rename = true;
             }
         }
     }
 
+    fn render_file_asset<T>(&mut self, ui: &mut egui::Ui, file: &FilePtr<T>, folder: ObjPtr<Folder>, delete: &mut Option<AssetPtr>, rename: &mut bool) where T: FileType {
+        if self.editing_name.is_none() || T::make_asset_ptr(file) != self.editing_name.as_ref().unwrap().0 {
+            let asset_text = format!("{} {}", T::icon(), file.name());
+            let resp = draggable_label(ui, asset_text.as_str(), (T::make_asset_ptr(file), folder));
+            resp.context_menu(|ui| {
+                if ui.button("Rename").clicked() {
+                    self.begin_rename(T::make_asset_ptr(file), folder, file.name().to_owned());
+                    ui.close_menu();
+                }
+                if ui.button("Delete").clicked() {
+                    *delete = Some(T::make_asset_ptr(file));
+                    ui.close_menu();
+                }
+            });
+        } else {
+            let (_, _, name) = self.editing_name.as_mut().unwrap();
+            if ui.text_edit_singleline(name).lost_focus() {
+                *rename = true;
+            }
+        }
+    } 
+
     fn render_folder_contents(
             &mut self,
             ui: &mut egui::Ui, state: &EditorState,
             systems: &mut EditorSystems,
             folder_ptr: ObjPtr<Folder>,
-            open: &mut Option<TypedAssetPtr>,
-            delete: &mut Option<TypedAssetPtr>,
+            open: &mut Option<AssetPtr>,
+            delete: &mut Option<AssetPtr>,
             rename: &mut bool,
-            asset_transfer: &mut Option<(ObjPtr<Folder>, TypedAssetPtr, ObjPtr<Folder>)>) -> Option<bool> {
+            asset_transfer: &mut Option<(ObjPtr<Folder>, AssetPtr, ObjPtr<Folder>)>) -> Option<bool> {
         let folder = state.project.folders.get(folder_ptr)?;
 
         let mut inner_hovered = false;
@@ -194,8 +222,7 @@ impl AssetsPanel {
             self.render_asset(ui, state, palette, folder_ptr, open, delete, rename, |_| {});
         }
         for audio in &folder.audios {
-            let audio_text = format!("{} {}", egui_phosphor::regular::SPEAKER_HIGH, audio.name());
-            let _resp = draggable_label(ui, &audio_text, (TypedAssetPtr::Audio(audio.clone()), folder_ptr));
+            self.render_file_asset(ui, audio, folder_ptr, delete, rename);
         }
         Some(inner_hovered)
     }
@@ -206,24 +233,24 @@ impl AssetsPanel {
         systems: &mut EditorSystems,
         superfolder: ObjPtr<Folder>,
         folder: &ObjBox<Folder>,
-        open: &mut Option<TypedAssetPtr>,
-        delete: &mut Option<TypedAssetPtr>,
+        open: &mut Option<AssetPtr>,
+        delete: &mut Option<AssetPtr>,
         rename: &mut bool, 
-        asset_transfer: &mut Option<(ObjPtr<Folder>, TypedAssetPtr, ObjPtr<Folder>)>) -> Option<bool> {
+        asset_transfer: &mut Option<(ObjPtr<Folder>, AssetPtr, ObjPtr<Folder>)>) -> Option<bool> {
 
-        if !self.editing_name.is_none() && self.editing_name.as_ref().unwrap().0 == Folder::make_typed_asset_ptr(folder.make_ptr()) {
-            if ui.text_edit_singleline(&mut self.editing_name.as_mut().unwrap().1).lost_focus() {
+        if !self.editing_name.is_none() && self.editing_name.as_ref().unwrap().0 == Folder::make_asset_ptr(folder.make_ptr()) {
+            if ui.text_edit_singleline(&mut self.editing_name.as_mut().unwrap().2).lost_focus() {
                 *rename = true;
             }
             return Some(false);
         }
 
         let is_anything_being_dragged = egui::DragAndDrop::has_any_payload(ui.ctx());
-        let can_accept_what_is_being_dragged = egui::DragAndDrop::has_payload_of_type::<(TypedAssetPtr, ObjPtr<Folder>)>(ui.ctx());
+        let can_accept_what_is_being_dragged = egui::DragAndDrop::has_payload_of_type::<(AssetPtr, ObjPtr<Folder>)>(ui.ctx());
 
         let mut frame = egui::Frame::default().begin(ui);
         let mut inner_hovered = false;
-        let folder_resp = draggable_widget(&mut frame.content_ui, (TypedAssetPtr::Folder(folder.make_ptr()), superfolder), |ui| {
+        let folder_resp = draggable_widget(&mut frame.content_ui, (AssetPtr::Folder(folder.make_ptr()), superfolder), |ui| {
             let resp = ui.collapsing(folder.get(&state.project).name.as_str(), |ui| {
                 inner_hovered |= self.render_folder_contents(ui, state, systems, folder.make_ptr(), open, delete, rename, asset_transfer).unwrap_or(false);
             }).header_response;
@@ -247,17 +274,17 @@ impl AssetsPanel {
 
         folder_resp.context_menu(|ui| {
             if ui.button("Rename").clicked() {
-                self.editing_name = Some((Folder::make_typed_asset_ptr(folder.make_ptr()), folder.get(&state.project).name.clone())); 
+                self.begin_rename(Folder::make_asset_ptr(folder.make_ptr()), superfolder, folder.get(&state.project).name.clone());
                 ui.close_menu();
             }
             if ui.button("Delete").clicked() {
-                *delete = Some(Folder::make_typed_asset_ptr(folder.make_ptr())); 
+                *delete = Some(Folder::make_asset_ptr(folder.make_ptr())); 
                 ui.close_menu();
             }
         });
 
         if !inner_hovered {
-            if let Some(payload) = response.dnd_release_payload::<(TypedAssetPtr, ObjPtr<Folder>)>() {
+            if let Some(payload) = response.dnd_release_payload::<(AssetPtr, ObjPtr<Folder>)>() {
                 let (asset, from_folder) = payload.as_ref().clone();
                 *asset_transfer = Some((folder.make_ptr(), asset, from_folder));
             }

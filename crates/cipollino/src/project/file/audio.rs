@@ -1,9 +1,9 @@
 
 use std::{fs::File, path::PathBuf, sync::Arc};
 
-use crate::audio::generate::MAX_AUDIO_CHANNELS;
+use crate::{audio::generate::MAX_AUDIO_CHANNELS, project::AssetPtr};
 
-use super::FileType;
+use super::{FilePtr, FileType};
 
 pub const SAMPLES_PER_VOLUME_SUM: usize = 100;
 
@@ -21,6 +21,14 @@ impl FileType for AudioFile {
 
     fn list_in_folder_mut(folder: &mut crate::project::folder::Folder) -> &mut Vec<super::FilePtr<Self>> {
         &mut folder.audios
+    }
+
+    fn make_asset_ptr(ptr: &FilePtr<Self>) -> AssetPtr {
+        AssetPtr::Audio(ptr.clone())
+    }
+
+    fn icon() -> &'static str {
+        egui_phosphor::regular::SPEAKER_HIGH
     }
 
 }

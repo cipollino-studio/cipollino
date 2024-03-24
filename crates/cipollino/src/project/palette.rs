@@ -1,6 +1,6 @@
 
 use project_macros::{ObjClone, ObjSerialize, Object};
-use super::{action::ObjAction, folder::Folder, obj::{asset::Asset, child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjPtrAny, ObjSerialize}, Project, TypedAssetPtr};
+use super::{action::ObjAction, folder::Folder, obj::{asset::Asset, child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjPtrAny, ObjSerialize}, Project, AssetPtr};
 
 #[derive(Object, Clone, ObjClone, ObjSerialize)]
 pub struct PaletteColor {
@@ -105,8 +105,8 @@ impl Asset for Palette {
         &mut self.folder 
     }
     
-    fn make_typed_asset_ptr(ptr: ObjPtr<Self>) -> TypedAssetPtr {
-        TypedAssetPtr::Palette(ptr)
+    fn make_asset_ptr(ptr: ObjPtr<Self>) -> AssetPtr {
+        AssetPtr::Palette(ptr)
     }
 
     fn icon() -> &'static str {
