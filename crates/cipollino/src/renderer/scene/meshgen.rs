@@ -131,17 +131,16 @@ fn filled_mesh(project: &Project, stroke_ptr: ObjPtr<Stroke>, gl: &Arc<glow::Con
 }
 
 pub fn get_mesh<'a>(project: &'a mut Project, stroke_ptr: ObjPtr<Stroke>, gl: &Arc<glow::Context>) -> Option<&'a Mesh> {
-    let stroke = project.strokes.get(stroke_ptr)?;
-    if stroke.mesh.need_remesh {
+    if project.remeshes_needed.contains(&stroke_ptr) || !project.meshes.contains_key(&stroke_ptr) {
+        let stroke = project.strokes.get(stroke_ptr)?;
         let stroke_filled = stroke.filled;
         let mesh = if stroke_filled { filled_mesh(project, stroke_ptr, gl) } else { unfilled_mesh(project, stroke_ptr, gl) };
-        let stroke = project.strokes.get_mut(stroke_ptr)?;
-        if let Some(prev_mesh) = stroke.mesh.mesh.as_ref() {
-            prev_mesh.delete(gl);
+        if let Some(mesh) = mesh {
+            if let Some(prev_mesh) = project.meshes.insert(stroke_ptr, mesh) {
+                prev_mesh.delete(gl);
+            }
         }
-        stroke.mesh.mesh = mesh;
-        stroke.mesh.need_remesh = false;
+        project.remeshes_needed.remove(&stroke_ptr);
     }
-    let stroke = project.strokes.get(stroke_ptr)?;
-    stroke.mesh.mesh.as_ref()
+    project.meshes.get(&stroke_ptr)
 }

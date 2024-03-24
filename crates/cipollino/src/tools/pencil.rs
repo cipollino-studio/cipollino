@@ -3,7 +3,7 @@ use std::{mem, sync::Arc};
 
 use glam::vec2;
 
-use crate::{editor::state::EditorState, panels::scene::ScenePanel, project::{action::{Action, ObjAction}, frame::Frame, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokeMesh, StrokePoint}}, util::curve};
+use crate::{editor::state::EditorState, panels::scene::ScenePanel, project::{action::{Action, ObjAction}, frame::Frame, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokePoint}}, util::curve};
 
 use super::{active_frame, Tool};
 
@@ -72,8 +72,7 @@ impl Tool for Pencil {
             points: pts,
             color: state.color,
             r: state.stroke_r,
-            filled: state.stroke_filled,
-            mesh: StrokeMesh::new()
+            filled: state.stroke_filled
         }) {
             self.curr_stroke_frame = Some((stroke, frame));
             self.stroke_act = Some(act);
@@ -112,8 +111,7 @@ impl Tool for Pencil {
                     color: state.color,
                     r: state.stroke_r,
                     filled: state.stroke_filled,
-                    points: vec![stroke_points],
-                    mesh: StrokeMesh::new()
+                    points: vec![stroke_points]
                 }) {
                     mem::replace(&mut self.stroke_act, Some(act)).unwrap().undo(&mut state.project);
                     Stroke::delete(&mut state.project, stroke);

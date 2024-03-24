@@ -1,5 +1,6 @@
 
 use std::{collections::HashMap, marker::PhantomData, sync::{Arc, Mutex}};
+use std::hash::Hash;
 
 use super::Project;
 
@@ -177,6 +178,14 @@ impl<T: Obj> Default for ObjPtr<T> {
         Self::null() 
     }
     
+}
+
+impl<T: Obj> Hash for ObjPtr<T> {
+
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.key.hash(state);
+    }
+
 }
 
 #[derive(Clone)]

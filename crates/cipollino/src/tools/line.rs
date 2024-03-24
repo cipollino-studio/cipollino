@@ -4,7 +4,7 @@ use std::{mem, sync::Arc};
 
 use glam::{vec2, Vec2};
 
-use crate::{editor::state::EditorState, panels::scene::ScenePanel, project::{action::{Action, ObjAction}, frame::Frame, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokeMesh, StrokePoint}}};
+use crate::{editor::state::EditorState, panels::scene::ScenePanel, project::{action::{Action, ObjAction}, frame::Frame, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokePoint}}};
 
 use super::{active_frame, Tool};
 
@@ -72,8 +72,7 @@ impl Tool for Line {
             points: pts,
             color: state.color,
             r: state.stroke_r,
-            filled: state.stroke_filled,
-            mesh: StrokeMesh::new()
+            filled: state.stroke_filled
         }) {
             self.curr_stroke_frame = Some((stroke, frame));
             self.stroke_act = Some(act);
@@ -92,8 +91,7 @@ impl Tool for Line {
                 points: vec![vec![
                     StrokePoint { a: self.first_point - dir, pt: self.first_point, b: self.first_point + dir },
                     StrokePoint { a: mouse_pos - dir, pt: mouse_pos, b: mouse_pos + dir }
-                ]],
-                mesh: StrokeMesh::new()
+                ]]
             }) {
                 mem::replace(&mut self.stroke_act, Some(act)).unwrap().undo(&mut state.project);
                 Stroke::delete(&mut state.project, stroke);

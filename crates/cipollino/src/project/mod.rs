@@ -11,11 +11,11 @@ pub mod palette;
 pub mod sound_instance;
 pub mod file;
 
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::{HashMap, HashSet}, path::PathBuf};
 
 use serde_json::json;
 
-use crate::util::fs::write_json_file;
+use crate::{renderer::mesh::Mesh, util::fs::write_json_file};
 
 use self::{file::{audio::AudioFile, FilePtr, FilePtrAny}, folder::Folder, frame::Frame, graphic::Graphic, layer::Layer, obj::{ObjBox, ObjList, ObjPtr}, palette::{Palette, PaletteColor}, sound_instance::SoundInstance, stroke::Stroke};
 
@@ -41,6 +41,10 @@ pub struct Project {
 
     // Path to the proj.cip file at the root of the project folder
     pub save_path: PathBuf,
+
+    // Stroke meshes are stored separately from the strokes to avoid triggering an autosave when a remesh happens
+    pub meshes: HashMap<ObjPtr<Stroke>, Mesh>,
+    pub remeshes_needed: HashSet<ObjPtr<Stroke>>
 }
 
 impl Project {
@@ -69,11 +73,18 @@ impl Project {
             palettes: ObjList::new(),
             palette_colors: ObjList::new(),
             sound_instances: ObjList::new(),
+
             audio_files: HashMap::new(),
+
             path_file_ptr: HashMap::new(),
             hash_file_ptr: HashMap::new(),
+
             root_folder: root,
+
             save_path: path,
+
+            meshes: HashMap::new(),
+            remeshes_needed: HashSet::new()
         }
     }
 
