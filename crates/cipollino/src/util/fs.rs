@@ -15,6 +15,18 @@ pub fn write_json_file(path: &PathBuf, data: serde_json::Value) -> Option<()> {
     Some(())
 }
 
+pub fn read_bson_file(path: &PathBuf) -> Option<bson::Bson> {
+    let file = fs::File::open(path).ok()?;
+    bson::from_reader(file).ok()
+}
+
+pub fn write_bson_file(path: &PathBuf, data: bson::Bson) -> Option<()> {
+    let file = fs::File::create(path).ok()?;
+    let doc = data.as_document().expect("cannot serialize non-document");
+    doc.to_writer(file).ok()?;
+    Some(())
+}
+
 pub fn remove(path: &PathBuf) {
     if path.is_dir() {
         let _ = fs::remove_dir_all(path);

@@ -3,7 +3,7 @@ use std::{fs, path::PathBuf};
 
 use serde_json::json;
 
-use crate::{project::{graphic::Graphic, obj::ObjBox}, util::fs::{read_json_file, write_json_file}};
+use crate::{project::{graphic::Graphic, obj::ObjBox}, util::fs::{read_bson_file, read_json_file, write_bson_file, write_json_file}};
 use sha2::Digest;
 
 use super::{file::{audio::AudioFile, FilePtr, FileType}, folder::Folder, obj::{asset::Asset, ObjPtr, ObjSerialize}, palette::Palette, Project};
@@ -35,12 +35,12 @@ impl Project {
             for gfx_box in &folder.graphics {
                 let gfx = gfx_box.get(self);
                 let data = gfx_box.obj_serialize(self);
-                write_json_file(&path.with_file_name(format!("{}.{}", gfx.name, gfx.extension())), data);
+                write_bson_file(&path.with_file_name(format!("{}.{}", gfx.name, gfx.extension())), data);
             }
             for palette_box in &folder.palettes {
                 let palette = palette_box.get(self);
                 let data = palette_box.obj_serialize(self);
-                write_json_file(&path.with_file_name(format!("{}.{}", palette.name(), palette.extension())), data);
+                write_bson_file(&path.with_file_name(format!("{}.{}", palette.name(), palette.extension())), data);
             }
         }
         for (ptr, path) in subfolders {
@@ -94,7 +94,7 @@ impl Project {
         if let Some(ext) = path.extension() {
             match ext.to_str().unwrap() {
                 "cipgfx" => {
-                    if let Some(data) = read_json_file(&path) { 
+                    if let Some(data) = read_bson_file(&path) { 
                         if let Some(gfx) = ObjBox::<Graphic>::obj_deserialize(self, &data, folder_ptr.into()) {
                             gfx.get_mut(self).name = path.file_stem().unwrap().to_str().unwrap().to_owned();
                             let folder = self.folders.get_mut(folder_ptr).unwrap();
@@ -103,7 +103,7 @@ impl Project {
                     }
                 },
                 "cippal" => {
-                    if let Some(data) = read_json_file(&path) { 
+                    if let Some(data) = read_bson_file(&path) { 
                         if let Some(palette) = ObjBox::<Palette>::obj_deserialize(self, &data, folder_ptr.into()) {
                             let name = path.file_stem().unwrap().to_str().unwrap().to_owned();
                             palette.get_mut(self).name = name; 

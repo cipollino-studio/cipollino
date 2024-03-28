@@ -228,8 +228,8 @@ pub trait ObjClone : Clone {
 
 pub trait ObjSerialize : Sized {
 
-    fn obj_serialize(&self, project: &Project) -> serde_json::Value;
-    fn obj_deserialize(project: &mut Project, data: &serde_json::Value, parent: ObjPtrAny) -> Option<Self>;
+    fn obj_serialize(&self, project: &Project) -> bson::Bson;
+    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny) -> Option<Self>;
 
 }
 

@@ -31,6 +31,7 @@ wav = "1.0.0"
 ffmpeg = {git = "https://github.com/meh/rust-ffmpeg.git", rev = "7c354aa", features = ["build", "build-license-gpl", "build-lib-x264"]}
 unique-type-id = "1.3.0"
 egui_extras = {version = "*", features = ["all_loaders"]}
+bson = "2.9.0"
 
 [build-dependencies]
 cc = "1.0"

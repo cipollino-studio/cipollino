@@ -1,9 +1,7 @@
 
 use std::{hash::Hash, marker::PhantomData, path::PathBuf};
 
-use serde_json::json;
-
-use crate::util::next_unique_name;
+use crate::util::{bson::bson_get, next_unique_name};
 
 use super::{action::ObjAction, folder::Folder, obj::{obj_clone_impls::PrimitiveObjClone, ObjClone, ObjPtr, ObjSerialize}, AssetPtr, Project};
 
@@ -242,17 +240,17 @@ impl PrimitiveObjClone for [u8; 8] {}
 
 impl<T: FileType> ObjSerialize for FilePtr<T> {
 
-    fn obj_serialize(&self, project: &Project) -> serde_json::Value {
+    fn obj_serialize(&self, project: &Project) -> bson::Bson {
         let ptr = self.lookup(project);
-        json!({
-            "filepath": ptr.ptr.path,
-            "hash": ptr.ptr.hash
+        bson::bson! ({
+            "filepath": ptr.ptr.path.to_str().unwrap(),
+            "hash": bson::to_bson(&ptr.ptr.hash).expect("serializing u64 should not fail")
         })
     }
 
-    fn obj_deserialize(project: &mut Project, data: &serde_json::Value, parent: super::obj::ObjPtrAny) -> Option<Self> {
-        let path = PathBuf::obj_deserialize(project, data.get("filepath")?, parent)?;
-        let hash = data.get("hash")?.as_u64()?; 
+    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: super::obj::ObjPtrAny) -> Option<Self> {
+        let path = PathBuf::obj_deserialize(project, bson_get(&data, "filepath")?, parent)?;
+        let hash = bson::from_bson(bson_get(data, "hash")?.clone()).ok()?;
         Some(Self {
             ptr: FilePtrAny::new(path, hash),
             _marker: PhantomData
