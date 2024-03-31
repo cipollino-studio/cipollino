@@ -167,7 +167,15 @@ impl Project {
 
     fn load_asset<T: Asset + ObjSerialize>(&mut self, path: PathBuf, folder: ObjPtr<Folder>) -> Option<()> {
         let mut asset_file = AssetFile::open(path.clone()).ok()?;
-        T::get_list_mut(self).obj_file_ptrs.borrow_mut().insert(ObjPtr::from_key(asset_file.root_obj_key), asset_file.root_obj_ptr);
+
+        let root_obj_ptr = if T::get_list(self).get(ObjPtr::from_key(asset_file.root_obj_key)).is_some() {
+            T::get_list_mut(self).next_ptr()
+        } else {
+            ObjPtr::from_key(asset_file.root_obj_key)
+        };
+        asset_file.set_root_obj_key(root_obj_ptr.key).ok()?;
+        
+        T::get_list_mut(self).obj_file_ptrs.borrow_mut().insert(root_obj_ptr, asset_file.root_obj_ptr);
         let obj_box = ObjBox::<T>::obj_deserialize(self, &bson!({
             "key": u64_to_bson(asset_file.root_obj_key),
             "ptr": u64_to_bson(asset_file.root_obj_ptr) 

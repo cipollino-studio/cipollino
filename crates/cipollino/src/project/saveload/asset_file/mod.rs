@@ -100,4 +100,9 @@ impl AssetFile {
         self.free_page_chain(first_page_ptr)
     }
 
+    pub fn set_root_obj_key(&mut self, key: u64) -> Result<(), std::io::Error> {
+        self.root_obj_key = key;
+        self.write_u64_to(ROOT_OBJ_KEY, key)
+    }
+
 }
