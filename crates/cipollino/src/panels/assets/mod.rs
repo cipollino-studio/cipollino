@@ -1,5 +1,5 @@
 
-use crate::{editor::{state::EditorState, EditorSystems}, project::{action::Action, file::{audio::AudioFile, FilePtr, FileType}, folder::Folder, graphic::Graphic, obj::{asset::Asset, ObjBox, ObjPtr}, palette::Palette}, util::ui::dnd::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_label, draggable_widget}};
+use crate::{editor::{state::EditorState, EditorSystems}, project::{action::Action, file::{audio::AudioFile, FilePtr, FileType}, folder::Folder, graphic::Graphic, obj::{asset::Asset, ObjBox, ObjPtr}, palette::Palette, Project}, util::ui::dnd::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_label, draggable_widget}};
 use crate::project::AssetPtr;
 
 use self::graphic_dialogs::{GraphicPropertiesDialog, NewGraphicDialog};
@@ -189,6 +189,22 @@ impl AssetsPanel {
         }
     } 
 
+    fn sort_asset_list<'a, T: Asset>(project: &'a Project, assets: &'a Vec<ObjBox<T>>) -> Vec<&'a ObjBox<T>> {
+        let mut res = assets.iter().map(|elem| elem).collect::<Vec<&'a ObjBox<T>>>();
+        res.sort_by(|a, b| {
+            a.get(project).name().to_lowercase().cmp(&b.get(project).name().to_lowercase())
+        });
+        res
+    }
+
+    fn sort_file_asset_list<'a, T: FileType>(file_assets: &'a Vec<FilePtr<T>>) -> Vec<&'a FilePtr<T>> {
+        let mut res = file_assets.iter().map(|elem| elem).collect::<Vec<&'a FilePtr<T>>>();
+        res.sort_by(|a, b| {
+            a.name().to_lowercase().cmp(&b.name().to_lowercase())
+        });
+        res
+    }
+
     fn render_folder_contents(
             &mut self,
             ui: &mut egui::Ui, state: &EditorState,
@@ -201,11 +217,11 @@ impl AssetsPanel {
         let folder = state.project.folders.get(folder_ptr)?;
 
         let mut inner_hovered = false;
-        for subfolder in &folder.folders {
+        for subfolder in Self::sort_asset_list(&state.project, &folder.folders) {
             inner_hovered |= self.render_subfolder(ui, state, systems, folder_ptr, subfolder, open, delete, rename, asset_transfer)?;
         }
 
-        for gfx in &folder.graphics {
+        for gfx in Self::sort_asset_list(&state.project, &folder.graphics) {
             let mut open_properties = false;
             self.render_asset(ui, state, gfx, folder_ptr, open, delete, rename, |ui| {
                 if ui.button("Properties").clicked() {
@@ -218,10 +234,10 @@ impl AssetsPanel {
                 systems.dialog.open_dialog(GraphicPropertiesDialog::new(gfx.make_ptr())); 
             }
         }
-        for palette in &folder.palettes {
+        for palette in Self::sort_asset_list(&state.project, &folder.palettes) {
             self.render_asset(ui, state, palette, folder_ptr, open, delete, rename, |_| {});
         }
-        for audio in &folder.audios {
+        for audio in Self::sort_file_asset_list(&folder.audios) { 
             self.render_file_asset(ui, audio, folder_ptr, delete, rename);
         }
         Some(inner_hovered)
