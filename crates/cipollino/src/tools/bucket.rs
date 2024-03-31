@@ -2,7 +2,7 @@
 use std::{sync::Arc, collections::{VecDeque, HashSet, HashMap}};
 
 use glam::{Vec2, vec2};
-use crate::{editor::state::EditorState, panels::scene::ScenePanel, project::{action::Action, obj::child_obj::ChildObj, stroke::{Stroke, StrokePoint}}, util::{curve::{bezier_bounding_box, bezier_dsample, bezier_sample, bezier_to_discrete_t_vals, fit_curve}, geo::{segment_aabb_intersect, segment_intersect}}};
+use crate::{editor::state::EditorState, panels::scene::ScenePanel, project::{action::Action, obj::child_obj::ChildObj, stroke::{Stroke, StrokePoint}}, util::{curve::{bezier_bounding_box, bezier_dsample, bezier_sample, bezier_to_discrete_t_vals, fit_curve}, geo::segment_intersect}};
 
 use super::{Tool, active_frame};
 
@@ -18,6 +18,14 @@ impl Bucket {
         }
     }
 
+}
+
+#[derive(Clone, Copy)]
+struct BoundarySegment {
+    a: Vec2,
+    b: Vec2,
+    src_a: Vec2,
+    src_b: Vec2
 }
 
 impl Tool for Bucket {
@@ -52,6 +60,94 @@ impl Tool for Bucket {
             Vec2::new((x as f32) * grid_size, (y as f32) * grid_size)
         };
 
+        // Step 0: Precompute boundary line segments
+        let visible_strokes = state.visible_strokes(); 
+        let mut boundary_segments = HashMap::new();
+        let chunk_size = 20.0;
+
+        let mut add_boundary_segment = |segment: BoundarySegment| {
+            let left = segment.a.x.min(segment.b.x);
+            let left_chunk = (left / chunk_size).floor() as i32 - 1;
+            let right = segment.a.x.max(segment.b.x);
+            let right_chunk = (right / chunk_size).floor() as i32 + 1;
+            let bottom = segment.a.y.min(segment.b.y);
+            let bottom_chunk = (bottom / chunk_size).floor() as i32 - 1;
+            let top = segment.a.y.max(segment.b.y);
+            let top_chunk = (top / chunk_size).floor() as i32 + 1;
+
+            for x in left_chunk..=right_chunk {
+                for y in bottom_chunk..=top_chunk {
+                    let chunk = (x, y);
+                    if !boundary_segments.contains_key(&chunk) {
+                        boundary_segments.insert(chunk, Vec::new());
+                    }
+                    boundary_segments.get_mut(&chunk).unwrap().push(segment);
+                }
+            }
+        };
+
+        for stroke in visible_strokes {
+            if let Some(stroke) = state.project.strokes.get(stroke) {
+                let r = if !stroke.filled { (stroke.r - 0.4).max(0.0) } else { 0.0 };
+                for (p0, p1) in stroke.iter_point_pairs() {
+                    let (mut bb_min, mut bb_max) = bezier_bounding_box(p0.pt, p0.b, p1.a, p1.pt);
+                    bb_min -= Vec2::splat(r * 2.0);
+                    bb_max += Vec2::splat(r * 2.0);
+
+                    let mut pts = Vec::new();
+                    let mut top_pts = Vec::new();
+                    let mut btm_pts = Vec::new();
+                    for t in bezier_to_discrete_t_vals(p0.pt, p0.b, p1.a, p1.pt, 10, true) {
+                        let pt = bezier_sample(t, p0.pt, p0.b, p1.a, p1.pt);
+                        let tang = bezier_dsample(t, p0.pt, p0.b, p1.a, p1.pt).normalize();
+                        let norm = vec2(tang.y, -tang.x);
+                        pts.push(pt);
+                        top_pts.push(pt + norm * r); 
+                        btm_pts.push(pt - norm * r); 
+                    }
+
+                    for i in 0..(top_pts.len() - 1) {
+                        add_boundary_segment(BoundarySegment {
+                            a: top_pts[i],
+                            b: top_pts[i + 1],
+                            src_a: pts[i],
+                            src_b: pts[i + 1]
+                        });
+                        add_boundary_segment(BoundarySegment {
+                            a: btm_pts[i],
+                            b: btm_pts[i + 1],
+                            src_a: pts[i],
+                            src_b: pts[i + 1]
+                        });
+                    }
+                }
+
+                if !stroke.filled {
+                    let mut add_end_cap = |p0: Vec2, p1: Vec2| {
+                        let tang = (p1 - p0).normalize() * r;
+                        let norm = vec2(-tang.y, tang.x);
+                        for i in 0..10 {
+                            let a0 = i as f32 / 10.0 * std::f32::consts::PI;
+                            let a1 = (i + 1) as f32 / 10.0 * std::f32::consts::PI;
+                            add_boundary_segment(BoundarySegment {
+                                a: p1 + a0.cos() * norm - a0.sin() * tang,
+                                b: p1 + a1.cos() * norm - a1.sin() * tang,
+                                src_a: p1,
+                                src_b: p1
+                            });
+                        }
+                    };
+
+                    if !stroke.points.is_empty() {
+                        let pt = stroke.points[0].first().unwrap(); 
+                        add_end_cap(pt.a, pt.pt);
+                        let pt = stroke.points[0].last().unwrap(); 
+                        add_end_cap(pt.b, pt.pt);
+                    }
+                }
+            }
+        }
+
         // Step 1: Floodfill using BFS to find the boundary points
         let mut bfs = VecDeque::new();
         let mut vis = HashSet::new();
@@ -64,7 +160,6 @@ impl Tool for Bucket {
             [-1,  0],
             [ 0, -1],
         ];
-        let visible_strokes = state.visible_strokes(); 
         let mut boundary = HashMap::new(); 
         while let Some(curr) = bfs.pop_front() {
             let curr_unsnapped = unsnap_coords(curr);
@@ -78,77 +173,26 @@ impl Tool for Bucket {
                     boundary.insert(next, next_unsnapped);
                     continue 'offset;
                 }
-                for stroke in &visible_strokes {
-                    if let Some(stroke) = state.project.strokes.get(*stroke) {
-                        let r = if !stroke.filled { (stroke.r - 0.4).max(0.0) } else { 0.0 };
-                        'point_pairs: for (p0, p1) in stroke.iter_point_pairs() {
 
-                            let (mut bb_min, mut bb_max) = bezier_bounding_box(p0.pt, p0.b, p1.a, p1.pt);
-                            bb_min -= Vec2::splat(r * 2.0);
-                            bb_max += Vec2::splat(r * 2.0);
-                            if !segment_aabb_intersect(curr_unsnapped, next_unsnapped, bb_min, bb_max) {
-                                continue 'point_pairs;
-                            }
-
-                            let mut top_pts = vec![];
-                            let mut btm_pts = vec![];
-                            for t in bezier_to_discrete_t_vals(p0.pt, p0.b, p1.a, p1.pt, 10, true) {
-                                let pt = bezier_sample(t, p0.pt, p0.b, p1.a, p1.pt);
-                                let tang = bezier_dsample(t, p0.pt, p0.b, p1.a, p1.pt).normalize();
-                                let norm = vec2(tang.y, -tang.x);
-                                top_pts.push(pt + norm * r); 
-                                btm_pts.push(pt - norm * r); 
-                            }
-
-                            for pts in top_pts.windows(2) {
-                                if let Some(intersect) = segment_intersect(pts[0], pts[1], curr_unsnapped, next_unsnapped) {
-                                    boundary.insert(next, intersect);
-                                    continue 'offset;
-                                }
-                            }
-                            for pts in btm_pts.windows(2) {
-                                if let Some(intersect) = segment_intersect(pts[0], pts[1], curr_unsnapped, next_unsnapped) {
-                                    boundary.insert(next, intersect);
-                                    continue 'offset;
-                                }
-                            }
-                        }
-
-                        if !stroke.filled {
-                            let mut collide_with_end_cap = |p0: Vec2, p1: Vec2| {
-                                let tang = (p1 - p0).normalize() * r;
-                                let norm = vec2(-tang.y, tang.x);
-                                for i in 0..10 {
-                                    let a0 = i as f32 / 10.0 * std::f32::consts::PI;
-                                    let a1 = (i + 1) as f32 / 10.0 * std::f32::consts::PI;
-                                    let p0 = p1 + a0.cos() * norm - a0.sin() * tang;
-                                    let p1 = p1 + a1.cos() * norm - a1.sin() * tang;
-                                    if let Some(intersect) = segment_intersect(p0, p1, curr_unsnapped, next_unsnapped) {
-                                        boundary.insert(next, intersect);
-                                        return true;
-                                    }
-                                }
-                                return false;
-                            };
-
-                            if !stroke.points.is_empty() {
-                                let pt = stroke.points[0].first().unwrap(); 
-                                if collide_with_end_cap(pt.a, pt.pt) {
-                                    continue 'offset;
-                                }
-                                let pt = stroke.points[0].last().unwrap(); 
-                                if collide_with_end_cap(pt.b, pt.pt) {
-                                    continue 'offset;
-                                }
-                            }
+                let chunk = (
+                    (curr_unsnapped.x / chunk_size).floor() as i32,
+                    (curr_unsnapped.y / chunk_size).floor() as i32
+                ); 
+                if let Some(segments) = boundary_segments.get(&chunk) {
+                    for segment in segments {
+                        if let Some(intersect) = segment_intersect(segment.a, segment.b, curr_unsnapped, next_unsnapped) {
+                            let t = (intersect - segment.a).length() / (segment.b - segment.a).length();
+                            let src_intersect = (1.0 - t) * segment.src_a + t * segment.src_b;
+                            boundary.insert(next, src_intersect);
+                            continue 'offset;
                         }
                     }
                 }
+
                 vis.insert(next);
                 bfs.push_back(next);
             }
         }
-
 
         // Step 2: Eliminate "Tails"
         // We only care about loops, not single lines in the middle of nowhere.
@@ -246,7 +290,13 @@ impl Tool for Bucket {
                     break;
                 }
                 if let Some(pt) = remove_pt(next, &mut boundary, &mut neighbour_cnt, &mut tail_bfs) {
-                    chain.push(pt);
+                    if let Some(prev_pt) = chain.last() {
+                        if (*prev_pt - pt).length() > 0.05 {
+                            chain.push(pt);
+                        }
+                    } else {
+                        chain.push(pt);
+                    }
                     dir = (dir + 5) % 8;
                     curr = next;
                     attempts = 0;
