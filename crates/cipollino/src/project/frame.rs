@@ -1,7 +1,7 @@
 
 use project_macros::{ObjClone, ObjSerialize, Object};
 
-use super::{Project, action::ObjAction, stroke::Stroke, obj::Obj, obj::{ObjBox, ObjList, ObjClone, ObjSerialize, ObjPtrAny}, obj::child_obj::ChildObj, obj::ObjPtr, layer::Layer};
+use super::{action::ObjAction, graphic::Graphic, layer::Layer, obj::{child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjPtrAny, ObjSerialize}, stroke::Stroke, Project};
 
 #[derive(Object, Clone, ObjClone, ObjSerialize)]
 pub struct Frame {
@@ -25,6 +25,11 @@ impl ChildObj for Frame {
 
     fn get_list_in_parent_mut(parent: &mut Self::Parent) -> &mut Vec<ObjBox<Self>> {
         &mut parent.frames
+    }
+
+    type RootAsset = Graphic;
+    fn get_root_asset(project: &Project, frame: ObjPtr<Self>) -> Option<ObjPtr<Self::RootAsset>> {
+        Layer::get_root_asset(project, project.frames.get(frame)?.layer)
     }
 
 }

@@ -89,7 +89,7 @@ impl Project {
     }
 
     pub fn mutated(&self) -> bool {
-        self.folders.mutated || self.graphics.mutated || self.layers.mutated || self.frames.mutated || self.strokes.mutated || self.palettes.mutated || self.palette_colors.mutated || self.sound_instances.mutated
+        self.folders.mutated() || self.graphics.mutated() || self.layers.mutated() || self.frames.mutated() || self.strokes.mutated() || self.palettes.mutated() || self.palette_colors.mutated() || self.sound_instances.mutated()
     }
 
     pub fn garbage_collect_objs(&mut self) {
@@ -98,9 +98,9 @@ impl Project {
         self.layers.garbage_collect_objs();
         self.frames.garbage_collect_objs();
         self.strokes.garbage_collect_objs();
+        self.sound_instances.garbage_collect_objs();
         self.palettes.garbage_collect_objs();
         self.palette_colors.garbage_collect_objs();
-        self.sound_instances.garbage_collect_objs();
     }
 
 }

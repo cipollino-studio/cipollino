@@ -83,7 +83,7 @@ impl Tool for Pencil {
     fn mouse_down(&mut self, mouse_pos: glam::Vec2, state: &mut EditorState, _scene: &mut ScenePanel) {
         state.pause();
 
-        if let Some((stroke, frame)) = self.curr_stroke_frame {
+        if let Some((_stroke, frame)) = self.curr_stroke_frame {
             if self.points.last().map(|prev_pt| (*prev_pt - mouse_pos).length() > 0.001).unwrap_or(true) {
                 self.points.push(mouse_pos);
 
@@ -106,6 +106,7 @@ impl Tool for Pencil {
                     });
                 }
 
+                mem::replace(&mut self.stroke_act, None).unwrap().undo(&mut state.project);
                 if let Some((new_stroke, act)) = Stroke::add(&mut state.project, frame, Stroke {
                     frame: frame,
                     color: state.color,
@@ -113,8 +114,7 @@ impl Tool for Pencil {
                     filled: state.stroke_filled,
                     points: vec![stroke_points]
                 }) {
-                    mem::replace(&mut self.stroke_act, Some(act)).unwrap().undo(&mut state.project);
-                    Stroke::delete(&mut state.project, stroke);
+                    self.stroke_act = Some(act);
                     self.curr_stroke_frame = Some((new_stroke, frame));
                 }
             }

@@ -25,6 +25,11 @@ impl ChildObj for PaletteColor {
         &mut parent.colors
     }
 
+    type RootAsset = Palette;
+    fn get_root_asset(project: &Project, palette_color: ObjPtr<Self>) -> Option<ObjPtr<Self::RootAsset>> {
+        Some(project.palette_colors.get(palette_color)?.palette)
+    }
+
 }
 
 impl Default for PaletteColor {
@@ -81,6 +86,12 @@ impl ChildObj for Palette {
     fn get_list_in_parent_mut(parent: &mut Self::Parent) -> &mut Vec<ObjBox<Self>> {
         &mut parent.palettes
     }
+
+    type RootAsset = Palette;
+    fn get_root_asset(_project: &Project, palette: ObjPtr<Self>) -> Option<ObjPtr<Self::RootAsset>> {
+        Some(palette)
+    }
+
 }
 
 impl Asset for Palette {

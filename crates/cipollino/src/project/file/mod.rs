@@ -1,9 +1,9 @@
 
 use std::{hash::Hash, marker::PhantomData, path::PathBuf};
 
-use crate::util::{bson::bson_get, next_unique_name};
+use crate::util::{bson::{bson_get, bson_to_u64, u64_to_bson}, next_unique_name};
 
-use super::{action::ObjAction, folder::Folder, obj::{obj_clone_impls::PrimitiveObjClone, ObjClone, ObjPtr, ObjSerialize}, AssetPtr, Project};
+use super::{action::ObjAction, folder::Folder, obj::{obj_clone_impls::PrimitiveObjClone, ObjClone, ObjPtr, ObjSerialize}, saveload::asset_file::AssetFile, AssetPtr, Project};
 
 pub mod audio;
 
@@ -234,27 +234,40 @@ impl<T: FileType> FilePtr<T> {
 
 }
 
-impl<T: FileType + Clone> ObjClone for FilePtr<T> {}
+impl<T: FileType + Clone> ObjClone for FilePtr<T> {} 
 impl PrimitiveObjClone for PathBuf {}
 impl PrimitiveObjClone for [u8; 8] {}
 
 impl<T: FileType> ObjSerialize for FilePtr<T> {
 
-    fn obj_serialize(&self, project: &Project) -> bson::Bson {
+    fn obj_serialize(&self, project: &Project, _asset_file: &mut AssetFile) -> bson::Bson {
         let ptr = self.lookup(project);
         bson::bson! ({
             "filepath": ptr.ptr.path.to_str().unwrap(),
-            "hash": bson::to_bson(&ptr.ptr.hash).expect("serializing u64 should not fail")
+            "hash": u64_to_bson(ptr.ptr.hash)
         })
     }
 
-    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: super::obj::ObjPtrAny) -> Option<Self> {
-        let path = PathBuf::obj_deserialize(project, bson_get(&data, "filepath")?, parent)?;
-        let hash = bson::from_bson(bson_get(data, "hash")?.clone()).ok()?;
+    fn obj_serialize_full(&self, project: &Project, asset_file: &mut AssetFile) -> bson::Bson {
+        self.obj_serialize(project, asset_file)
+    }
+
+    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: super::obj::ObjPtrAny, asset_file: &mut AssetFile) -> Option<Self> {
+        let path = PathBuf::obj_deserialize(project, bson_get(&data, "filepath")?, parent, asset_file)?;
+        let hash = bson_to_u64(bson_get(data, "hash")?)?;
         Some(Self {
             ptr: FilePtrAny::new(path, hash),
             _marker: PhantomData
         })
+    }
+
+    type RawData = Self;
+    fn to_raw_data(&self, _project: &Project) -> Self::RawData {
+        self.clone() 
+    }
+
+    fn from_raw_data(_project: &mut Project, data: &Self::RawData) -> Self {
+        data.clone() 
     }
 
 }

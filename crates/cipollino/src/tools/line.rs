@@ -81,8 +81,9 @@ impl Tool for Line {
     }
 
     fn mouse_down(&mut self, mouse_pos: glam::Vec2, state: &mut EditorState, _scene: &mut ScenePanel) {
-        if let Some((stroke, frame)) = self.curr_stroke_frame {
+        if let Some((_stroke, frame)) = self.curr_stroke_frame {
             let dir = (mouse_pos - self.first_point) / 3.0;
+            mem::replace(&mut self.stroke_act, None).unwrap().undo(&mut state.project);
             if let Some((new_stroke, act)) = Stroke::add(&mut state.project, frame, Stroke {
                 frame: frame,
                 color: state.color,
@@ -93,8 +94,7 @@ impl Tool for Line {
                     StrokePoint { a: mouse_pos - dir, pt: mouse_pos, b: mouse_pos + dir }
                 ]]
             }) {
-                mem::replace(&mut self.stroke_act, Some(act)).unwrap().undo(&mut state.project);
-                Stroke::delete(&mut state.project, stroke);
+                self.stroke_act = Some(act);
                 self.curr_stroke_frame = Some((new_stroke, frame));
             }
         }

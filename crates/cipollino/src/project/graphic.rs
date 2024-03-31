@@ -50,6 +50,10 @@ impl ChildObj for Graphic {
         &mut parent.graphics
     }
 
+    type RootAsset = Graphic;
+    fn get_root_asset(_project: &Project, graphic: ObjPtr<Self>) -> Option<ObjPtr<Self::RootAsset>> {
+        Some(graphic)
+    }
 
 }
 

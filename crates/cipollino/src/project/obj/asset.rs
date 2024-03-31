@@ -1,7 +1,7 @@
 
 use std::{path::PathBuf, str::FromStr};
 
-use crate::{project::{action::ObjAction, folder::Folder, Project, AssetPtr}, util};
+use crate::{project::{action::ObjAction, folder::Folder, AssetPtr, Project}, util};
 
 use super::{child_obj::ChildObj, Obj, ObjBox, ObjPtr};
 
@@ -31,6 +31,7 @@ pub trait Asset : Obj + ChildObj<Parent = Folder> {
         *obj.name_mut() = valid_name;
         *obj.folder_mut() = folder;
         let (ptr, add_act) = Self::add(project, folder, obj)?;
+
         Some((ptr, vec![add_act, ObjAction::new(|_proj| {
 
         }, move |proj| {
@@ -64,9 +65,6 @@ pub trait Asset : Obj + ChildObj<Parent = Folder> {
         let obj = Self::get_list(project).get(obj_ptr)?;
         let init_name = obj.name().clone();
         let new_name = next_valid_name(project, &name, Self::get_list_in_parent(folder));
-        // if let Some(path) = obj.file_path(&project) {
-        //     std::fs::remove_file(path);
-        // }
 
         let redo = move |proj: &'_ mut Project| {
             let obj = Self::get_list(proj).get(obj_ptr).unwrap();

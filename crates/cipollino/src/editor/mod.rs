@@ -30,8 +30,6 @@ pub struct Editor {
 
     project_open: bool,
 
-    autosave_debounce_timer: f32,
-
     audio: Option<AudioController>,
     prev_open_graphic: ObjPtr<Graphic>,
     prev_playing: bool
@@ -78,7 +76,6 @@ impl Editor {
             config_path,
             export: Export::new(), 
             project_open: false,
-            autosave_debounce_timer: -1.0,
 
             audio: AudioController::new(),
             prev_open_graphic: ObjPtr::null(),
@@ -154,17 +151,10 @@ impl Editor {
         systems.toasts.render(ctx);
 
         if self.project_open {
-            if self.project_open && state.project.mutated() {
-                self.autosave_debounce_timer = 1.0;
-            }
-            let dt = ctx.input(|i| i.predicted_dt);
-            if self.autosave_debounce_timer > 0.0 && self.autosave_debounce_timer < dt {
-                state.project.save();
-            }
-            self.autosave_debounce_timer -= dt;
+            state.project.save();
         }
 
-        if state.project.graphics.mutated || state.project.layers.mutated || state.project.sound_instances.mutated
+        if state.project.graphics.mutated() || state.project.layers.mutated() || state.project.sound_instances.mutated()
            || self.prev_open_graphic != state.open_graphic || self.prev_playing != state.playing {
             set_audio_data(state, &mut self.audio); 
         }

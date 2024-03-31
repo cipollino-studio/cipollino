@@ -7,39 +7,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'cipollino'",
+            "name": "Cargo launch",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=cipollino",
-                    "--package=cipollino"
-                ],
-                "filter": {
-                    "name": "cipollino",
-                    "kind": "bin"
-                }
+                ]
             },
+            "program": "${workspaceFolder}/target/debug/cipollino",
             "args": [],
             "cwd": "${workspaceFolder}"
         },
-        {
-            "type": "lldb",
-            "request": "launch",
-            "name": "Debug unit tests in executable 'cipollino'",
-            "cargo": {
-                "args": [
-                    "test",
-                    "--no-run",
-                    "--bin=cipollino",
-                    "--package=cipollino"
-                ],
-                "filter": {
-                    "name": "cipollino",
-                    "kind": "bin"
-                }
-            },
-            "args": [],
-            "cwd": "${workspaceFolder}"
-        }
     ]
 }

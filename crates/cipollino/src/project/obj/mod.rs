@@ -1,22 +1,30 @@
 
-use std::{collections::HashMap, marker::PhantomData, sync::{Arc, Mutex}};
+use std::{cell::RefCell, collections::{HashMap, HashSet}, marker::PhantomData, sync::{Arc, Mutex}};
 use std::hash::Hash;
 
-use super::Project;
+use super::{saveload::asset_file::AssetFile, Project};
 
 pub mod obj_clone_impls;
 pub mod asset;
 pub mod child_obj;
 
+
 pub struct ObjList<T: Obj> {
     objs: HashMap<u64, T>,
+
     /*
         When an ObjBox is dropped, we want to automatically destroy the object it contained.
         A reference to list is given to each ObjBox, allowing the list to "garbage collect" deleted objects.
     */
-    dropped: Arc<Mutex<Vec<u64>>>,
-    pub mutated: bool,
-    pub curr_key: u64
+    pub dropped: Arc<Mutex<Vec<u64>>>,
+
+    pub created: HashSet<ObjPtr<T>>,
+    pub modified: HashSet<ObjPtr<T>>,
+
+    pub curr_key: u64,
+    
+    // First page pointers of every object in their respective asset files(see saveload::asset_file)
+    pub obj_file_ptrs: RefCell<HashMap<ObjPtr<T>, u64>>
 }
 
 impl<T: Obj> ObjList<T> {
@@ -25,8 +33,10 @@ impl<T: Obj> ObjList<T> {
         Self {
             objs: HashMap::new(),
             dropped: Arc::new(Mutex::new(Vec::new())),
-            mutated: true,
-            curr_key: 1
+            created: HashSet::new(),
+            modified: HashSet::new(),
+            curr_key: 1,
+            obj_file_ptrs: RefCell::new(HashMap::new())
         }
     }
 
@@ -41,20 +51,25 @@ impl<T: Obj> ObjList<T> {
     pub fn add(&mut self, obj: T) -> ObjBox<T> {
         self.objs.insert(self.curr_key, obj);
         self.curr_key += 1;
+        let ptr = ObjPtr {
+            key: self.curr_key - 1,
+            _marker: PhantomData
+        };
+        self.created.insert(ptr);
+        self.modified.insert(ptr);
         ObjBox {
-            ptr: ObjPtr {
-                key: self.curr_key - 1,
-                _marker: PhantomData
-            },
-            dropped: self.dropped.clone()
+            ptr,
+            dropped: self.dropped.clone(),
         }
     }
 
     pub fn add_with_ptr(&mut self, obj: T, ptr: ObjPtr<T>) -> ObjBox<T> {
         self.objs.insert(ptr.key, obj);
+        self.created.insert(ptr);
+        self.modified.insert(ptr);
         ObjBox {
             ptr,
-            dropped: self.dropped.clone()
+            dropped: self.dropped.clone(),
         }
     }
 
@@ -63,7 +78,7 @@ impl<T: Obj> ObjList<T> {
     }
 
     pub fn get_mut(&mut self, ptr: ObjPtr<T>) -> Option<&mut T> {
-        self.mutated = true;
+        self.modified.insert(ptr);
         self.objs.get_mut(&ptr.key)
     }
 
@@ -76,14 +91,28 @@ impl<T: Obj> ObjList<T> {
     }
 
     pub fn garbage_collect_objs(&mut self) {
-        let mut dropped = self.dropped.lock().unwrap();
-        for key in dropped.iter() {
-            self.objs.remove(key);
-        }
-        dropped.clear();
+        loop {
+            let mut dropped = self.dropped.lock().unwrap();
+            let dropped_clone = dropped.clone();
+            dropped.clear();
+            drop(dropped);
 
-        self.mutated = false;
+            for key in dropped_clone {
+                self.objs.remove(&key);
+            }
+
+            if self.dropped.lock().unwrap().is_empty() {
+                break;
+            }
+        }
+
+        self.created.clear();
+        self.modified.clear();
     } 
+
+    pub fn mutated(&self) -> bool {
+        !self.dropped.lock().unwrap().is_empty() || !self.modified.is_empty()
+    }
 
 }
 
@@ -191,7 +220,7 @@ impl<T: Obj> Hash for ObjPtr<T> {
 #[derive(Clone)]
 pub struct ObjBox<T: Obj> {
     ptr: ObjPtr<T>,
-    dropped: Arc<Mutex<Vec<u64>>>
+    dropped: Arc<Mutex<Vec<u64>>>,
 }
 
 impl<T: Obj> ObjBox<T> {
@@ -223,13 +252,22 @@ pub trait ObjClone : Clone {
     fn obj_clone(&self, _project: &mut Project) -> Self {
         self.clone()
     }
-
+    
 }
 
 pub trait ObjSerialize : Sized {
 
-    fn obj_serialize(&self, project: &Project) -> bson::Bson;
-    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny) -> Option<Self>;
+    // Used to serialize one object at a time, for saving modifications incrementally
+    fn obj_serialize(&self, project: &Project, asset_file: &mut AssetFile) -> bson::Bson;
+    // Used to write the entire object tree to disk, when creating an asset file
+    fn obj_serialize_full(&self, project: &Project, asset_file: &mut AssetFile) -> bson::Bson;
+    // Used to deserialize the entire object tree
+    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny, asset_file: &mut AssetFile) -> Option<Self>;
+
+    // Used to take data out of the object tree, for undo/redo
+    type RawData: Send + Sync;
+    fn to_raw_data(&self, project: &Project) -> Self::RawData;
+    fn from_raw_data(project: &mut Project, data: &Self::RawData) -> Self;
 
 }
 

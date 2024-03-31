@@ -1,6 +1,6 @@
 
 use project_macros::{ObjClone, ObjSerialize, Object};
-use super::{action::ObjAction, file::{audio::AudioFile, FilePtr}, layer::Layer, obj::{child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjPtrAny, ObjSerialize}, Project};
+use super::{action::ObjAction, file::{audio::AudioFile, FilePtr}, graphic::Graphic, layer::Layer, obj::{child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjPtrAny, ObjSerialize}, Project};
 
 #[derive(Object, Clone, ObjClone, ObjSerialize)]
 pub struct SoundInstance {    
@@ -28,6 +28,12 @@ impl ChildObj for SoundInstance {
     fn get_list_in_parent_mut(parent: &mut Self::Parent) -> &mut Vec<ObjBox<Self>> {
         &mut parent.sound_instances
     }
+
+    type RootAsset = Graphic;
+    fn get_root_asset(project: &Project, sound_instance: ObjPtr<Self>) -> Option<ObjPtr<Self::RootAsset>> {
+        Layer::get_root_asset(project, project.sound_instances.get(sound_instance)?.layer)
+    }
+
 }
 
 impl Default for SoundInstance {

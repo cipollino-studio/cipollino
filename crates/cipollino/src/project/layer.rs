@@ -89,6 +89,11 @@ impl ChildObj for Layer {
         &mut parent.layers
     }
 
+    type RootAsset = Graphic;
+    fn get_root_asset(project: &Project, layer: ObjPtr<Self>) -> Option<ObjPtr<Self::RootAsset>> {
+        Some(project.layers.get(layer)?.graphic)
+    }
+
 }
 
 impl Default for Layer {

@@ -86,8 +86,6 @@ pub fn obj_clone(input: TokenStream) -> TokenStream {
         obj_clone_impl.append_all(quote! {
             #field_name: self.#field_name.obj_clone(project),
         });
-
-        
     }
 
     quote! {
@@ -115,41 +113,88 @@ pub fn obj_serialize(input: TokenStream) -> TokenStream {
     };
     let name = ast.ident;
 
+    let raw_data_name = format_ident!("{}RawData", name);
+
     let mut serialize_impl = quote!{};
+    let mut serialize_full_impl = quote!{};
     let mut deserialize_impl = quote!{};
+    let mut raw_data_struct_fields = quote!{};
+    let mut to_raw_data_impl = quote!{};
+    let mut from_raw_data_impl = quote!{};
     for field in fields {
         let field_name = field.ident.clone();
+        let ty = field.ty.to_token_stream();
+
         if !field_has_attr(&field, "parent") {
             let field_name_str = field_name.to_token_stream().to_string();
             serialize_impl.append_all(quote! {
-                #field_name_str: self.#field_name.obj_serialize(project),
+                #field_name_str: self.#field_name.obj_serialize(project, asset_file),
             });
 
-            let ty = field.ty.to_token_stream();
+            serialize_full_impl.append_all(quote! {
+                #field_name_str: self.#field_name.obj_serialize_full(project, asset_file),
+            });
+
             deserialize_impl.append_all(quote! {
                 if let Some(field) = crate::util::bson::bson_get(data, #field_name_str) {
-                    if let Some(val) = <#ty>::obj_deserialize(project, field, parent) {
+                    if let Some(val) = <#ty>::obj_deserialize(project, field, parent, asset_file) {
                         res.#field_name = val;
                     }
                 }
             });
         } 
+
+        raw_data_struct_fields.append_all(quote! {
+            #field_name: <#ty as ObjSerialize>::RawData,
+        });
+
+        to_raw_data_impl.append_all(quote! {
+            #field_name: self.#field_name.to_raw_data(project),
+        });
+
+        from_raw_data_impl.append_all(quote! {
+            #field_name: <#ty as ObjSerialize>::from_raw_data(project, &data.#field_name),
+        });
     }
 
     quote! {
+
+        pub struct #raw_data_name {
+            #raw_data_struct_fields
+        } 
         
         impl ObjSerialize for #name {
 
-            fn obj_serialize(&self, project: &Project) -> bson::Bson {
+            fn obj_serialize(&self, project: &Project, asset_file: &mut crate::project::saveload::asset_file::AssetFile) -> bson::Bson {
                 bson::bson! {{
                     #serialize_impl
                 }}
             }
 
-            fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny) -> Option<Self> {
+            fn obj_serialize_full(&self, project: &Project, asset_file: &mut crate::project::saveload::asset_file::AssetFile) -> bson::Bson {
+                bson::bson! {{
+                    #serialize_full_impl
+                }}
+            }
+
+            fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny, asset_file: &mut crate::project::saveload::asset_file::AssetFile) -> Option<Self> {
                 let mut res = Self::default();
                 #deserialize_impl 
                 Some(res)
+            }
+
+            type RawData = #raw_data_name;
+
+            fn to_raw_data(&self, project: &Project) -> Self::RawData {
+                Self::RawData {
+                    #to_raw_data_impl
+                }
+            }
+
+            fn from_raw_data(project: &mut Project, data: &Self::RawData) -> Self {
+                Self {
+                    #from_raw_data_impl
+                }
             }
 
         }

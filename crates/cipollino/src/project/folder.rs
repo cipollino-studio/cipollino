@@ -1,6 +1,6 @@
 
 use std::path::PathBuf;
-use project_macros::{ObjClone, Object};
+use project_macros::{ObjClone, ObjSerialize, Object};
 use crate::project::obj::{Obj, ObjList};
 use crate::project::Project;
 use super::file::audio::AudioFile;
@@ -12,8 +12,9 @@ use super::obj::{ObjBox, ObjClone, ObjPtr};
 use super::action::ObjAction;
 use super::palette::Palette;
 use super::AssetPtr;
+use super::obj::{ObjSerialize, ObjPtrAny};
 
-#[derive(Object, Clone, ObjClone)]
+#[derive(Object, Clone, ObjClone, ObjSerialize)]
 pub struct Folder {
     #[field]
     pub name: String,
@@ -39,6 +40,11 @@ impl ChildObj for Folder {
 
     fn get_list_in_parent_mut(parent: &mut Self::Parent) -> &mut Vec<ObjBox<Self>> {
         &mut parent.folders
+    }
+
+    type RootAsset = Folder;
+    fn get_root_asset(_project: &Project, _folder: ObjPtr<Self>) -> Option<ObjPtr<Self::RootAsset>> {
+        panic!("should never be called");
     }
 }
 

@@ -2,7 +2,7 @@
 use glam::{Vec2, Mat4, vec3, vec2};
 use project_macros::{ObjClone, ObjSerialize, Object};
 
-use super::{action::ObjAction, frame::Frame, obj::{child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjPtrAny, ObjSerialize}, palette::PaletteColor, Project};
+use super::{action::ObjAction, frame::Frame, graphic::Graphic, obj::{child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjPtrAny, ObjSerialize}, palette::PaletteColor, saveload::asset_file::AssetFile, Project};
 
 #[derive(Clone, Copy, ObjClone, Default, ObjSerialize)]
 pub struct StrokePoint {
@@ -31,21 +31,25 @@ impl StrokeColor {
     
 }
 
-impl ObjClone for StrokeColor {}
+impl ObjClone for StrokeColor {} 
 
 impl ObjSerialize for StrokeColor {
 
-    fn obj_serialize(&self, project: &Project) -> bson::Bson {
+    fn obj_serialize(&self, project: &Project, asset_file: &mut AssetFile) -> bson::Bson {
         match self {
             Self::Color(color) => bson::bson!([color.x, color.y, color.z, color.w]),
             Self::Palette(ptr, backup_color) => bson::bson!({
-                "color": ptr.obj_serialize(project),
+                "color": ptr.obj_serialize(project, asset_file),
                 "backup": [backup_color.x, backup_color.y, backup_color.z, backup_color.w]
             })
         }
     }
 
-    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny) -> Option<Self> {
+    fn obj_serialize_full(&self, project: &Project, asset_file: &mut AssetFile) -> bson::Bson {
+        self.obj_serialize(project, asset_file)
+    }
+
+    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny, asset_file: &mut AssetFile) -> Option<Self> {
         if let Some(arr) = data.as_array() {
             let mut color = [0.0; 4];
             color[3] = 1.0;
@@ -55,13 +59,23 @@ impl ObjSerialize for StrokeColor {
             let color = glam::Vec4::from_slice(&color);
             Some(StrokeColor::Color(color))
         } else if let Some(obj) = data.as_document() {
-            let ptr = obj.get(&"color".to_owned()).map(|data| ObjPtr::<PaletteColor>::obj_deserialize(project, data, parent).unwrap_or(ObjPtr::null())).unwrap_or(ObjPtr::null());
-            let backup = obj.get(&"backup".to_owned()).map(|data| glam::Vec4::obj_deserialize(project, data, parent).unwrap_or(glam::vec4(0.0, 0.0, 0.0, 1.0))).unwrap_or(glam::vec4(0.0, 0.0, 0.0, 1.0));
+            let ptr = obj.get(&"color".to_owned()).map(|data| ObjPtr::<PaletteColor>::obj_deserialize(project, data, parent, asset_file).unwrap_or(ObjPtr::null())).unwrap_or(ObjPtr::null());
+            let backup = obj.get(&"backup".to_owned()).map(|data| glam::Vec4::obj_deserialize(project, data, parent, asset_file).unwrap_or(glam::vec4(0.0, 0.0, 0.0, 1.0))).unwrap_or(glam::vec4(0.0, 0.0, 0.0, 1.0));
             Some(Self::Palette(ptr, backup))
         } else {
             None
         }
     }
+
+    type RawData = StrokeColor;
+    fn to_raw_data(&self, _project: &Project) -> Self::RawData {
+        *self        
+    }
+    
+    fn from_raw_data(_project: &mut Project, data: &Self::RawData) -> Self {
+        *data 
+    }
+
 }
 
 #[derive(Object, Clone, ObjClone, ObjSerialize)]
@@ -121,6 +135,11 @@ impl ChildObj for Stroke {
 
     fn get_list_in_parent_mut(parent: &mut Self::Parent) -> &mut Vec<ObjBox<Self>> {
         &mut parent.strokes
+    }
+
+    type RootAsset = Graphic;
+    fn get_root_asset(project: &Project, stroke: ObjPtr<Self>) -> Option<ObjPtr<Self::RootAsset>> {
+        Frame::get_root_asset(project, project.strokes.get(stroke)?.frame)
     }
 
 }
