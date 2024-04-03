@@ -1,6 +1,6 @@
 use crate::{editor::{state::EditorState, toasts::Toasts}, project::{file::FilePtr, Project}};
 
-use std::{fs, path::PathBuf};
+use std::{collections::HashSet, fs, path::PathBuf};
 
 use bson::bson;
 
@@ -11,21 +11,23 @@ use super::asset_file::AssetFile;
 use super::super::{file::{audio::AudioFile, FileType}, folder::Folder, obj::{asset::Asset, ObjPtr, ObjSerialize}, palette::Palette};
 
 pub struct LoadingMetadata {
-    pub audio_file_ptrs: Vec<(FilePtr<AudioFile>, String)> 
+    pub audio_file_ptrs: HashSet<FilePtr<AudioFile>> 
 }
 
 impl LoadingMetadata {
 
     pub fn new() -> Self {
         Self {
-            audio_file_ptrs: Vec::new() 
+            audio_file_ptrs: HashSet::new() 
         }
     }
 
     fn display_file_missing_errors<T: FileType>(&self, state: &mut EditorState, toasts: &mut Toasts) {
-        for (ptr, path) in T::list_in_loading_metadata(self) {
-            if let None = T::get_list(&state.project).get(ptr) {
-                toasts.error_toast(format!("File '{}' missing.", path));
+        for (path, key) in T::get_list(&state.project).path_lookup.iter() {
+            if let None = T::get_list(&state.project).get(&FilePtr::from_key(*key)) {
+                if T::list_in_loading_metadata(self).contains(&FilePtr::from_key(*key)) {
+                    toasts.error_toast(format!("File '{}' missing.", path.to_str().unwrap()));
+                }
             }
         } 
     }
@@ -53,7 +55,7 @@ impl Project {
 
             let mut res = Self::new(proj_file_path.clone(), fps, sample_rate);
             if let Some(audio_file_lookups) = proj_data.get("audio_files") {
-                res.audio_files.load_lookups(audio_file_lookups.clone(), &mut metadata);       
+                res.audio_files.load_lookups(audio_file_lookups.clone());       
             }
 
             res

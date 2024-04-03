@@ -1,5 +1,5 @@
 
-use std::{collections::HashMap, marker::PhantomData, path::PathBuf};
+use std::{collections::{HashMap, HashSet}, marker::PhantomData, path::PathBuf};
 
 use serde_json::{json, Map, Value};
 
@@ -19,8 +19,8 @@ pub trait FileType: Sized + Send + Sync + Clone {
     fn get_list_mut(project: &mut Project) -> &mut FileList<Self>;
     fn list_in_folder(folder: &Folder) -> &Vec<FilePtr<Self>>;
     fn list_in_folder_mut(folder: &mut Folder) -> &mut Vec<FilePtr<Self>>;
-    fn list_in_loading_metadata(metadata: &LoadingMetadata) -> &Vec<(FilePtr<Self>, String)>;
-    fn list_in_loading_metadata_mut(metadata: &mut LoadingMetadata) -> &mut Vec<(FilePtr<Self>, String)>;
+    fn list_in_loading_metadata(metadata: &LoadingMetadata) -> &HashSet<FilePtr<Self>>;
+    fn list_in_loading_metadata_mut(metadata: &mut LoadingMetadata) -> &mut HashSet<FilePtr<Self>>; 
 
     fn make_asset_ptr(ptr: &FilePtr<Self>) -> AssetPtr;
 
@@ -199,7 +199,7 @@ impl<T: FileType> FileBox<T> {
 
 pub struct FileList<T: FileType> {
     files: HashMap<u64, FileBox<T>>,
-    path_lookup: HashMap<PathBuf, u64>,
+    pub path_lookup: HashMap<PathBuf, u64>,
     curr_key: u64
 }
 
@@ -213,12 +213,11 @@ impl<T: FileType> FileList<T> {
         }
     }
 
-    pub fn load_lookups(&mut self, data: Value, metadata: &mut LoadingMetadata) -> Option<()> {
+    pub fn load_lookups(&mut self, data: Value) -> Option<()> {
 
         let paths = data.get("paths")?.as_object()?;
         for (path, key) in paths.iter() { 
             let key = key.as_u64()?;
-            T::list_in_loading_metadata_mut(metadata).push((FilePtr::<T>::from_key(key), path.clone()));
             self.path_lookup.insert(path.into(), key); 
             self.curr_key = self.curr_key.max(key + 1);
         }
@@ -282,28 +281,23 @@ impl<T: FileType> FileList<T> {
 
 impl<T: FileType> ObjSerialize for FilePtr<T> {
 
-    fn obj_serialize(&self, project: &Project, _asset_file: &mut AssetFile) -> bson::Bson {
-        if let Some(file) = self.get(project) {
-            bson::bson!({
-                "key": u64_to_bson(file.ptr.key),
-            })
-        } else {
-            bson::bson!({
-                "key": u64_to_bson(0)
-            })
-        }
+    fn obj_serialize(&self, _project: &Project, _asset_file: &mut AssetFile) -> bson::Bson {
+        bson::bson!({
+            "key": u64_to_bson(self.key),
+        })
     }
 
     fn obj_serialize_full(&self, project: &Project, asset_file: &mut AssetFile) -> bson::Bson {
         self.obj_serialize(project, asset_file)
     }
 
-    fn obj_deserialize(_project: &mut Project, data: &bson::Bson, _parent: super::obj::ObjPtrAny, _asset_file: &mut AssetFile, _metadata: &mut LoadingMetadata) -> Option<Self> {
+    fn obj_deserialize(_project: &mut Project, data: &bson::Bson, _parent: super::obj::ObjPtrAny, _asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<Self> {
         let key = bson_to_u64(bson_get(data, "key")?)?;
         let res = Self {
             key, 
             _marker: PhantomData
         };
+        T::list_in_loading_metadata_mut(metadata).insert(res);
         Some(res)
     }
 

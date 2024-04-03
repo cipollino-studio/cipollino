@@ -1,5 +1,5 @@
 
-use std::{fs::File, path::PathBuf, sync::Arc};
+use std::{fs::File, path::PathBuf, sync::Arc, collections::HashSet};
 
 use crate::{audio::generate::MAX_AUDIO_CHANNELS, project::{saveload::load::LoadingMetadata, AssetPtr, Project}};
 
@@ -42,11 +42,11 @@ impl FileType for AudioFile {
         &mut folder.audios
     }
 
-    fn list_in_loading_metadata(metadata: &LoadingMetadata) -> &Vec<(FilePtr<Self>, String)> {
+    fn list_in_loading_metadata(metadata: &LoadingMetadata) -> &HashSet<FilePtr<Self>> {
         &metadata.audio_file_ptrs
     }
 
-    fn list_in_loading_metadata_mut(metadata: &mut LoadingMetadata) -> &mut Vec<(FilePtr<Self>, String)> { 
+    fn list_in_loading_metadata_mut(metadata: &mut LoadingMetadata) -> &mut HashSet<FilePtr<Self>> { 
         &mut metadata.audio_file_ptrs
     }
 
