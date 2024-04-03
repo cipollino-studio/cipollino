@@ -1,7 +1,7 @@
 
 use std::sync::Arc;
 
-use crate::{project::{saveload::asset_file::AssetFile, Project}, util::bson::{bson_get, bson_to_u64, u64_to_bson}};
+use crate::{project::{saveload::{asset_file::AssetFile, load::LoadingMetadata}, Project}, util::bson::{bson_get, bson_to_u64, u64_to_bson}};
 use super::{child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjPtr, ObjPtrAny, ObjSerialize};
 use bson::bson;
 
@@ -27,10 +27,10 @@ impl<T: ObjSerialize> ObjSerialize for Vec<T> {
         self.iter().map(|elem| elem.obj_serialize_full(project, asset_file)).collect()
     }
 
-    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny, asset_file: &mut AssetFile) -> Option<Self> {
+    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny, asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<Self> {
         let mut res = Vec::new(); 
         for elem in data.as_array()? {
-            res.push(T::obj_deserialize(project, elem, parent, asset_file)?);
+            res.push(T::obj_deserialize(project, elem, parent, asset_file, metadata)?);
         }
         Some(res)
     }
@@ -62,7 +62,7 @@ impl<T: PrimitiveObjClone> ObjSerialize for T {
         self.obj_serialize(project, asset_file)
     }
 
-    fn obj_deserialize(_project: &mut Project, data: &bson::Bson, _parent: ObjPtrAny, _asset_file: &mut AssetFile) -> Option<Self> {
+    fn obj_deserialize(_project: &mut Project, data: &bson::Bson, _parent: ObjPtrAny, _asset_file: &mut AssetFile, _metadata: &mut LoadingMetadata) -> Option<Self> {
         bson::from_bson(data.clone()).ok()
     }
 
@@ -113,7 +113,7 @@ impl<T: Obj> ObjSerialize for ObjPtr<T> {
         u64_to_bson(self.key) 
     }
 
-    fn obj_deserialize(_project: &mut Project, data: &bson::Bson, _parent: ObjPtrAny, _asset_file: &mut AssetFile) -> Option<Self> {
+    fn obj_deserialize(_project: &mut Project, data: &bson::Bson, _parent: ObjPtrAny, _asset_file: &mut AssetFile, _metadata: &mut LoadingMetadata) -> Option<Self> {
         Some(Self::from_key(bson_to_u64(data)?))
     }
 
@@ -147,7 +147,7 @@ impl<T: ChildObj + ObjSerialize> ObjSerialize for ObjBox<T> {
         self.obj_serialize(project, asset_file)
     }
 
-    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny, asset_file: &mut AssetFile) -> Option<Self> {
+    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny, asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<Self> {
         
         let page_ptr = bson_to_u64(bson_get(data, "ptr")?)?;
 
@@ -167,7 +167,7 @@ impl<T: ChildObj + ObjSerialize> ObjSerialize for ObjBox<T> {
         T::get_list_mut(project).obj_file_ptrs.borrow_mut().insert(ptr, page_ptr);
 
         let obj_data = asset_file.get_obj_data(page_ptr).ok()??;
-        let mut obj = T::obj_deserialize(project, &bson::Bson::Document(obj_data), ptr.into(), asset_file)?;
+        let mut obj = T::obj_deserialize(project, &bson::Bson::Document(obj_data), ptr.into(), asset_file, metadata)?;
         *obj.parent_mut() = parent.into();
         Some(T::get_list_mut(project).add_with_ptr(obj, ptr)) // TODO: triggers an autosave
     }

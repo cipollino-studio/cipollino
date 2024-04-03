@@ -1,7 +1,7 @@
 
 use std::{fs, path::PathBuf, sync::{Arc, Mutex}};
 
-use crate::{audio::AudioController, export::Export, panels, project::{graphic::Graphic, obj::ObjPtr, Project}, renderer::scene::SceneRenderer};
+use crate::{audio::AudioController, export::Export, panels, project::{graphic::Graphic, obj::ObjPtr}, renderer::scene::SceneRenderer};
 use egui::{KeyboardShortcut, Modifiers};
 
 use self::{clipboard::Clipboard, dialog::{DialogManager, DialogsToOpen}, dropped_files::handle_dropped_files, prefs::UserPrefs, splash_screen::SplashScreen, state::EditorState, toasts::Toasts};
@@ -40,7 +40,7 @@ pub struct EditorSystems<'a> {
     pub renderer: &'a mut SceneRenderer,
     pub dialog: DialogsToOpen,
     pub prefs: &'a mut UserPrefs,
-    pub toasts: &'a mut Toasts 
+    pub toasts: &'a mut Toasts,
 }
 
 impl Editor {
@@ -132,7 +132,7 @@ impl Editor {
             renderer: scene_renderer.as_mut().unwrap(),
             dialog: DialogsToOpen::new(),
             prefs: &mut self.prefs,
-            toasts: &mut self.toasts
+            toasts: &mut self.toasts,
         }; 
 
         // Panels
@@ -192,7 +192,7 @@ impl Editor {
             ui.menu_button("File", |ui| {
                 if ui.button("Open").clicked() {
                     if let Some(path) = rfd::FileDialog::new().add_filter("Cipollino Project File", &["cip"]).pick_file() {
-                        *state = EditorState::new_with_project(Project::load(path));
+                        *state = EditorState::load_project(path, &mut self.toasts);
                         return;
                     }
                     ui.close_menu();

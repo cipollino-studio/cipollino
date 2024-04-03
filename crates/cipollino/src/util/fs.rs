@@ -34,3 +34,11 @@ pub fn remove(path: &PathBuf) {
         let _ = fs::remove_file(path);
     }
 }
+
+pub fn set_file_stem(path: &mut PathBuf, stem: &str) {
+    if let Some(ext) = path.extension() {
+        path.set_file_name(format!("{}.{}", stem, ext.to_str().unwrap()));
+    } else {
+        path.set_file_name(stem);
+    }
+}

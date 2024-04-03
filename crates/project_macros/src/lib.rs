@@ -137,7 +137,7 @@ pub fn obj_serialize(input: TokenStream) -> TokenStream {
 
             deserialize_impl.append_all(quote! {
                 if let Some(field) = crate::util::bson::bson_get(data, #field_name_str) {
-                    if let Some(val) = <#ty>::obj_deserialize(project, field, parent, asset_file) {
+                    if let Some(val) = <#ty>::obj_deserialize(project, field, parent, asset_file, metadata) {
                         res.#field_name = val;
                     }
                 }
@@ -177,7 +177,7 @@ pub fn obj_serialize(input: TokenStream) -> TokenStream {
                 }}
             }
 
-            fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny, asset_file: &mut crate::project::saveload::asset_file::AssetFile) -> Option<Self> {
+            fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny, asset_file: &mut crate::project::saveload::asset_file::AssetFile, metadata: &mut crate::project::saveload::load::LoadingMetadata) -> Option<Self> {
                 let mut res = Self::default();
                 #deserialize_impl 
                 Some(res)

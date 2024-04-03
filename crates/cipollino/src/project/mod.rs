@@ -17,7 +17,7 @@ use serde_json::json;
 
 use crate::{renderer::mesh::Mesh, util::fs::write_json_file};
 
-use self::{file::{audio::AudioFile, FilePtr, FilePtrAny}, folder::Folder, frame::Frame, graphic::Graphic, layer::Layer, obj::{ObjBox, ObjList, ObjPtr}, palette::{Palette, PaletteColor}, sound_instance::SoundInstance, stroke::Stroke};
+use self::{file::{audio::AudioFile, FileList, FilePtr}, folder::Folder, frame::Frame, graphic::Graphic, layer::Layer, obj::{ObjBox, ObjList, ObjPtr}, palette::{Palette, PaletteColor}, sound_instance::SoundInstance, stroke::Stroke};
 
 pub struct Project {
     pub fps: f32,
@@ -32,10 +32,7 @@ pub struct Project {
     pub palette_colors: ObjList<PaletteColor>,
     pub sound_instances: ObjList<SoundInstance>,
 
-    pub audio_files: HashMap<FilePtr<AudioFile>, AudioFile>,
-
-    pub path_file_ptr: HashMap<PathBuf, FilePtrAny>,
-    pub hash_file_ptr: HashMap<u64, FilePtrAny>,
+    pub audio_files: FileList<AudioFile>, 
 
     pub root_folder: ObjBox<Folder>,
 
@@ -55,7 +52,7 @@ impl Project {
             "fps": fps,
             "sample_rate": sample_rate
         }));
-        Self::load(path)
+        Self::load(path).0
     }
 
     pub fn new(path: PathBuf, fps: f32, sample_rate: f32) -> Self {
@@ -74,10 +71,7 @@ impl Project {
             palette_colors: ObjList::new(),
             sound_instances: ObjList::new(),
 
-            audio_files: HashMap::new(),
-
-            path_file_ptr: HashMap::new(),
-            hash_file_ptr: HashMap::new(),
+            audio_files: FileList::new(),
 
             root_folder: root,
 

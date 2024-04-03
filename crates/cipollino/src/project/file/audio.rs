@@ -1,9 +1,9 @@
 
 use std::{fs::File, path::PathBuf, sync::Arc};
 
-use crate::{audio::generate::MAX_AUDIO_CHANNELS, project::AssetPtr};
+use crate::{audio::generate::MAX_AUDIO_CHANNELS, project::{saveload::load::LoadingMetadata, AssetPtr, Project}};
 
-use super::{FilePtr, FileType};
+use super::{FileList, FilePtr, FileType};
 
 pub const SAMPLES_PER_VOLUME_SUM: usize = 100;
 
@@ -15,12 +15,39 @@ pub struct AudioFile {
 
 impl FileType for AudioFile {
 
+    fn load(path: PathBuf) -> Option<Self> {
+        match path.extension()?.to_str()? {
+            "mp3" => {
+                let file = File::open(path).ok()?;
+                let samples = read_mp3_data(file); 
+                Some(Self::new(samples))
+            },
+            _ => None
+        }
+    }
+
+    fn get_list(project: &Project) -> &FileList<Self> {
+        &project.audio_files 
+    }
+
+    fn get_list_mut(project: &mut Project) -> &mut FileList<Self> {
+        &mut project.audio_files 
+    }
+
     fn list_in_folder(folder: &crate::project::folder::Folder) -> &Vec<super::FilePtr<Self>> {
         &folder.audios
     }
 
     fn list_in_folder_mut(folder: &mut crate::project::folder::Folder) -> &mut Vec<super::FilePtr<Self>> {
         &mut folder.audios
+    }
+
+    fn list_in_loading_metadata(metadata: &LoadingMetadata) -> &Vec<(FilePtr<Self>, String)> {
+        &metadata.audio_file_ptrs
+    }
+
+    fn list_in_loading_metadata_mut(metadata: &mut LoadingMetadata) -> &mut Vec<(FilePtr<Self>, String)> { 
+        &mut metadata.audio_file_ptrs
     }
 
     fn make_asset_ptr(ptr: &FilePtr<Self>) -> AssetPtr {
@@ -87,15 +114,5 @@ impl AudioFile {
         }
     }
 
-    pub fn load(path: &PathBuf) -> Option<Self> {
-        match path.extension()?.to_str()? {
-            "mp3" => {
-                let file = File::open(path).ok()?;
-                let samples = read_mp3_data(file); 
-                Some(Self::new(samples))
-            },
-            _ => None
-        }
-    }
 
 }

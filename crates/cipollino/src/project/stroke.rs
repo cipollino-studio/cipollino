@@ -2,7 +2,7 @@
 use glam::{Vec2, Mat4, vec3, vec2};
 use project_macros::{ObjClone, ObjSerialize, Object};
 
-use super::{action::ObjAction, frame::Frame, graphic::Graphic, obj::{child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjPtrAny, ObjSerialize}, palette::PaletteColor, saveload::asset_file::AssetFile, Project};
+use super::{action::ObjAction, frame::Frame, graphic::Graphic, obj::{child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjPtrAny, ObjSerialize}, palette::PaletteColor, saveload::{asset_file::AssetFile, load::LoadingMetadata}, Project};
 
 #[derive(Clone, Copy, ObjClone, Default, ObjSerialize)]
 pub struct StrokePoint {
@@ -49,7 +49,7 @@ impl ObjSerialize for StrokeColor {
         self.obj_serialize(project, asset_file)
     }
 
-    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny, asset_file: &mut AssetFile) -> Option<Self> {
+    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny, asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<Self> {
         if let Some(arr) = data.as_array() {
             let mut color = [0.0; 4];
             color[3] = 1.0;
@@ -59,8 +59,8 @@ impl ObjSerialize for StrokeColor {
             let color = glam::Vec4::from_slice(&color);
             Some(StrokeColor::Color(color))
         } else if let Some(obj) = data.as_document() {
-            let ptr = obj.get(&"color".to_owned()).map(|data| ObjPtr::<PaletteColor>::obj_deserialize(project, data, parent, asset_file).unwrap_or(ObjPtr::null())).unwrap_or(ObjPtr::null());
-            let backup = obj.get(&"backup".to_owned()).map(|data| glam::Vec4::obj_deserialize(project, data, parent, asset_file).unwrap_or(glam::vec4(0.0, 0.0, 0.0, 1.0))).unwrap_or(glam::vec4(0.0, 0.0, 0.0, 1.0));
+            let ptr = obj.get(&"color".to_owned()).map(|data| ObjPtr::<PaletteColor>::obj_deserialize(project, data, parent, asset_file, metadata).unwrap_or(ObjPtr::null())).unwrap_or(ObjPtr::null());
+            let backup = obj.get(&"backup".to_owned()).map(|data| glam::Vec4::obj_deserialize(project, data, parent, asset_file, metadata).unwrap_or(glam::vec4(0.0, 0.0, 0.0, 1.0))).unwrap_or(glam::vec4(0.0, 0.0, 0.0, 1.0));
             Some(Self::Palette(ptr, backup))
         } else {
             None

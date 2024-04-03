@@ -1,11 +1,11 @@
 
-use std::sync::{Arc, RwLock};
+use std::{path::PathBuf, sync::{Arc, RwLock}};
 
 use egui_toast::{Toast, ToastKind, ToastOptions};
 
 use crate::{audio::{state::{AudioClip, AudioState}, AudioController}, project::{action::ActionManager, graphic::Graphic, layer::{Layer, LayerKind}, obj::ObjPtr, palette::Palette, stroke::{Stroke, StrokeColor}, Project}, tools::{bucket::Bucket, color_picker::ColorPicker, line::Line, pencil::Pencil, select::Select, Tool}};
 
-use super::{clipboard, selection::{self, Selection}};
+use super::{clipboard, selection::{self, Selection}, toasts::Toasts};
 
 pub struct EditorState {
     pub project: Project, 
@@ -95,6 +95,14 @@ impl EditorState {
         EditorState::new_with_project(Project::new("".into(), 24.0, 44100.0))
     }
 
+    pub fn load_project(path: PathBuf, toasts: &mut Toasts) -> Self {
+        let (project, metadata) = Project::load(path);
+        let mut state = Self::new_with_project(project);
+        metadata.display_errors(&mut state, toasts);
+
+        state
+    }
+
     pub fn visible_strokes(&self) -> Vec<ObjPtr<Stroke>> {
         if let Some(graphic) = self.project.graphics.get(self.open_graphic) {
             visible_strokes(&self.project, graphic, self.frame()).collect()
@@ -161,12 +169,13 @@ impl EditorState {
             }
             for instance in &layer.sound_instances {
                 let instance = instance.get(&self.project);
-                let file = self.project.audio_files.get(&instance.audio.lookup(&self.project))?;
-                audio.clips.push(AudioClip {
-                    begin: instance.begin, 
-                    end: instance.end, 
-                    samples: file.samples.clone(),
-                });
+                if let Some(file) = self.project.audio_files.get(&instance.audio) {
+                    audio.clips.push(AudioClip {
+                        begin: instance.begin, 
+                        end: instance.end, 
+                        samples: file.data.samples.clone(),
+                    });
+                }
             }
         }
 

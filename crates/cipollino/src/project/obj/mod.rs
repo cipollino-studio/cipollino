@@ -2,7 +2,7 @@
 use std::{cell::RefCell, collections::{HashMap, HashSet}, marker::PhantomData, sync::{Arc, Mutex}};
 use std::hash::Hash;
 
-use super::{saveload::asset_file::AssetFile, Project};
+use super::{saveload::{asset_file::AssetFile, load::LoadingMetadata}, Project};
 
 pub mod obj_clone_impls;
 pub mod asset;
@@ -262,7 +262,7 @@ pub trait ObjSerialize : Sized {
     // Used to write the entire object tree to disk, when creating an asset file
     fn obj_serialize_full(&self, project: &Project, asset_file: &mut AssetFile) -> bson::Bson;
     // Used to deserialize the entire object tree
-    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny, asset_file: &mut AssetFile) -> Option<Self>;
+    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny, asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<Self>;
 
     // Used to take data out of the object tree, for undo/redo
     type RawData: Send + Sync;

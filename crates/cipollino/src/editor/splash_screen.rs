@@ -3,8 +3,6 @@ use std::path::PathBuf;
 
 use unique_type_id::UniqueTypeId;
 
-use crate::project::Project;
-
 use super::{dialog::Dialog, new_project::{default_project_location, NewProject}, prefs::{UserPref, UserPrefs}, state::EditorState, EditorSystems};
 
 #[derive(UniqueTypeId)]
@@ -36,7 +34,7 @@ impl SplashScreen {
                     .pick_file() {
                         *close_dialog = true;
                         push_recent_project(systems.prefs, path.clone());
-                        *state = EditorState::new_with_project(Project::load(path));
+                        *state = EditorState::load_project(path, systems.toasts);
                 }
             }
         });
@@ -63,7 +61,7 @@ impl SplashScreen {
                 });
             if link.clicked() && found {
                 push_recent_project(systems.prefs, path.clone());
-                *state = EditorState::new_with_project(Project::load(path));
+                *state = EditorState::load_project(path, systems.toasts);
                 *close_dialog = true;
             }
         }

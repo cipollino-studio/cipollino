@@ -1,269 +1,316 @@
 
-use std::{hash::Hash, marker::PhantomData, path::PathBuf};
+use std::{collections::HashMap, marker::PhantomData, path::PathBuf};
 
-use crate::util::{bson::{bson_get, bson_to_u64, u64_to_bson}, next_unique_name};
+use serde_json::{json, Map, Value};
 
-use super::{action::ObjAction, folder::Folder, obj::{obj_clone_impls::PrimitiveObjClone, ObjClone, ObjPtr, ObjSerialize}, saveload::asset_file::AssetFile, AssetPtr, Project};
+use std::hash::Hash;
+
+use crate::util::{bson::{bson_get, bson_to_u64, u64_to_bson}, fs::set_file_stem, next_unique_name};
+
+use super::{action::ObjAction, folder::Folder, obj::{ObjClone, ObjPtr, ObjSerialize}, saveload::{asset_file::AssetFile, load::LoadingMetadata}, AssetPtr, Project};
 
 pub mod audio;
 
-// TODO: This system has no chance of functioning. Rewrite.
-
-#[derive(Clone, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub struct FilePtrAny {
-    pub path: PathBuf,
-    pub hash: u64,
-}
-
-impl FilePtrAny {
-
-    pub fn new(path: PathBuf, hash: u64) -> Self {
-        Self {
-            path,
-            hash
-        }
-    }
-
-    pub fn null() -> Self {
-        Self {
-            path: PathBuf::new(),
-            hash: 0,
-        }
-    }
-
-    pub fn name(&self) -> &str {
-        self.path.file_stem().unwrap().to_str().unwrap()
-    }
-
-    pub fn set_name(&mut self, name: String) {
-        self.path.set_file_name(format!("{}.{}", name, self.path.extension().unwrap().to_str().unwrap()));
-    }
-
-    pub fn lookup(&self, project: &Project) -> Self {
-        if !project.path_file_ptr.contains_key(&self.path) {
-            if let Some(new_ptr) = project.hash_file_ptr.get(&self.hash) {
-                return new_ptr.clone();
-            }
-        }
-        self.clone()
-    }
-
-}
-
 pub trait FileType: Sized + Send + Sync + Clone {
 
+    fn load(path: PathBuf) -> Option<Self>;
+
+    fn get_list(project: &Project) -> &FileList<Self>;
+    fn get_list_mut(project: &mut Project) -> &mut FileList<Self>;
     fn list_in_folder(folder: &Folder) -> &Vec<FilePtr<Self>>;
     fn list_in_folder_mut(folder: &mut Folder) -> &mut Vec<FilePtr<Self>>;
+    fn list_in_loading_metadata(metadata: &LoadingMetadata) -> &Vec<(FilePtr<Self>, String)>;
+    fn list_in_loading_metadata_mut(metadata: &mut LoadingMetadata) -> &mut Vec<(FilePtr<Self>, String)>;
 
     fn make_asset_ptr(ptr: &FilePtr<Self>) -> AssetPtr;
 
     fn icon() -> &'static str;
-    
-    fn rename(project: &mut Project, mut ptr: FilePtr<Self>, folder_ptr: ObjPtr<Folder>, name: String) -> Option<ObjAction> where Self: 'static {
-        let old_ptr = ptr.clone();
-        let from_path = project.base_path().join(&ptr.ptr.path);
 
-        let folder = project.folders.get(folder_ptr)?;
-        let idx = Self::list_in_folder(folder).iter().position(|other| *other == ptr)?;
-        let new_name = next_unique_name(&name, folder.audios.iter().map(|audio| audio.name()));
-        let to_path = from_path.with_file_name(format!("{}.{}", new_name, from_path.extension().unwrap().to_str().unwrap()));
+    fn rename(project: &mut Project, ptr: &FilePtr<Self>, name: String) -> Option<ObjAction> where Self: 'static {
+        let file = Self::get_list(project).get(ptr)?;
+        let new_name = next_unique_name(&name, Self::list_in_folder(project.folders.get(file.folder)?).iter().map(|file_ptr| file_ptr.get(&project).map_or("", |file| file.name())));
+        let old_name = file.name().to_owned(); 
 
-        std::fs::rename(from_path.clone(), to_path.clone()).ok()?;
+        let old_path = file.absolute_path(project);
+        let old_path_rel = file.path.clone();
+        Self::get_list_mut(project).path_lookup.remove(&old_path_rel);
+        let file = Self::get_list_mut(project).get_mut(ptr)?;
+        set_file_stem(&mut file.path, &new_name);
+        let file = Self::get_list(project).get(ptr)?;
+        let key = file.ptr.key;
+        let new_path_rel = file.path.clone();
+        let new_path = file.absolute_path(project);
+        Self::get_list_mut(project).path_lookup.insert(new_path_rel.clone(), key);
 
-        ptr.ptr.path = to_path.clone();
-        let new_ptr = ptr.clone();
-        let folder = project.folders.get_mut(folder_ptr)?;
-        let list = Self::list_in_folder_mut(folder);
-        list.remove(idx);
-        list.push(ptr.clone());
+        std::fs::rename(old_path.clone(), new_path.clone()).ok()?;
 
-        let redo = {
-            let from_path = from_path.clone();
-            let to_path = to_path.clone();
-            let old_ptr = old_ptr.clone();
-            let new_ptr = new_ptr.clone();
-            move |proj: &mut Project| {
-                let _ = std::fs::rename(from_path.clone(), to_path.clone());
-                if let Some(folder) = proj.folders.get_mut(folder_ptr) {
-                    let list = Self::list_in_folder_mut(folder); 
-                    if let Some(idx) = list.iter().position(|other| other == &old_ptr) {
-                        list.remove(idx);
-                    } 
-                    list.push(new_ptr.clone());
-                }
-            }
-        };
-
-        let undo = {
-            move |proj: &mut Project| {
-                let _ = std::fs::rename(to_path.clone(), from_path.clone());
-                if let Some(folder) = proj.folders.get_mut(folder_ptr) {
-                    let list = Self::list_in_folder_mut(folder); 
-                    if let Some(idx) = list.iter().position(|other| other == &new_ptr) {
-                        list.remove(idx);
-                    } 
-                    list.push(old_ptr.clone());
-                }
-            }
-        };
-
-        Some(ObjAction::new(redo, undo))
+        let ptr = ptr.clone();
+        let ptr_1 = ptr.clone();
+        let old_path_1 = old_path.clone();
+        let new_path_1 = new_path.clone();
+        let old_path_rel_1 = old_path_rel.clone();
+        let new_path_rel_1 = new_path_rel.clone();
+        Some(ObjAction::new(move |proj| {
+            Self::get_list_mut(proj).path_lookup.remove(&old_path_rel);
+            let file = Self::get_list_mut(proj).get_mut(&ptr).unwrap();
+            set_file_stem(&mut file.path, &new_name);
+            Self::get_list_mut(proj).path_lookup.insert(new_path_rel.clone(), key);
+            let _ = std::fs::rename(old_path.clone(), new_path.clone());
+        }, move |proj| {
+            Self::get_list_mut(proj).path_lookup.remove(&new_path_rel_1);
+            let file = Self::get_list_mut(proj).get_mut(&ptr_1).unwrap();
+            set_file_stem(&mut file.path, &old_name);
+            Self::get_list_mut(proj).path_lookup.insert(old_path_rel_1.clone(), key);
+            let _ = std::fs::rename(new_path_1.clone(), old_path_1.clone());
+        }))
     }
 
-    fn transfer(project: &mut Project, mut ptr: FilePtr<Self>, from: ObjPtr<Folder>, to: ObjPtr<Folder>) -> Option<ObjAction> where Self: 'static {
-        let old_ptr = ptr.clone();
-        let from_folder = project.folders.get(from)?;
-        let mut from_path = from_folder.file_path(project)?;
-        from_path.push(ptr.ptr.path.file_name()?);
-        let idx = Self::list_in_folder(from_folder).iter().position(|other| *other == ptr)?;
+    fn transfer(project: &mut Project, ptr: &FilePtr<Self>, from: ObjPtr<Folder>, to: ObjPtr<Folder>) -> Option<ObjAction> where Self: 'static {
+        if from == to {
+            return None;
+        }
+
+        let file = Self::get_list(project).get(ptr)?;
+        let new_name = next_unique_name(&file.name().to_owned(), Self::list_in_folder(project.folders.get(to)?).iter().map(|file_ptr| file_ptr.get(&project).map_or("", |file| file.name())));
 
         let to_folder = project.folders.get(to)?;
-        let mut to_path = to_folder.file_path(project)?;
-        let new_name = next_unique_name(&ptr.name().to_owned(), Self::list_in_folder(to_folder).iter().map(|ptr| ptr.name()));
-        ptr.set_name(new_name);
-        let new_ptr = ptr.clone();
-        to_path.push(ptr.ptr.path.file_name()?);
+        let mut new_path = to_folder.file_path(project)?.join(file.path.file_name()?.to_str()?);
+        set_file_stem(&mut new_path, &new_name);
+        let new_path_rel = pathdiff::diff_paths(new_path.clone(), project.base_path())?;
 
-        let to_folder = project.folders.get_mut(to)?;
-        Self::list_in_folder_mut(to_folder).push(ptr.clone());
-        
-        let from_folder = project.folders.get_mut(from)?;
-        Self::list_in_folder_mut(from_folder).remove(idx);
+        let old_path = file.absolute_path(project);
+        let old_path_rel = file.path.clone();
+        Self::get_list_mut(project).path_lookup.remove(&old_path_rel);
 
-        let _ = std::fs::rename(from_path.clone(), to_path.clone());
+        let file = Self::get_list_mut(project).get_mut(ptr)?;
+        file.path = new_path_rel.clone(); 
 
-        let redo = {
-            let from_path = from_path.clone();
-            let to_path = to_path.clone();
-            let old_ptr = old_ptr.clone();
-            let new_ptr = new_ptr.clone();
-            move |proj: &mut Project| {
-                let _ = std::fs::rename(from_path.clone(), to_path.clone());
-                if let Some(from_folder) = proj.folders.get_mut(from) {
-                    let list = Self::list_in_folder_mut(from_folder);
-                    if let Some(idx) = list.iter().position(|other| other == &old_ptr) {
-                        list.remove(idx);
-                    }
-                }
-                if let Some(to_folder) = proj.folders.get_mut(to) {
-                    let list = Self::list_in_folder_mut(to_folder);
-                    list.push(new_ptr.clone()); 
-                }
-            }
-        };
+        let file = Self::get_list(project).get(ptr)?;
+        let key = file.ptr.key;
+        Self::get_list_mut(project).path_lookup.insert(new_path_rel.clone(), key);
 
-        let undo = {
-            let from_path = from_path.clone();
-            let to_path = to_path.clone();
-            let old_ptr = old_ptr.clone();
-            let new_ptr = new_ptr.clone();
-            move |proj: &mut Project| {
-                let _ = std::fs::rename(to_path.clone(), from_path.clone());
-                if let Some(to_folder) = proj.folders.get_mut(to) {
-                    let list = Self::list_in_folder_mut(to_folder);
-                    if let Some(idx) = list.iter().position(|other| other == &new_ptr) {
-                        list.remove(idx);
-                    }
-                }
-                if let Some(from_folder) = proj.folders.get_mut(from) {
-                    let list = Self::list_in_folder_mut(from_folder);
-                    list.push(old_ptr.clone()); 
-                }
-            }
-        };
+        Self::list_in_folder_mut(project.folders.get_mut(from)?).retain(|other| other != ptr);
+        Self::list_in_folder_mut(project.folders.get_mut(to)?).push(ptr.clone());
+        std::fs::rename(old_path.clone(), new_path.clone()).ok()?;
 
-        Some(ObjAction::new(redo, undo)) 
+        let ptr = ptr.clone();
+        let ptr_1 = ptr.clone();
+        let old_path_1 = old_path.clone();
+        let new_path_1 = new_path.clone();
+        let old_path_rel_1 = old_path_rel.clone();
+        let new_path_rel_1 = new_path_rel.clone();
+        Some(ObjAction::new(move |proj| {
+            Self::get_list_mut(proj).path_lookup.remove(&old_path_rel);
+            let file = Self::get_list_mut(proj).get_mut(&ptr).unwrap();
+            file.path = new_path_rel.clone();
+            Self::get_list_mut(proj).path_lookup.insert(new_path_rel.clone(), key);
+            Self::list_in_folder_mut(proj.folders.get_mut(from).unwrap()).retain(|other| other != &ptr);
+            Self::list_in_folder_mut(proj.folders.get_mut(to).unwrap()).push(ptr.clone());
+            let _ = std::fs::rename(old_path.clone(), new_path.clone());
+        }, move |proj| {
+            Self::get_list_mut(proj).path_lookup.remove(&new_path_rel_1);
+            let file = Self::get_list_mut(proj).get_mut(&ptr_1).unwrap();
+            file.path = old_path_rel_1.clone();
+            Self::get_list_mut(proj).path_lookup.insert(old_path_rel_1.clone(), key);
+            Self::list_in_folder_mut(proj.folders.get_mut(to).unwrap()).retain(|other| other != &ptr_1);
+            Self::list_in_folder_mut(proj.folders.get_mut(from).unwrap()).push(ptr_1.clone());
+            let _ = std::fs::rename(new_path_1.clone(), old_path_1.clone());
+        }))
     }
 
 }
 
-#[derive(Clone, serde::Deserialize)]
 pub struct FilePtr<T: FileType> {
-    pub ptr: FilePtrAny,
-    pub _marker: PhantomData<T>
+    key: u64, 
+    _marker: PhantomData<T>
 }
+
+impl<T: FileType> FilePtr<T> {
+
+    pub fn from_key(key: u64) -> Self {
+        Self {
+            key,
+            _marker: PhantomData
+        }
+    }
+
+    pub fn null() -> Self {
+        Self::from_key(0)
+    }
+
+    pub fn get<'a>(&'a self, project: &'a Project) -> Option<&'a FileBox<T>> {
+        T::get_list(project).get(self)
+    }
+
+}
+
+impl<T: FileType> Hash for FilePtr<T> {
+
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.key.hash(state);
+    }
+
+}
+
+impl<T: FileType> Clone for FilePtr<T> {
+
+    fn clone(&self) -> Self {
+        Self {
+            key: self.key,
+            _marker: PhantomData
+        }
+    }
+
+}
+
+impl<T: FileType> Copy for FilePtr<T> {} 
+
+impl<T: FileType> ObjClone for FilePtr<T> {}
 
 impl<T: FileType> PartialEq for FilePtr<T> {
 
     fn eq(&self, other: &Self) -> bool {
-        self.ptr == other.ptr
+        self.key == other.key
     }
 
 }
 
 impl<T: FileType> Eq for FilePtr<T> {}
 
-impl<T: FileType> Hash for FilePtr<T> {
+pub struct FileBox<T: FileType> {
+    pub data: T,
+    pub ptr: FilePtr<T>,
+    // Path to the file, relative to the root folder of the project
+    pub path: PathBuf,
+    pub folder: ObjPtr<Folder>
+}
 
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.ptr.hash(state);
+impl<T: FileType> FileBox<T> {
+    
+    pub fn name<'a>(&'a self) -> &'a str {
+        self.path.file_stem().unwrap().to_str().unwrap()
+    }
+
+    pub fn absolute_path(&self, project: &Project) -> PathBuf {
+        project.base_path().join(self.path.clone())
     }
 
 }
 
-impl<T: FileType> FilePtr<T> {
+pub struct FileList<T: FileType> {
+    files: HashMap<u64, FileBox<T>>,
+    path_lookup: HashMap<PathBuf, u64>,
+    curr_key: u64
+}
 
-    pub fn new(path: PathBuf, hash: u64) -> Self {
+impl<T: FileType> FileList<T> {
+
+    pub fn new() -> Self {
         Self {
-            ptr: FilePtrAny::new(path, hash),
-            _marker: PhantomData
+            files: HashMap::new(),
+            path_lookup: HashMap::new(),
+            curr_key: 1
         }
     }
 
-    pub fn null() -> Self {
-        Self {
-            ptr: FilePtrAny::null(),
-            _marker: PhantomData
+    pub fn load_lookups(&mut self, data: Value, metadata: &mut LoadingMetadata) -> Option<()> {
+
+        let paths = data.get("paths")?.as_object()?;
+        for (path, key) in paths.iter() { 
+            let key = key.as_u64()?;
+            T::list_in_loading_metadata_mut(metadata).push((FilePtr::<T>::from_key(key), path.clone()));
+            self.path_lookup.insert(path.into(), key); 
+            self.curr_key = self.curr_key.max(key + 1);
         }
+
+        Some(())
     }
 
-    pub fn name(&self) -> &str {
-        self.ptr.name()
-    }
+    pub fn save_lookups(&self) -> Value {
+        let mut paths = Map::new();
 
-    pub fn set_name(&mut self, name: String) {
-        self.ptr.set_name(name);
-    }
-
-    pub fn lookup(&self, project: &Project) -> Self {
-        Self {
-            ptr: self.ptr.lookup(project),
-            _marker: PhantomData
+        for (path, key) in self.path_lookup.iter() {
+            paths.insert(path.to_str().unwrap().to_owned(), json!(*key));
         }
+
+        json!({
+            "paths": paths,
+        })
+    }
+
+    pub fn load_file(&mut self, project_base_path: PathBuf, path: PathBuf, folder: ObjPtr<Folder>) -> Option<FilePtr<T>> {
+        let rel_path = pathdiff::diff_paths(path.clone(), project_base_path)?; 
+        let data = T::load(path)?;
+
+        let mut key = if let Some(key) = self.path_lookup.get(&rel_path) {
+            *key
+        } else {
+            self.curr_key
+        };
+        self.curr_key = self.curr_key.max(key + 1);
+
+        if self.files.contains_key(&key) {
+            key = self.curr_key;
+            self.curr_key += 1; 
+        }
+
+        let ptr = FilePtr {
+            key,
+            _marker: PhantomData
+        };
+
+        self.files.insert(key, FileBox {
+            data,
+            ptr: ptr.clone(),
+            path: rel_path.clone(),
+            folder
+        });
+        self.path_lookup.insert(rel_path, key);
+
+        Some(ptr)
+    }
+
+    pub fn get<'a>(&'a self, ptr: &FilePtr<T>) -> Option<&'a FileBox<T>> {
+        self.files.get(&ptr.key)
+    }
+    
+    pub fn get_mut<'a>(&'a mut self, ptr: &FilePtr<T>) -> Option<&'a mut FileBox<T>> {
+        self.files.get_mut(&ptr.key)
     }
 
 }
-
-impl<T: FileType + Clone> ObjClone for FilePtr<T> {} 
-impl PrimitiveObjClone for PathBuf {}
-impl PrimitiveObjClone for [u8; 8] {}
 
 impl<T: FileType> ObjSerialize for FilePtr<T> {
 
     fn obj_serialize(&self, project: &Project, _asset_file: &mut AssetFile) -> bson::Bson {
-        let ptr = self.lookup(project);
-        bson::bson! ({
-            "filepath": ptr.ptr.path.to_str().unwrap(),
-            "hash": u64_to_bson(ptr.ptr.hash)
-        })
+        if let Some(file) = self.get(project) {
+            bson::bson!({
+                "key": u64_to_bson(file.ptr.key),
+            })
+        } else {
+            bson::bson!({
+                "key": u64_to_bson(0)
+            })
+        }
     }
 
     fn obj_serialize_full(&self, project: &Project, asset_file: &mut AssetFile) -> bson::Bson {
         self.obj_serialize(project, asset_file)
     }
 
-    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: super::obj::ObjPtrAny, asset_file: &mut AssetFile) -> Option<Self> {
-        let path = PathBuf::obj_deserialize(project, bson_get(&data, "filepath")?, parent, asset_file)?;
-        let hash = bson_to_u64(bson_get(data, "hash")?)?;
-        Some(Self {
-            ptr: FilePtrAny::new(path, hash),
+    fn obj_deserialize(_project: &mut Project, data: &bson::Bson, _parent: super::obj::ObjPtrAny, _asset_file: &mut AssetFile, _metadata: &mut LoadingMetadata) -> Option<Self> {
+        let key = bson_to_u64(bson_get(data, "key")?)?;
+        let res = Self {
+            key, 
             _marker: PhantomData
-        })
+        };
+        Some(res)
     }
 
     type RawData = Self;
+
     fn to_raw_data(&self, _project: &Project) -> Self::RawData {
-        self.clone() 
+        self.clone()
     }
 
     fn from_raw_data(_project: &mut Project, data: &Self::RawData) -> Self {

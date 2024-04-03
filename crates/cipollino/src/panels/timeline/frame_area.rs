@@ -90,12 +90,12 @@ impl FrameGridRow {
                 }
             }
 
-            if let Some(audio) = state.project.audio_files.get(&sound_instance.audio.lookup(&state.project)) {
+            if let Some(audio) = state.project.audio_files.get(&sound_instance.audio) {
                 for x in (left as i32)..(right as i32) {
                     let x = x as f32;
                     let t = (x - left) / (right - left);
-                    let volume_sum_idx = (t * (audio.volumes.len() as f32)) as usize;
-                    let sum = audio.volumes[volume_sum_idx].powf(0.4);
+                    let volume_sum_idx = (t * (audio.data.volumes.len() as f32)) as usize;
+                    let sum = audio.data.volumes[volume_sum_idx].powf(0.4);
                     ui.painter().rect_filled(
                         egui::Rect::from_center_size(egui::pos2(x, rect.center().y), egui::vec2(1.0, sum * frame_h)),
                         0.0,
@@ -112,7 +112,7 @@ impl FrameGridRow {
                         if let Some(audio) = state.project.audio_files.get(audio) {
                             ui.painter().rect_stroke(
                                 egui::Rect::from_min_size(
-                                    egui::pos2(hover_pos.x, rect.top()), egui::vec2(frame_w * (audio.samples.len() as f32) * state.sample_len() / state.frame_len(), frame_h)),
+                                    egui::pos2(hover_pos.x, rect.top()), egui::vec2(frame_w * (audio.data.samples.len() as f32) * state.sample_len() / state.frame_len(), frame_h)),
                                 0.0,
                                 ui.visuals().widgets.active.bg_stroke);
                         }
@@ -121,7 +121,7 @@ impl FrameGridRow {
                 if let Some(payload) = response.dnd_release_payload::<(AssetPtr, ObjPtr<Folder>)>() {
                     if let AssetPtr::Audio(audio_file_ptr) = &(*payload).0 {
                         if let Some(audio) = state.project.audio_files.get(audio_file_ptr) {
-                            let length = audio.samples.len() as i64;
+                            let length = audio.data.samples.len() as i64;
                             SoundInstance::add(&mut state.project, layer_ptr, SoundInstance {
                                 layer: layer_ptr,
                                 begin,

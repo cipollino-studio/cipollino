@@ -1,4 +1,6 @@
 
+use crate::project::saveload::load::LoadingMetadata;
+
 use super::{state::EditorState, EditorSystems};
 
 pub fn handle_dropped_files(ctx: &egui::Context, state: &mut EditorState, systems: &mut EditorSystems) {
@@ -23,9 +25,10 @@ pub fn handle_dropped_files(ctx: &egui::Context, state: &mut EditorState, system
                 }
             }
             
+            let mut metadata = LoadingMetadata::new();
             match std::fs::rename(path, dest_path.clone()) {
                 Ok(_) => {
-                    state.project.load_file_to_root_folder(dest_path);
+                    state.project.load_file_to_root_folder(dest_path, &mut metadata);
                 },
                 Err(err) => {
                     systems.toasts.error_toast(format!("Could not move file: {}.", err.to_string()));

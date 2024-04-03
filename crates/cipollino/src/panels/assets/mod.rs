@@ -1,4 +1,6 @@
 
+use std::cmp;
+
 use crate::{editor::{state::EditorState, EditorSystems}, project::{action::Action, file::{audio::AudioFile, FilePtr, FileType}, folder::Folder, graphic::Graphic, obj::{asset::Asset, ObjBox, ObjPtr}, palette::Palette, Project}, util::ui::dnd::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_label, draggable_widget}};
 use crate::project::AssetPtr;
 
@@ -7,7 +9,7 @@ use self::graphic_dialogs::{GraphicPropertiesDialog, NewGraphicDialog};
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct AssetsPanel {
     #[serde(skip)]
-    editing_name: Option<(AssetPtr, ObjPtr<Folder>, String)>
+    editing_name: Option<(AssetPtr, String)>
 }
 
 mod graphic_dialogs;
@@ -104,13 +106,13 @@ impl AssetsPanel {
         }
 
         if rename {
-            let (asset, folder, name) = std::mem::replace(&mut self.editing_name, None).unwrap();
+            let (asset, name) = std::mem::replace(&mut self.editing_name, None).unwrap();
             if !name.is_empty() {
                 if let Some(act) = match asset {
                     AssetPtr::Folder(folder) => Folder::rename(&mut state.project, folder, name),
                     AssetPtr::Graphic(graphic) => Graphic::rename(&mut state.project, graphic, name),
                     AssetPtr::Palette(palette) => Palette::rename(&mut state.project, palette, name),
-                    AssetPtr::Audio(audio) => AudioFile::rename(&mut state.project, audio, folder, name),
+                    AssetPtr::Audio(audio) => AudioFile::rename(&mut state.project, &audio, name),
                 } {
                     state.actions.add(Action::from_single(act));
                 }
@@ -129,7 +131,7 @@ impl AssetsPanel {
                     Folder::asset_transfer(&mut state.project, subfolder, folder) 
                 },
                 AssetPtr::Audio(audio) => {
-                    AudioFile::transfer(&mut state.project, audio, from_folder, folder).map(|act| vec![act])
+                    AudioFile::transfer(&mut state.project, &audio, from_folder, folder).map(|act| vec![act])
                 }
             } {
                 state.actions.add(Action::from_list(acts));
@@ -137,8 +139,8 @@ impl AssetsPanel {
         }
     }
 
-    fn begin_rename(&mut self, asset: AssetPtr, folder: ObjPtr<Folder>, name: String) {
-        self.editing_name = Some((asset, folder, name.clone()));
+    fn begin_rename(&mut self, asset: AssetPtr, name: String) {
+        self.editing_name = Some((asset, name.clone()));
     }
 
     fn render_asset<T, F>(&mut self, ui: &mut egui::Ui, state: &EditorState, obj: &ObjBox<T>, folder: ObjPtr<Folder>, open: &mut Option<AssetPtr>, delete: &mut Option<AssetPtr>, rename: &mut bool, context_menu: F) where T: Asset, F: FnOnce(&mut egui::Ui) {
@@ -151,7 +153,7 @@ impl AssetsPanel {
             resp.context_menu(|ui| {
                 context_menu(ui);
                 if ui.button("Rename").clicked() {
-                    self.begin_rename(T::make_asset_ptr(obj.make_ptr()), folder, obj.get(&state.project).name().clone());
+                    self.begin_rename(T::make_asset_ptr(obj.make_ptr()), obj.get(&state.project).name().clone());
                     ui.close_menu();
                 }
                 if ui.button("Delete").clicked() {
@@ -160,33 +162,35 @@ impl AssetsPanel {
                 }
             });
         } else {
-            let (_, _, name) = self.editing_name.as_mut().unwrap();
+            let (_, name) = self.editing_name.as_mut().unwrap();
             if ui.text_edit_singleline(name).lost_focus() {
                 *rename = true;
             }
         }
     }
 
-    fn render_file_asset<T>(&mut self, ui: &mut egui::Ui, file: &FilePtr<T>, folder: ObjPtr<Folder>, delete: &mut Option<AssetPtr>, rename: &mut bool) where T: FileType {
-        if self.editing_name.is_none() || T::make_asset_ptr(file) != self.editing_name.as_ref().unwrap().0 {
+    fn render_file_asset<T>(&mut self, ui: &mut egui::Ui, project: &Project, file_ptr: &FilePtr<T>, folder: ObjPtr<Folder>, delete: &mut Option<AssetPtr>, rename: &mut bool) -> Option<()> where T: FileType {
+        if self.editing_name.is_none() || T::make_asset_ptr(file_ptr) != self.editing_name.as_ref().unwrap().0 {
+            let file = file_ptr.get(project)?;
             let asset_text = format!("{} {}", T::icon(), file.name());
-            let resp = draggable_label(ui, asset_text.as_str(), (T::make_asset_ptr(file), folder));
+            let resp = draggable_label(ui, asset_text.as_str(), (T::make_asset_ptr(file_ptr), folder));
             resp.context_menu(|ui| {
                 if ui.button("Rename").clicked() {
-                    self.begin_rename(T::make_asset_ptr(file), folder, file.name().to_owned());
+                    self.begin_rename(T::make_asset_ptr(file_ptr), file.name().to_owned());
                     ui.close_menu();
                 }
                 if ui.button("Delete").clicked() {
-                    *delete = Some(T::make_asset_ptr(file));
+                    *delete = Some(T::make_asset_ptr(file_ptr));
                     ui.close_menu();
                 }
             });
         } else {
-            let (_, _, name) = self.editing_name.as_mut().unwrap();
+            let (_, name) = self.editing_name.as_mut().unwrap();
             if ui.text_edit_singleline(name).lost_focus() {
                 *rename = true;
             }
         }
+        Some(())
     } 
 
     fn sort_asset_list<'a, T: Asset>(project: &'a Project, assets: &'a Vec<ObjBox<T>>) -> Vec<&'a ObjBox<T>> {
@@ -197,10 +201,15 @@ impl AssetsPanel {
         res
     }
 
-    fn sort_file_asset_list<'a, T: FileType>(file_assets: &'a Vec<FilePtr<T>>) -> Vec<&'a FilePtr<T>> {
+    fn sort_file_asset_list<'a, T: FileType>(project: &'a Project, file_assets: &'a Vec<FilePtr<T>>) -> Vec<&'a FilePtr<T>> {
         let mut res = file_assets.iter().map(|elem| elem).collect::<Vec<&'a FilePtr<T>>>();
-        res.sort_by(|a, b| {
-            a.name().to_lowercase().cmp(&b.name().to_lowercase())
+        res.sort_by(|a_ptr, b_ptr| {
+            if let Some(a) = a_ptr.get(project) {
+                if let Some(b) = b_ptr.get(project) {
+                    return a.name().to_lowercase().cmp(&b.name().to_lowercase());
+                }
+            }
+            cmp::Ordering::Equal 
         });
         res
     }
@@ -237,8 +246,8 @@ impl AssetsPanel {
         for palette in Self::sort_asset_list(&state.project, &folder.palettes) {
             self.render_asset(ui, state, palette, folder_ptr, open, delete, rename, |_| {});
         }
-        for audio in Self::sort_file_asset_list(&folder.audios) { 
-            self.render_file_asset(ui, audio, folder_ptr, delete, rename);
+        for audio in Self::sort_file_asset_list(&state.project, &folder.audios) { 
+            self.render_file_asset(ui, &state.project, audio, folder_ptr, delete, rename);
         }
         Some(inner_hovered)
     }
@@ -255,7 +264,7 @@ impl AssetsPanel {
         asset_transfer: &mut Option<(ObjPtr<Folder>, AssetPtr, ObjPtr<Folder>)>) -> Option<bool> {
 
         if !self.editing_name.is_none() && self.editing_name.as_ref().unwrap().0 == Folder::make_asset_ptr(folder.make_ptr()) {
-            if ui.text_edit_singleline(&mut self.editing_name.as_mut().unwrap().2).lost_focus() {
+            if ui.text_edit_singleline(&mut self.editing_name.as_mut().unwrap().1).lost_focus() {
                 *rename = true;
             }
             return Some(false);
@@ -290,7 +299,7 @@ impl AssetsPanel {
 
         folder_resp.context_menu(|ui| {
             if ui.button("Rename").clicked() {
-                self.begin_rename(Folder::make_asset_ptr(folder.make_ptr()), superfolder, folder.get(&state.project).name.clone());
+                self.begin_rename(Folder::make_asset_ptr(folder.make_ptr()), folder.get(&state.project).name.clone());
                 ui.close_menu();
             }
             if ui.button("Delete").clicked() {
