@@ -41,7 +41,7 @@ pub trait ChildObj: Obj + 'static + ObjSerialize {
         let idx = if siblings.len() == 0 {
             0
         } else if idx < 0 {
-            siblings.len() - ((-idx as usize) % siblings.len())
+            siblings.len() - ((-(idx + 1) as usize) % siblings.len())
         } else {
             (idx as usize) % siblings.len()
         };
