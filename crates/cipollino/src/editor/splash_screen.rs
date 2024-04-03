@@ -1,19 +1,25 @@
 
 use std::path::PathBuf;
 
+use include_lines::static_include_lines;
 use unique_type_id::UniqueTypeId;
 
 use super::{dialog::Dialog, new_project::{default_project_location, NewProject}, prefs::{UserPref, UserPrefs}, state::EditorState, EditorSystems};
+use rand::Rng;
 
 #[derive(UniqueTypeId)]
 pub struct SplashScreen {
-
+    quote: &'static str
 }
+
+static_include_lines!(QUOTES, "res/quotes.txt");
 
 impl SplashScreen {
 
     pub fn new() -> Self {
-        Self {}
+        Self {
+            quote: QUOTES[rand::thread_rng().gen_range(0..QUOTES.len())] 
+        }
     }
 
     fn splash_screen_left_side(&mut self, ui: &mut egui::Ui, close_dialog: &mut bool, state: &mut EditorState, systems: &mut EditorSystems) {
@@ -81,7 +87,9 @@ impl Dialog for SplashScreen {
         }));
         egui::Frame::default().inner_margin(ui.ctx().style().spacing.window_margin).show(ui, |ui| {
             ui.vertical_centered(|ui| {
-                ui.small("\"Animation consists of nothing but work!\" - Richard Williams")
+                ui.allocate_ui(egui::vec2(240.0, ui.available_size_before_wrap().y), |ui| {
+                    ui.small(self.quote);
+                });
             });
             ui.add_space(15.0);
             ui.columns(2, |cols| {
