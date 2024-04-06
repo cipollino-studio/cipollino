@@ -6,6 +6,7 @@ use super::generate::MAX_AUDIO_CHANNELS;
 pub struct AudioClip {
     pub begin: i64,
     pub end: i64,
+    pub offset: i64,
     pub samples: Arc<Vec<[f32; MAX_AUDIO_CHANNELS]>>
 }
 

@@ -13,7 +13,7 @@ pub mod audio;
 
 pub trait FileType: Sized + Send + Sync + Clone {
 
-    fn load(path: PathBuf) -> Option<Self>;
+    fn load(project: &Project, path: PathBuf) -> Option<Self>;
 
     fn get_list(project: &Project) -> &FileList<Self>;
     fn get_list_mut(project: &mut Project) -> &mut FileList<Self>;
@@ -237,20 +237,21 @@ impl<T: FileType> FileList<T> {
         })
     }
 
-    pub fn load_file(&mut self, project_base_path: PathBuf, path: PathBuf, folder: ObjPtr<Folder>) -> Option<FilePtr<T>> {
+    pub fn load_file(project: &mut Project, project_base_path: PathBuf, path: PathBuf, folder: ObjPtr<Folder>) -> Option<FilePtr<T>> {
         let rel_path = pathdiff::diff_paths(path.clone(), project_base_path)?; 
-        let data = T::load(path)?;
+        let data = T::load(project, path)?;
+        let list = T::get_list_mut(project);
 
-        let mut key = if let Some(key) = self.path_lookup.get(&rel_path) {
+        let mut key = if let Some(key) = list.path_lookup.get(&rel_path) {
             *key
         } else {
-            self.curr_key
+            list.curr_key
         };
-        self.curr_key = self.curr_key.max(key + 1);
+        list.curr_key = list.curr_key.max(key + 1);
 
-        if self.files.contains_key(&key) {
-            key = self.curr_key;
-            self.curr_key += 1; 
+        if list.files.contains_key(&key) {
+            key = list.curr_key;
+            list.curr_key += 1; 
         }
 
         let ptr = FilePtr {
@@ -258,13 +259,13 @@ impl<T: FileType> FileList<T> {
             _marker: PhantomData
         };
 
-        self.files.insert(key, FileBox {
+        list.files.insert(key, FileBox {
             data,
             ptr: ptr.clone(),
             path: rel_path.clone(),
             folder
         });
-        self.path_lookup.insert(rel_path, key);
+        list.path_lookup.insert(rel_path, key);
 
         Some(ptr)
     }

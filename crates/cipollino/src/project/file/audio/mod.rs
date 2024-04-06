@@ -1,11 +1,14 @@
 
-use std::{fs::File, path::PathBuf, sync::Arc, collections::HashSet};
+use std::{path::PathBuf, sync::Arc, collections::HashSet};
 
 use crate::{audio::generate::MAX_AUDIO_CHANNELS, project::{saveload::load::LoadingMetadata, AssetPtr, Project}};
+
+use self::reader::read_samples;
 
 use super::{FileList, FilePtr, FileType};
 
 pub const SAMPLES_PER_VOLUME_SUM: usize = 100;
+mod reader;
 
 #[derive(Clone)]
 pub struct AudioFile {
@@ -15,12 +18,10 @@ pub struct AudioFile {
 
 impl FileType for AudioFile {
 
-    fn load(path: PathBuf) -> Option<Self> {
+    fn load(project: &Project, path: PathBuf) -> Option<Self> {
         match path.extension()?.to_str()? {
             "mp3" => {
-                let file = File::open(path).ok()?;
-                let samples = read_mp3_data(file); 
-                Some(Self::new(samples))
+                Some(Self::new(read_samples(path, project.sample_rate as u32)?))
             },
             _ => None
         }
@@ -58,39 +59,6 @@ impl FileType for AudioFile {
         egui_phosphor::regular::SPEAKER_HIGH
     }
 
-}
-
-fn read_mp3_data(file: File) -> Vec<[f32; MAX_AUDIO_CHANNELS]> {
-    use minimp3_fixed::{Decoder, Frame, Error}; 
-    
-    let mut decoder = Decoder::new(file);
-    let mut samples = Vec::new();
-    loop {
-        match decoder.next_frame() {
-            Ok(Frame { data, sample_rate: _, channels, .. }) => {
-                // TODO: reinteroplate audio with sample rates not equal to project's sample rate 
-                for i in 0..(data.len() / channels) {
-                    let mut sample = [0.0; MAX_AUDIO_CHANNELS];
-                    for j in 0..(channels.min(MAX_AUDIO_CHANNELS)) {
-                        sample[j] = (data[i * channels + j] as f32) / (i16::MAX as f32);
-                    }
-
-                    // If the source audio is mono, copy the one channel to all channels 
-                    if channels == 1 {
-                        for i in 1..MAX_AUDIO_CHANNELS {
-                            sample[i] = sample[0];
-                        }
-                    }
-
-                    samples.push(sample);
-                }
-            },
-            Err(Error::Eof) => break,
-            Err(_) => break
-        }    
-    }
-
-    samples
 }
 
 impl AudioFile {

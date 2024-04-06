@@ -11,6 +11,8 @@ pub struct SoundInstance {
     pub begin: i64,
     #[field]
     pub end: i64,
+    #[field]
+    pub offset: i64,
     pub audio: FilePtr<AudioFile>
 }
 
@@ -43,6 +45,7 @@ impl Default for SoundInstance {
             layer: ObjPtr::null(),
             begin: 0,
             end: 0,
+            offset: 0,
             audio: FilePtr::null()
         }
     }

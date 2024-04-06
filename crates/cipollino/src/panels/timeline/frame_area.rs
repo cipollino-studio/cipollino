@@ -1,9 +1,69 @@
 
 use egui::{vec2, Vec2};
 
-use crate::{editor::{selection::Selection, state::EditorState}, project::{action::Action, folder::Folder, frame::Frame, layer::Layer, obj::{child_obj::ChildObj, ObjPtr}, sound_instance::SoundInstance, AssetPtr}};
+use crate::{editor::{selection::Selection, state::EditorState}, project::{action::{Action, ObjAction}, file::{audio::AudioFile, FilePtr}, folder::Folder, frame::Frame, layer::Layer, obj::{child_obj::ChildObj, ObjPtr}, sound_instance::SoundInstance, AssetPtr, Project}};
 
 use super::{FrameGridRow, FrameGridRowKind, TimelinePanel};
+
+fn add_sound_instance(project: &mut Project, layer_ptr: ObjPtr<Layer>, audio: FilePtr<AudioFile>, begin: i64) -> Option<Vec<ObjAction>> {
+    let mut acts = Vec::new();
+    
+    let audio_file = audio.get(project)?;
+    let length = audio_file.data.samples.len() as i64;
+    let end = begin + length;
+
+    let layer = project.layers.get(layer_ptr)?;
+    let sound_instance_ptrs = layer.sound_instances.iter().map(|layer| layer.make_ptr()).collect::<Vec<ObjPtr<SoundInstance>>>();
+    for sound_instance_ptr in sound_instance_ptrs {
+        if let Some(sound_instance) = project.sound_instances.get(sound_instance_ptr) {
+            if (begin..end).contains(&sound_instance.begin) && (begin..end).contains(&sound_instance.end) {
+                if let Some(act) = SoundInstance::delete(project, sound_instance_ptr) {
+                    acts.push(act);
+                }
+                continue;
+            }
+        }
+        if let Some(sound_instance) = project.sound_instances.get(sound_instance_ptr) {
+            if (sound_instance.begin..sound_instance.end).contains(&begin) && (sound_instance.begin..sound_instance.end).contains(&end) {
+                if let Some(act) = SoundInstance::set_end(project, sound_instance_ptr, begin) {
+                    acts.push(act);
+                }
+                continue;
+            }
+        }
+        if let Some(sound_instance) = project.sound_instances.get(sound_instance_ptr) { 
+            if (sound_instance.begin..sound_instance.end).contains(&begin) {
+                if let Some(act) = SoundInstance::set_end(project, sound_instance_ptr, begin) {
+                    acts.push(act);
+                }
+            }
+        }
+        if let Some(sound_instance) = project.sound_instances.get(sound_instance_ptr) { 
+            let samples_chopped = begin + length - sound_instance.begin; 
+            let offset = sound_instance.offset;
+            if (sound_instance.begin..sound_instance.end).contains(&(begin + length)) {
+                if let Some(act) = SoundInstance::set_begin(project, sound_instance_ptr, begin + length) {
+                    acts.push(act);
+                }
+                if let Some(act) = SoundInstance::set_offset(project, sound_instance_ptr, offset + samples_chopped) {
+                    acts.push(act);
+                }
+            }
+        }
+    }
+
+    if let Some((_, act)) = SoundInstance::add(project, layer_ptr, SoundInstance {
+        layer: layer_ptr,
+        begin,
+        end: begin + length,
+        offset: 0,
+        audio,
+    }) {
+        acts.push(act);
+    }
+
+    Some(acts)
+}
 
 impl FrameGridRow {
 
@@ -94,40 +154,39 @@ impl FrameGridRow {
                 for x in (left as i32)..(right as i32) {
                     let x = x as f32;
                     let t = (x - left) / (right - left);
+                    let min_t = (sound_instance.offset as f32) / (audio.data.samples.len() as f32);
+                    let max_t = min_t + ((sound_instance.end - sound_instance.begin) as f32) / (audio.data.samples.len() as f32);
+                    let t = t * (max_t - min_t) + min_t; 
                     let volume_sum_idx = (t * (audio.data.volumes.len() as f32)) as usize;
-                    let sum = audio.data.volumes[volume_sum_idx].powf(0.4);
+                    let sum = audio.data.volumes[volume_sum_idx.clamp(0, audio.data.volumes.len() - 1)];
                     ui.painter().rect_filled(
-                        egui::Rect::from_center_size(egui::pos2(x, rect.center().y), egui::vec2(1.0, sum * frame_h)),
+                        egui::Rect::from_center_size(egui::pos2(x, rect.center().y), egui::vec2(1.0, (1.5 * sum).clamp(0.0, 1.0) * frame_h)),
                         0.0,
                         egui::Color32::from_rgba_premultiplied(0, 0, 0, 60));
                 }
             }
         }
 
+        // Dropping audio onto the layer
         if let Some(hover_pos) = ui.input(|i| i.pointer.hover_pos()) {
             if rect.contains(hover_pos) {
-                let begin = (44100.0 * (hover_pos.x - rect.left()) / frame_w / 24.0).floor() as i64;
                 if let Some(payload) = response.dnd_hover_payload::<(AssetPtr, ObjPtr<Folder>)>() {
-                    if let AssetPtr::Audio(audio) = &(*payload).0 {
-                        if let Some(audio) = state.project.audio_files.get(audio) {
-                            ui.painter().rect_stroke(
-                                egui::Rect::from_min_size(
-                                    egui::pos2(hover_pos.x, rect.top()), egui::vec2(frame_w * (audio.data.samples.len() as f32) * state.sample_len() / state.frame_len(), frame_h)),
-                                0.0,
-                                ui.visuals().widgets.active.bg_stroke);
-                        }
-                    }
-                }
-                if let Some(payload) = response.dnd_release_payload::<(AssetPtr, ObjPtr<Folder>)>() {
                     if let AssetPtr::Audio(audio_file_ptr) = &(*payload).0 {
                         if let Some(audio) = state.project.audio_files.get(audio_file_ptr) {
+                            let begin = (44100.0 * (hover_pos.x - rect.left()) / frame_w / 24.0).floor() as i64;
                             let length = audio.data.samples.len() as i64;
-                            SoundInstance::add(&mut state.project, layer_ptr, SoundInstance {
-                                layer: layer_ptr,
-                                begin,
-                                end: begin + length,
-                                audio: audio_file_ptr.clone(),
-                            });
+
+                            ui.painter().rect_stroke(
+                                egui::Rect::from_min_size(
+                                    egui::pos2(hover_pos.x, rect.top()), egui::vec2(frame_w * (length as f32) * state.sample_len() / state.frame_len(), frame_h)),
+                                0.0,
+                                ui.visuals().widgets.active.bg_stroke);
+
+                            if response.dnd_release_payload::<(AssetPtr, ObjPtr<Folder>)>().is_some() {
+                                if let Some(acts) = add_sound_instance(&mut state.project, layer_ptr, *audio_file_ptr, begin) {
+                                    state.actions.add(Action::from_list(acts));
+                                }
+                            }
                         }
                     }
                 }
@@ -262,7 +321,7 @@ pub fn frames(timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_w: f32, fra
     }
 
     // Sound dragging
-    if let Selection::Timeline(_, sounds) = &state.selection {
+    if let Selection::Timeline(_, selected_sounds) = &state.selection {
         if response.drag_delta().x.abs() > 0.0 {
             if let Some(action) = &timeline.sound_drag_action {
                 action.undo(&mut state.project);
@@ -270,14 +329,28 @@ pub fn frames(timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_w: f32, fra
 
             timeline.sound_drag += response.drag_delta().x;
             let mut sound_shift = ((timeline.sound_drag / frame_w) * state.frame_len() / state.sample_len()) as i64;
-            for sound in sounds {
-                if let Some(sound) = state.project.sound_instances.get(*sound) {
-                    sound_shift = sound_shift.max(-sound.begin);
+            for selected_sound_ptr in selected_sounds {
+                if let Some(selected_sound) = state.project.sound_instances.get(*selected_sound_ptr) {
+                    sound_shift = sound_shift.max(-selected_sound.begin);
+                    if let Some(layer) = state.project.layers.get(selected_sound.layer) {
+                        for sound_box in &layer.sound_instances {
+                            if selected_sounds.contains(&sound_box.make_ptr()) {
+                                continue;
+                            }
+                            let sound = sound_box.get(&state.project);
+                            if sound.end <= selected_sound.begin {
+                                sound_shift = sound_shift.max(sound.end - selected_sound.begin);
+                            }
+                            if sound.begin >= selected_sound.end {
+                                sound_shift = sound_shift.min(sound.begin - selected_sound.end);
+                            }
+                        }
+                    }
                 }
             }
             
             let mut new_action = Action::new();
-            for sound_ptr in sounds {
+            for sound_ptr in selected_sounds {
                 if let Some(sound) = state.project.sound_instances.get(*sound_ptr) {
                     let begin = sound.begin;
                     let end = sound.end;

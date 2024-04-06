@@ -173,6 +173,7 @@ impl EditorState {
                     audio.clips.push(AudioClip {
                         begin: instance.begin, 
                         end: instance.end, 
+                        offset: instance.offset,
                         samples: file.data.samples.clone(),
                     });
                 }

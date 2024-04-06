@@ -1,4 +1,4 @@
-use crate::{editor::{state::EditorState, toasts::Toasts}, project::{file::FilePtr, Project}};
+use crate::{editor::{state::EditorState, toasts::Toasts}, project::{file::{FileList, FilePtr}, Project}};
 
 use std::{collections::HashSet, fs, path::PathBuf};
 
@@ -109,7 +109,7 @@ impl Project {
 
     fn load_file_asset<T: FileType>(&mut self, path: PathBuf, folder: ObjPtr<Folder>) -> Option<()> {
         let base_path = self.base_path();
-        let file = T::get_list_mut(self).load_file(base_path, path, folder)?;
+        let file = FileList::<T>::load_file(self, base_path, path, folder)?;
         T::list_in_folder_mut(self.folders.get_mut(folder)?).push(file);
         Some(())
     }

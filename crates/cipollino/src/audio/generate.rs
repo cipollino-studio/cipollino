@@ -10,8 +10,8 @@ impl AudioState {
 
         for clip in &self.clips {
             if self.time >= clip.begin && self.time < clip.end {
-                let offset = (self.time - clip.begin) as usize;
-                if offset > clip.samples.len() {
+                let offset = (self.time - clip.begin + clip.offset) as usize;
+                if offset >= clip.samples.len() {
                     continue;
                 }
                 for c in 0..MAX_AUDIO_CHANNELS {
