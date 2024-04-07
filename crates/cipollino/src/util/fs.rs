@@ -42,3 +42,8 @@ pub fn set_file_stem(path: &mut PathBuf, stem: &str) {
         path.set_file_name(stem);
     }
 }
+
+#[cfg(target_os = "macos")]
+pub fn trash_folder() -> PathBuf {
+    directories::UserDirs::new().unwrap().home_dir().join(".Trash")
+}

@@ -99,7 +99,7 @@ impl AssetsPanel {
                 AssetPtr::Folder(folder) => Folder::asset_delete(&mut state.project, folder),
                 AssetPtr::Graphic(graphic) => Graphic::asset_delete(&mut state.project, graphic),
                 AssetPtr::Palette(palette) => Palette::asset_delete(&mut state.project, palette),
-                AssetPtr::Audio(_) => todo!(),
+                AssetPtr::Audio(audio) => AudioFile::delete(&mut state.project, audio).map(|act| vec![act]),
             } {
                 state.actions.add(Action::from_list(acts));
             }

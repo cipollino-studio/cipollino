@@ -1,11 +1,11 @@
 
-use std::{collections::{HashMap, HashSet}, marker::PhantomData, path::PathBuf};
+use std::{collections::{HashMap, HashSet}, marker::PhantomData, path::PathBuf, sync::{Arc, Mutex}};
 
 use serde_json::{json, Map, Value};
 
 use std::hash::Hash;
 
-use crate::util::{bson::{bson_get, bson_to_u64, u64_to_bson}, fs::set_file_stem, next_unique_name};
+use crate::util::{bson::{bson_get, bson_to_u64, u64_to_bson}, fs::{set_file_stem, trash_folder}, next_unique_name};
 
 use super::{action::ObjAction, folder::Folder, obj::{ObjClone, ObjPtr, ObjSerialize}, saveload::{asset_file::AssetFile, load::LoadingMetadata}, AssetPtr, Project};
 
@@ -25,6 +25,49 @@ pub trait FileType: Sized + Send + Sync + Clone {
     fn make_asset_ptr(ptr: &FilePtr<Self>) -> AssetPtr;
 
     fn icon() -> &'static str;
+
+    fn delete(project: &mut Project, ptr: FilePtr<Self>) -> Option<ObjAction> where Self: 'static {
+        let file = ptr.get(project)?;
+        let path = file.path.clone();
+        let absolute_path = file.absolute_path(project);
+        let key = ptr.key;
+        Self::list_in_folder_mut(project.folders.get_mut(file.folder)?).retain(|other_ptr| *other_ptr != ptr);
+        Self::get_list_mut(project).path_lookup.remove(&path)?;
+        let file = Self::get_list_mut(project).files.remove(&ptr.key)?;
+
+        let mut graveyard_path = trash_folder().join(absolute_path.file_name()?);
+        if graveyard_path.exists() {
+            for i in 1.. {
+                graveyard_path = trash_folder().join(absolute_path.file_name()?);
+                set_file_stem(&mut graveyard_path, format!("{} ({})", absolute_path.file_stem()?.to_str()?, i).as_str());
+                if !graveyard_path.exists() {
+                    break;
+                }
+            }
+        }
+
+        std::fs::rename(absolute_path.clone(), graveyard_path.clone()).ok()?;
+
+        let file_box = Arc::new(Mutex::new(Some(file)));
+        let absolute_path_1 = absolute_path.clone();
+        let graveyard_path_1 = graveyard_path.clone();
+        let file_box_1 = file_box.clone();
+        Some(ObjAction::new(move |proj| {
+            if std::fs::rename(absolute_path.clone(), graveyard_path.clone()).is_ok() {
+                let file = Self::get_list_mut(proj).files.remove(&key).unwrap();
+                Self::get_list_mut(proj).path_lookup.remove(&file.path);
+                Self::list_in_folder_mut(proj.folders.get_mut(file.folder).unwrap()).retain(|other_file| other_file != &file.ptr);
+                *file_box.lock().unwrap() = Some(file);
+            }
+        }, move |proj| {
+            if std::fs::rename(graveyard_path_1.clone(), absolute_path_1.clone()).is_ok() {
+                let file = std::mem::replace(&mut *file_box_1.lock().unwrap(), None).unwrap();
+                Self::get_list_mut(proj).path_lookup.insert(path.clone(), key);
+                Self::list_in_folder_mut(proj.folders.get_mut(file.folder).unwrap()).push(file.ptr);
+                Self::get_list_mut(proj).files.insert(file.ptr.key, file);
+            }
+        }))
+    }
 
     fn rename(project: &mut Project, ptr: &FilePtr<Self>, name: String) -> Option<ObjAction> where Self: 'static {
         let file = Self::get_list(project).get(ptr)?;
