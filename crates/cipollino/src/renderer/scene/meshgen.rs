@@ -1,7 +1,9 @@
 
-use std::{sync::Arc, f32::consts};
+use std::{f32::consts, sync::Arc};
 
 use crate::{renderer::mesh::Mesh, project::{Project, obj::ObjPtr, stroke::Stroke}, util::curve::{self, bezier_to_discrete_t_vals, bezier_to_discrete}};
+
+use super::SceneRenderer;
 
 fn unfilled_mesh(project: &Project, stroke_ptr: ObjPtr<Stroke>, gl: &Arc<glow::Context>) -> Option<Mesh> {
     let stroke = project.strokes.get(stroke_ptr)?;
@@ -130,17 +132,21 @@ fn filled_mesh(project: &Project, stroke_ptr: ObjPtr<Stroke>, gl: &Arc<glow::Con
     Some(mesh)
 }
 
-pub fn get_mesh<'a>(project: &'a mut Project, stroke_ptr: ObjPtr<Stroke>, gl: &Arc<glow::Context>) -> Option<&'a Mesh> {
-    if project.remeshes_needed.contains(&stroke_ptr) || !project.meshes.contains_key(&stroke_ptr) {
-        let stroke = project.strokes.get(stroke_ptr)?;
-        let stroke_filled = stroke.filled;
-        let mesh = if stroke_filled { filled_mesh(project, stroke_ptr, gl) } else { unfilled_mesh(project, stroke_ptr, gl) };
-        if let Some(mesh) = mesh {
-            if let Some(prev_mesh) = project.meshes.insert(stroke_ptr, mesh) {
-                prev_mesh.delete(gl);
+impl SceneRenderer {
+
+    pub fn get_mesh<'a>(&'a mut self, project: &Project, stroke_ptr: ObjPtr<Stroke>, gl: &Arc<glow::Context>) -> Option<&'a Mesh> {
+        if !self.stroke_meshes.contains_key(&stroke_ptr) {
+            if let Some(stroke) = project.strokes.get(stroke_ptr) {
+                let stroke_filled = stroke.filled;
+                let mesh = if stroke_filled { filled_mesh(project, stroke_ptr, gl) } else { unfilled_mesh(project, stroke_ptr, gl) };
+                if let Some(mesh) = mesh {
+                    if let Some(prev_mesh) = self.stroke_meshes.insert(stroke_ptr, mesh) {
+                        prev_mesh.delete(gl);
+                    }
+                }
             }
         }
-        project.remeshes_needed.remove(&stroke_ptr);
+        self.stroke_meshes.get(&stroke_ptr)
     }
-    project.meshes.get(&stroke_ptr)
+
 }

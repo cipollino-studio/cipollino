@@ -1,12 +1,12 @@
 
 mod meshgen;
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
-use glam::{vec4, Vec4};
+use glam::vec4;
 use glow::{Context, HasContext};
 
-use crate::project::{graphic::Graphic, layer::LayerKind, obj::ObjPtr, stroke::Stroke, Project};
+use crate::project::{graphic::Graphic, layer::{Layer, LayerKind}, obj::{ObjBox, ObjPtr}, stroke::Stroke, Project};
 
 use super::{shader::Shader, fb::Framebuffer, mesh::Mesh};
 
@@ -20,6 +20,8 @@ pub struct SceneRenderer {
 
     pub screen_quad: Mesh,
     pub screen_shader: Shader,
+
+    stroke_meshes: HashMap<ObjPtr<Stroke>, Mesh>
 }
 
 impl SceneRenderer {
@@ -77,10 +79,142 @@ impl SceneRenderer {
             clip_shadow_shader: Shader::new(include_str!("shaders/clip_shadow_vs.glsl"), include_str!("shaders/clip_shadow_fs.glsl"), gl),
 
             screen_quad,
-            screen_shader: Shader::new(include_str!("shaders/screen_vs.glsl"), include_str!("shaders/screen_fs.glsl"), gl)
+            screen_shader: Shader::new(include_str!("shaders/screen_vs.glsl"), include_str!("shaders/screen_fs.glsl"), gl),
+
+            stroke_meshes: HashMap::new()
         }
     }
 
+    fn render_stroke_mesh(&mut self, project: &Project, stroke_ptr: ObjPtr<Stroke>, gl: &Arc<Context>) {
+        let mesh = if let Some(mesh) = self.get_mesh(project, stroke_ptr, gl) {
+            mesh
+        } else {
+            return;
+        };
+        mesh.render(gl);
+    }
+
+    fn render_stroke(&mut self, project: &Project, stroke_ptr: ObjPtr<Stroke>, color_override: Option<glam::Vec4>, gl: &Arc<Context>) {
+        let stroke = if let Some(stroke) = project.strokes.get(stroke_ptr) {
+            stroke
+        } else {
+            return;
+        };
+        let filled = stroke.filled;
+        let color = color_override.unwrap_or(stroke.color.get_color(project));
+
+        if !filled {
+            unsafe {
+                gl.clear(glow::DEPTH_BUFFER_BIT);
+            }
+            self.flat_color_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, color.w), gl);
+            self.render_stroke_mesh(project, stroke_ptr, gl);
+        } else {
+            self.flat_color_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, 1.0), gl);
+            unsafe {
+                gl.enable(glow::STENCIL_TEST);
+                gl.stencil_mask(0xFF);
+                gl.clear(glow::STENCIL_BUFFER_BIT);
+                gl.stencil_func(glow::NEVER, 1, 0xFF);
+                gl.stencil_op(glow::INVERT, glow::INVERT, glow::INVERT);
+            }
+            self.render_stroke_mesh(project, stroke_ptr, gl);
+            unsafe {
+                gl.stencil_func(glow::EQUAL, 0xFF, 0xFF);
+                gl.stencil_op(glow::KEEP, glow::KEEP, glow::KEEP);
+                gl.stencil_mask(0);
+                gl.clear(glow::DEPTH_BUFFER_BIT);
+            }
+            self.flat_color_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, color.w), gl);
+            self.render_stroke_mesh(project, stroke_ptr, gl);
+            unsafe {
+                gl.disable(glow::STENCIL_TEST);
+            }
+        }
+    }
+
+    fn render_onion_skin<'a, I>(&mut self, project: &'a Project, time: i32, onion_before: i32, onion_after: i32, layer_iter: I, gl: &Arc<Context>) where I: Iterator<Item = &'a ObjBox<Layer>> {
+        let mut onion_before_strokes = vec![Vec::new(); onion_before as usize];
+        let mut onion_after_strokes = vec![Vec::new(); onion_before as usize];
+        for layer in layer_iter { 
+            let layer = layer.get(project);
+            if let Some(frame) = layer.get_frame_at(project, time) {
+                let mut curr_time = frame.get(project).time;
+                for i in 0..onion_before {
+                    if let Some(frame) = layer.get_frame_before(project, curr_time) {
+                        for stroke in &frame.get(project).strokes {
+                            if stroke.get(&project).filled {
+                                continue;
+                            }
+                            onion_before_strokes[i as usize].push(stroke.make_ptr());
+                        }
+                        
+                        curr_time = frame.get(project).time;
+                    }
+                }
+                let mut curr_time = frame.get(project).time;
+                for i in 0..onion_after {
+                    if let Some(frame) = layer.get_frame_after(project, curr_time) {
+                        for stroke in &frame.get(project).strokes {
+                            if stroke.get(project).filled {
+                                continue;
+                            }
+                            onion_after_strokes[i as usize].push(stroke.make_ptr());
+                        }
+                        curr_time = frame.get(project).time;
+                    }
+                }
+            }
+        }
+
+        let initial_alpha = 0.75;
+        let alpha_decay = 0.8 as f32;
+
+        let mut alpha = initial_alpha * alpha_decay.powi(onion_before - 1);
+        for strokes in onion_before_strokes.iter().rev() {
+            for stroke in strokes {
+                self.render_stroke(project, *stroke, Some(vec4(1.0, 0.3, 1.0, alpha)), gl);
+            }
+            alpha /= alpha_decay;
+        }
+
+        let mut alpha = initial_alpha * alpha_decay.powi(onion_before - 1);
+        for strokes in onion_after_strokes.iter().rev() {
+            for stroke in strokes {
+                self.render_stroke(project, *stroke, Some(vec4(0.3, 1.0, 1.0, alpha)), gl);
+            }
+            alpha /= alpha_decay;
+        }
+
+    }
+
+    fn render_picking<'a, I>(&mut self, project: &'a Project, time: i32, layer_iter: I, color_key_map: &mut Vec<ObjPtr<Stroke>>, gl: &Arc<Context>) where I: Iterator<Item = &'a ObjBox<Layer>> {
+        for layer in layer_iter { 
+            let layer = layer.get(project);
+            if let Some(frame) = layer.get_frame_at(project, time) {
+                for stroke in &frame.get(project).strokes  {
+                    let mut color = 0 as u32;
+                    for i in 0..color_key_map.len() {
+                        if color_key_map[i] == stroke.make_ptr() {
+                            color = i as u32;
+                            break;
+                        } 
+                    };
+                    if color == 0 {
+                        color_key_map.push(stroke.make_ptr());
+                        color = color_key_map.len() as u32;
+                    }
+                    let bytes = color.to_le_bytes();
+                    let r = (bytes[0] as f32) / 255.0;
+                    let g = (bytes[1] as f32) / 255.0;
+                    let b = (bytes[2] as f32) / 255.0;
+
+                    self.render_stroke(project, stroke.make_ptr(), Some(glam::vec4(r, g, b, 1.0)), gl);
+                }
+            }
+        }
+    }
+    
     pub fn render(
         &mut self,
 
@@ -102,6 +236,13 @@ impl SceneRenderer {
         gl: &Arc<Context>
     ) -> Option<glam::Mat4> {
 
+        for stroke in &project.remeshes_needed {
+            if let Some(mesh) = self.stroke_meshes.remove(stroke) {
+                mesh.delete(gl);
+            }
+        }
+        project.remeshes_needed.clear();
+
         fb.resize(w, h, gl);
         fb.render_to(gl);
 
@@ -120,91 +261,19 @@ impl SceneRenderer {
         self.flat_color_shader.enable(gl);
         self.flat_color_shader.set_mat4("uTrans", &proj_view, gl);
 
-        let mut onion_strokes = Vec::new();
-        let mut stroke_keys = Vec::new();
-        for layer in project.graphics.get(gfx)?.layers.iter().rev() {
+        let layer_iter = project.graphics.get(gfx)?.layers.iter().rev().filter(|layer| {
             let layer = layer.get(project);
-            if !layer.show || layer.kind != LayerKind::Animation {
-                continue;
-            }
+            layer.show && layer.kind == LayerKind::Animation
+        });
+
+        self.render_onion_skin(project, time, onion_before, onion_after, layer_iter.clone(), gl);
+
+        for layer in layer_iter.clone() { 
+            let layer = layer.get(project);
             if let Some(frame) = layer.get_frame_at(project, time) {
-                let mut curr_time = frame.get(project).time;
-                let mut alpha = 0.75;
-                for _i in 0..onion_before {
-                    if let Some(frame) = layer.get_frame_before(project, curr_time) {
-                        onion_strokes.append(&mut (frame.get(project).strokes
-                            .iter()
-                            .filter(|stroke| !stroke.get(project).filled) 
-                            .map(|key| (glam::vec4(1.0, 0.3, 1.0, alpha), key.make_ptr())).collect()));
-                        alpha *= 0.8;
-                        curr_time = frame.get(project).time;
-                    }
+                for stroke in &frame.get(project).strokes  {
+                    self.render_stroke(project, stroke.make_ptr(), None, gl);
                 }
-                // Ugly bug fix: make sure the oldest strokes are drawn at the back
-                onion_strokes.reverse();
-                let mut curr_time = frame.get(project).time;
-                let mut alpha = 0.75;
-                for _i in 0..onion_after {
-                    if let Some(frame) = layer.get_frame_after(project, curr_time) {
-                        onion_strokes.append(&mut (frame.get(project,).strokes
-                            .iter()
-                            .filter(|stroke| !stroke.get(project).filled) 
-                            .map(|key| (glam::vec4(0.3, 1.0, 1.0, alpha), key.make_ptr())).collect()));
-                        alpha *= 0.8;
-                        curr_time = frame.get(project).time;
-                    }
-                }
-                stroke_keys.append(&mut frame.get(project).strokes.iter().map(|stroke| stroke.make_ptr()).collect());
-            }
-        }
-        for (color, key) in onion_strokes {
-            if let Some(mesh) = meshgen::get_mesh(project, key, gl) {
-                self.flat_color_shader.set_vec4("uColor", color, gl);
-                mesh.render(gl);
-            }
-        }
-
-        let mut render_stroke_mesh = |mesh: &Mesh, color: Vec4, filled: bool, gl: &Arc<glow::Context>| {
-            if !filled {
-                unsafe {
-                    gl.clear(glow::DEPTH_BUFFER_BIT);
-                }
-                self.flat_color_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, color.w), gl);
-                mesh.render(gl);
-            } else {
-                self.flat_color_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, 1.0), gl);
-                unsafe {
-                    gl.enable(glow::STENCIL_TEST);
-                    gl.stencil_mask(0xFF);
-                    gl.clear(glow::STENCIL_BUFFER_BIT);
-                    gl.stencil_func(glow::NEVER, 1, 0xFF);
-                    gl.stencil_op(glow::INVERT, glow::INVERT, glow::INVERT);
-                }
-                mesh.render(gl);
-                unsafe {
-                    gl.stencil_func(glow::EQUAL, 0xFF, 0xFF);
-                    gl.stencil_op(glow::KEEP, glow::KEEP, glow::KEEP);
-                    gl.stencil_mask(0);
-                    gl.clear(glow::DEPTH_BUFFER_BIT);
-                }
-                self.flat_color_shader.set_vec4("uColor", glam::vec4(color.x, color.y, color.z, color.w), gl);
-                mesh.render(gl);
-                unsafe {
-                    gl.disable(glow::STENCIL_TEST);
-                }
-            }
-        };
-
-        for stroke_ptr in &stroke_keys {
-            let stroke = project.strokes.get(*stroke_ptr);
-            if stroke.is_none() {
-                continue;
-            }
-            let stroke = stroke.unwrap();
-            let color = stroke.color.get_color(&project);
-            let filled = stroke.filled;
-            if let Some(mesh) = meshgen::get_mesh(project, *stroke_ptr, gl) {
-                render_stroke_mesh(mesh, color, filled, gl); 
             }
         }
        
@@ -217,31 +286,10 @@ impl SceneRenderer {
                 gl.clear_color(0.0, 0.0, 0.0, 1.0);
                 gl.clear(glow::COLOR_BUFFER_BIT);
             }
-            for stroke_ptr in &stroke_keys {
-                let stroke = project.strokes.get(*stroke_ptr)?;
-                let filled = stroke.filled;
-                if let Some(mesh) = meshgen::get_mesh(project, *stroke_ptr, gl) {
-                    let mut color = 0 as u32;
-                    for i in 0..color_key_map.len() {
-                        if color_key_map[i] == *stroke_ptr {
-                            color = i as u32;
-                            break;
-                        } 
-                    };
-                    if color == 0 {
-                        color_key_map.push(*stroke_ptr);
-                        color = color_key_map.len() as u32;
-                    }
-                    let bytes = color.to_le_bytes();
-                    let r = (bytes[0] as f32) / 255.0;
-                    let g = (bytes[1] as f32) / 255.0;
-                    let b = (bytes[2] as f32) / 255.0;
-
-                    render_stroke_mesh(mesh, vec4(r, g, b, 1.0), filled, gl); 
-                }
-            }
-            fb.render_to(gl);
+            
+            self.render_picking(project, time, layer_iter.clone(), color_key_map, gl);
         }
+        fb.render_to(gl);
 
         Some(proj_view) 
         
