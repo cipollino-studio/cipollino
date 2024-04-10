@@ -1,9 +1,10 @@
 
 use project_macros::{ObjClone, ObjSerialize, Object};
+use unique_type_id::UniqueTypeId;
 
-use super::{action::ObjAction, graphic::Graphic, layer::Layer, obj::{child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjPtrAny, ObjSerialize}, stroke::Stroke, Project};
+use super::{action::ObjAction, graphic::Graphic, layer::Layer, obj::{child_obj::{ChildObj, HasRootAsset}, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjSerialize}, stroke::Stroke, Project};
 
-#[derive(Object, Clone, ObjClone, ObjSerialize)]
+#[derive(Object, Clone, ObjClone, ObjSerialize, UniqueTypeId)]
 pub struct Frame {
     #[parent]
     pub layer: ObjPtr<Layer>,
@@ -13,19 +14,27 @@ pub struct Frame {
 }
 
 impl ChildObj for Frame {
-    type Parent = Layer;
+    type Parent = ObjPtr<Layer>;
 
-    fn parent_mut(&mut self) -> &mut ObjPtr<Self::Parent> {
+    fn parent(&self) -> Self::Parent {
+        self.layer
+    }
+
+    fn parent_mut(&mut self) -> &mut Self::Parent {
         &mut self.layer
     }
 
-    fn get_list_in_parent(parent: &Self::Parent) -> &Vec<ObjBox<Self>> {
-        &parent.frames
+    fn get_list_in_parent(project: &Project, parent: Self::Parent) -> Option<&Vec<ObjBox<Self>>> {
+        Some(&project.layers.get(parent)?.frames)
     }
 
-    fn get_list_in_parent_mut(parent: &mut Self::Parent) -> &mut Vec<ObjBox<Self>> {
-        &mut parent.frames
+    fn get_list_in_parent_mut(project: &mut Project, parent: Self::Parent) -> Option<&mut Vec<ObjBox<Self>>> {
+        Some(&mut project.layers.get_mut(parent)?.frames)
     }
+
+}
+
+impl HasRootAsset for Frame {
 
     type RootAsset = Graphic;
     fn get_root_asset(project: &Project, frame: ObjPtr<Self>) -> Option<ObjPtr<Self::RootAsset>> {

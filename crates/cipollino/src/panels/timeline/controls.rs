@@ -1,18 +1,33 @@
 
-use crate::{editor::state::EditorState, project::{action::Action, graphic::Graphic, layer::{Layer, LayerKind}, obj::child_obj::ChildObj}};
+use crate::{editor::state::EditorState, project::{action::Action, graphic::Graphic, layer::{Layer, LayerKind, LayerParent}, obj::child_obj::ChildObj}};
 
 use super::{next_keyframe, prev_keyframe, TimelinePanel};
 
 pub fn timeline_controls(timeline: &mut TimelinePanel, ui: &mut egui::Ui, state: &mut EditorState) {
 
     if ui.button(egui_phosphor::regular::FILE_PLUS).clicked() {
-        if let Some((layer, act)) = Layer::add(&mut state.project, state.open_graphic, Layer {
-            graphic: state.open_graphic,
+        if let Some((layer, act)) = Layer::add(&mut state.project, LayerParent::Graphic(state.open_graphic), Layer {
+            parent: LayerParent::Graphic(state.open_graphic),
             name: "Layer".to_owned(),
             show: true,
             kind: LayerKind::Animation, 
             frames: Vec::new(),
-            sound_instances: Vec::new()
+            sound_instances: Vec::new(),
+            layers: Vec::new()
+        }) {
+            state.actions.add(Action::from_single(act));
+            state.active_layer = layer;
+        }
+    }
+    if ui.button(egui_phosphor::regular::FOLDER_PLUS).clicked() {
+        if let Some((layer, act)) = Layer::add(&mut state.project, LayerParent::Graphic(state.open_graphic), Layer {
+            parent: LayerParent::Graphic(state.open_graphic),
+            name: "Layer Group".to_owned(),
+            show: true,
+            kind: LayerKind::Group, 
+            frames: Vec::new(),
+            sound_instances: Vec::new(),
+            layers: Vec::new()
         }) {
             state.actions.add(Action::from_single(act));
             state.active_layer = layer;

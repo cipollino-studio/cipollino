@@ -2,11 +2,11 @@
 
 use serde_json::json;
 
-use crate::{project::{graphic::Graphic, obj::ObjBox}, util::fs::write_json_file};
+use crate::{project::{graphic::Graphic, obj::{child_obj::HasRootAsset, ObjBox}}, util::fs::write_json_file};
 
 use super::asset_file::AssetFile;
 
-use super::super::{folder::Folder, frame::Frame, layer::Layer, obj::{asset::Asset, child_obj::ChildObj, Obj, ObjPtr, ObjSerialize}, palette::{Palette, PaletteColor}, sound_instance::SoundInstance, stroke::Stroke, Project};
+use super::super::{folder::Folder, frame::Frame, layer::Layer, obj::{asset::Asset, Obj, ObjPtr, ObjSerialize}, palette::{Palette, PaletteColor}, sound_instance::SoundInstance, stroke::Stroke, Project};
 
 impl Project {
 
@@ -61,7 +61,7 @@ impl Project {
         Some(())
     }
 
-    fn save_obj_creation<T: ChildObj + ObjSerialize>(&mut self, obj_ptr: ObjPtr<T>) -> Option<()> {
+    fn save_obj_creation<T: HasRootAsset + ObjSerialize>(&mut self, obj_ptr: ObjPtr<T>) -> Option<()> {
         if T::get_list(self).obj_file_ptrs.borrow().get(&obj_ptr).is_some() {
             return Some(())
         } 
@@ -73,7 +73,7 @@ impl Project {
         Some(())
     }
 
-    fn save_obj_modification<T: ChildObj + ObjSerialize>(&self, obj_ptr: ObjPtr<T>) -> Option<()> {
+    fn save_obj_modification<T: HasRootAsset + ObjSerialize>(&self, obj_ptr: ObjPtr<T>) -> Option<()> {
         let obj = T::get_list(self).get(obj_ptr)?;
         let root_asset_ptr = T::get_root_asset(self, obj_ptr)?;
         let root_asset_path = T::RootAsset::get_list(self).get(root_asset_ptr)?.file_path(self)?;
@@ -85,7 +85,7 @@ impl Project {
         Some(())
     }
 
-    fn save_obj_deletion<T: ChildObj + ObjSerialize>(&self, obj_ptr: ObjPtr<T>, delete_obj_ptrs: &mut Vec<ObjPtr<T>>) -> Option<()> {
+    fn save_obj_deletion<T: HasRootAsset + ObjSerialize>(&self, obj_ptr: ObjPtr<T>, delete_obj_ptrs: &mut Vec<ObjPtr<T>>) -> Option<()> {
         if let Some(ptr) = T::get_list(self).obj_file_ptrs.borrow().get(&obj_ptr) {
             let root_asset_ptr = T::get_root_asset(self, obj_ptr)?;
             let root_asset_path = T::RootAsset::get_list(self).get(root_asset_ptr)?.file_path(self)?;
@@ -96,7 +96,7 @@ impl Project {
         Some(())
     }
 
-    fn save_obj_list_modifications<T: ChildObj + ObjSerialize>(&mut self) -> Option<()> {
+    fn save_obj_list_modifications<T: HasRootAsset + ObjSerialize>(&mut self) -> Option<()> {
 
         let list = T::get_list(self);
         let mut delete_obj_ptrs = Vec::new();

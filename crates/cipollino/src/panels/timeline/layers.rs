@@ -1,19 +1,21 @@
 
 use egui::{vec2, Vec2};
 
-use crate::{editor::state::EditorState, project::{action::Action, layer::{Layer, LayerKind}, obj::{child_obj::ChildObj, ObjPtr}}, util::ui::{dnd::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_widget}, label_size}};
+use crate::{editor::state::EditorState, project::{action::Action, layer::{Layer, LayerKind, LayerParent}, obj::{child_obj::ChildObj, ObjPtr}}, util::ui::{dnd::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_widget}, label_size}};
 
 use super::{FrameGridRow, FrameGridRowKind, TimelinePanel};
 
 impl FrameGridRow {
 
-    fn render_layer_layer(&self, timeline: &mut TimelinePanel, ui: &mut egui::Ui, rect: egui::Rect, state: &mut EditorState, response: &egui::Response, layer_drop_idx: &mut Option<usize>, layer_ptr: ObjPtr<Layer>) -> Option<()> {
+    fn render_layer_layer(&self, timeline: &mut TimelinePanel, ui: &mut egui::Ui, rect: egui::Rect, state: &mut EditorState, response: &egui::Response, layer_drop_idx: &mut Option<(usize, LayerParent)>, layer_ptr: ObjPtr<Layer>, indent: u32) -> Option<()> {
         let layer = state.project.layers.get(layer_ptr)?; 
 
         let mut set_name = false;
         let mut delete_layer = false;
         let mut show_hide_layer = false; 
         let mut set_layer_kind = None;
+
+        let indent_size = 10.0;
 
         if layer_ptr == state.active_layer {
             ui.painter().rect(rect, 0.0, super::HIGHLIGHT, egui::Stroke::NONE);
@@ -28,6 +30,8 @@ impl FrameGridRow {
             let name_size = label_size(ui, egui::Label::new(layer.name.clone()).selectable(false));
             let mut text_rect = rect.clone();
             text_rect.set_width(name_size.x);
+            text_rect.set_left(text_rect.left() + (indent as f32) * indent_size);
+            text_rect.set_right(text_rect.right() + (indent as f32) * indent_size);
             let layer_name_response = draggable_widget(ui, layer_ptr, move |ui| {
                 let mut label = egui::Label::new(layer.name.clone()).selectable(false);
                 if !egui::DragAndDrop::has_payload_of_type::<ObjPtr<Layer>>(ui.ctx()) {
@@ -65,11 +69,13 @@ impl FrameGridRow {
                 match layer.kind {
                     LayerKind::Animation => egui_phosphor::regular::EYE,
                     LayerKind::Audio => egui_phosphor::regular::SPEAKER_HIGH,
+                    LayerKind::Group => egui_phosphor::regular::EYE
                 }
             } else {
                 match layer.kind {
                     LayerKind::Animation => egui_phosphor::regular::EYE_CLOSED,
                     LayerKind::Audio => egui_phosphor::regular::SPEAKER_SLASH,
+                    LayerKind::Group => egui_phosphor::regular::EYE_CLOSED
                 }
             };
             let eye_size = label_size(ui, egui::Label::new(eye_text).selectable(false));
@@ -81,7 +87,37 @@ impl FrameGridRow {
         }
     
         let showing_layer = layer.show;
-    
+        if let (Some(pointer), Some(payload)) = (
+            ui.input(|i| i.pointer.hover_pos()),
+            response.dnd_hover_payload::<ObjPtr<Layer>>(),
+        ) {
+            if rect.contains(pointer) {
+                let stroke = egui::Stroke::new(1.0, egui::Color32::WHITE);
+                let mut x_range = rect.x_range();
+                x_range.min += (indent as f32) * indent_size;
+                if pointer.y < rect.center().y {
+                    ui.painter().hline(x_range, rect.top(), stroke);
+                    if *payload.as_ref() != layer_ptr {
+                        *layer_drop_idx = Some((self.local_idx.max(1) - 1, layer.parent));
+                    }
+                } else {
+                    if layer.kind == LayerKind::Group {
+                        let mut x_range = x_range;
+                        x_range.min += indent_size;
+                        ui.painter().hline(x_range, rect.bottom(), stroke);
+                        if *payload.as_ref() != layer_ptr {
+                            *layer_drop_idx = Some((0, LayerParent::Layer(layer_ptr)));
+                        }
+                    } else {
+                        ui.painter().hline(x_range, rect.bottom(), stroke);
+                        if *payload.as_ref() != layer_ptr {
+                            *layer_drop_idx = Some((self.local_idx, layer.parent));
+                        }
+                    }
+                }
+            }
+        }
+
         if delete_layer {
             if let Some(act) = Layer::delete(&mut state.project, layer_ptr) {
                 state.actions.add(Action::from_single(act));
@@ -103,40 +139,40 @@ impl FrameGridRow {
                 state.actions.add(Action::from_single(act));
             }
         }
-
-        if let (Some(pointer), Some(payload)) = (
-            ui.input(|i| i.pointer.hover_pos()),
-            response.dnd_hover_payload::<ObjPtr<Layer>>(),
-        ) {
-            if rect.contains(pointer) {
-                let stroke = egui::Stroke::new(1.0, egui::Color32::WHITE);
-                if pointer.y < rect.center().y {
-                    ui.painter().hline(rect.x_range(), rect.top(), stroke);
-                    if *payload.as_ref() != layer_ptr {
-                        *layer_drop_idx = Some(self.idx.max(1) - 1);
-                    }
-                } else {
-                    ui.painter().hline(rect.x_range(), rect.bottom(), stroke);
-                    if *payload.as_ref() != layer_ptr {
-                        *layer_drop_idx = Some(self.idx);
-                    }
-                }
-            }
-        }
     
         None
     }
 
-    fn render_layer(&self, timeline: &mut TimelinePanel, ui: &mut egui::Ui, rect: egui::Rect, state: &mut EditorState, response: &egui::Response, layer_drop_idx: &mut Option<usize>) {
-        match &self.kind {
-            FrameGridRowKind::AnimationLayer(layer) | FrameGridRowKind::AudioLayer(layer) => self.render_layer_layer(timeline, ui, rect, state, response, layer_drop_idx, *layer),
+    fn render_layer(&self, timeline: &mut TimelinePanel, ui: &mut egui::Ui, rect: egui::Rect, state: &mut EditorState, response: &egui::Response, layer_drop_idx: &mut Option<(usize, LayerParent)>) {
+        let layer = match &self.kind {
+            FrameGridRowKind::AnimationLayer(layer) | FrameGridRowKind::AudioLayer(layer) | FrameGridRowKind::GroupLayer(layer) => layer,
         };
+        self.render_layer_layer(timeline, ui, rect, state, response, layer_drop_idx, *layer, self.indent);
     }
 
 }
 
+fn drop_layer(state: &mut EditorState, layer_ptr: ObjPtr<Layer>, new_idx: usize, new_parent: LayerParent) {
+    let mut acts = Vec::new();
+    let mut valid = true;
+    if let Some(layer) = state.project.layers.get(layer_ptr) {
+        if layer.parent != new_parent {
+            if let Some(act) = Layer::transfer(&mut state.project, layer_ptr, new_parent) {
+                acts.push(act);
+            } else {
+                valid = false;
+            }
+        }
+    } 
+    if valid {
+        if let Some(act) = Layer::set_index(&mut state.project, layer_ptr, new_idx) {
+            acts.push(act);
+        }
+        state.actions.add(Action::from_list(acts));
+    }
+}
+
 pub fn layers(timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_h: f32, state: &mut EditorState, grid_rows: &Vec<FrameGridRow>, sidebar_w: f32) {
-    let mut i = 0;
     let colors = dnd_drop_zone_setup_colors(ui);
     let init_stroke = std::mem::replace(&mut ui.visuals_mut().widgets.active.bg_stroke.color, egui::Color32::TRANSPARENT);
     let mut layer_drop_idx = None;
@@ -144,18 +180,15 @@ pub fn layers(timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_h: f32, sta
         let (rect, response) = ui.allocate_exact_size(Vec2::new(sidebar_w, (grid_rows.len() as f32) * frame_h), egui::Sense::click());
         let tl = rect.left_top(); 
         for row in grid_rows {
-            let layer_name_tl = tl + Vec2::new(0.0, frame_h * (i as f32)); 
+            let layer_name_tl = tl + Vec2::new(0.0, frame_h * (row.global_idx as f32)); 
             let layer_name_br = layer_name_tl + Vec2::new(sidebar_w, frame_h); 
             let rect = egui::Rect::from_min_max(layer_name_tl, layer_name_br);
             row.render_layer(timeline, ui, rect, state, &response, &mut layer_drop_idx);
-            i += 1;
         }
     }) {
-        if let Some(new_idx) = layer_drop_idx {
-            let layer = *payload.as_ref();
-            if let Some(act) = Layer::set_index(&mut state.project, layer, new_idx) {
-                state.actions.add(Action::from_single(act));
-            }
+        if let Some((new_idx, new_parent)) = layer_drop_idx {
+            let layer_ptr = *payload.as_ref();
+            drop_layer(state, layer_ptr, new_idx, new_parent);
         }
     }
     dnd_drop_zone_reset_colors(ui, colors);

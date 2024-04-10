@@ -133,7 +133,7 @@ impl SceneRenderer {
         }
     }
 
-    fn render_onion_skin<'a, I>(&mut self, project: &'a Project, time: i32, onion_before: i32, onion_after: i32, layer_iter: I, gl: &Arc<Context>) where I: Iterator<Item = &'a ObjBox<Layer>> {
+    fn render_onion_skin<'a, I>(&mut self, project: &Project, time: i32, onion_before: i32, onion_after: i32, layer_iter: I, gl: &Arc<Context>) where I: Iterator<Item = &'a &'a ObjBox<Layer>> {
         let mut onion_before_strokes = vec![Vec::new(); onion_before as usize];
         let mut onion_after_strokes = vec![Vec::new(); onion_before as usize];
         for layer in layer_iter { 
@@ -188,7 +188,7 @@ impl SceneRenderer {
 
     }
 
-    fn render_picking<'a, I>(&mut self, project: &'a Project, time: i32, layer_iter: I, color_key_map: &mut Vec<ObjPtr<Stroke>>, gl: &Arc<Context>) where I: Iterator<Item = &'a ObjBox<Layer>> {
+    fn render_picking<'a, I>(&mut self, project: &Project, time: i32, layer_iter: I, color_key_map: &mut Vec<ObjPtr<Stroke>>, gl: &Arc<Context>) where I: Iterator<Item = &'a &'a ObjBox<Layer>> {
         for layer in layer_iter { 
             let layer = layer.get(project);
             if let Some(frame) = layer.get_frame_at(project, time) {
@@ -214,7 +214,39 @@ impl SceneRenderer {
             }
         }
     }
+
+    fn get_shown_layers<'a>(&mut self, project: &'a Project, layers: &'a Vec<ObjBox<Layer>>, res_layers: &mut Vec<&'a ObjBox<Layer>>) {
+        for layer_box in layers.iter().rev() {
+            let layer = layer_box.get(project); 
+            if !layer.show {
+                continue;
+            }
+            if layer.kind == LayerKind::Animation {
+                res_layers.push(layer_box);
+            } else {
+                self.get_shown_layers(project, &layer.layers, res_layers);
+            }
+        }
+    }
     
+    fn render_main(&mut self, project: &Project, time: i32, layers: &Vec<ObjBox<Layer>>, gl: &Arc<Context>) { 
+        for layer in layers.iter().rev() {
+            let layer = layer.get(project);
+            if !layer.show {
+                continue;
+            }
+            if layer.kind == LayerKind::Animation {
+                if let Some(frame) = layer.get_frame_at(project, time) {
+                    for stroke in &frame.get(project).strokes  {
+                        self.render_stroke(project, stroke.make_ptr(), None, gl);
+                    }
+                }
+            } else if layer.kind == LayerKind::Group {
+                self.render_main(project, time, &layer.layers, gl);
+            }
+        }
+    }
+
     pub fn render(
         &mut self,
 
@@ -261,21 +293,14 @@ impl SceneRenderer {
         self.flat_color_shader.enable(gl);
         self.flat_color_shader.set_mat4("uTrans", &proj_view, gl);
 
-        let layer_iter = project.graphics.get(gfx)?.layers.iter().rev().filter(|layer| {
-            let layer = layer.get(project);
-            layer.show && layer.kind == LayerKind::Animation
-        });
-
+        let gfx = project.graphics.get(gfx)?;
+        let mut layers = Vec::new();
+        self.get_shown_layers(&project, &gfx.layers, &mut layers);
+        let layer_iter = layers.iter();
+        
         self.render_onion_skin(project, time, onion_before, onion_after, layer_iter.clone(), gl);
 
-        for layer in layer_iter.clone() { 
-            let layer = layer.get(project);
-            if let Some(frame) = layer.get_frame_at(project, time) {
-                for stroke in &frame.get(project).strokes  {
-                    self.render_stroke(project, stroke.make_ptr(), None, gl);
-                }
-            }
-        }
+        self.render_main(project, time, &gfx.layers, gl);
        
         if let Some((fb_pick, color_key_map)) = fb_pick {
             fb_pick.resize(w, h, gl);

@@ -145,7 +145,7 @@ pub fn obj_serialize(input: TokenStream) -> TokenStream {
         } 
 
         raw_data_struct_fields.append_all(quote! {
-            #field_name: <#ty as ObjSerialize>::RawData,
+            #field_name: <#ty as crate::project::obj::ToRawData>::RawData,
         });
 
         to_raw_data_impl.append_all(quote! {
@@ -153,15 +153,12 @@ pub fn obj_serialize(input: TokenStream) -> TokenStream {
         });
 
         from_raw_data_impl.append_all(quote! {
-            #field_name: <#ty as ObjSerialize>::from_raw_data(project, &data.#field_name),
+            #field_name: <#ty as crate::project::obj::ToRawData>::from_raw_data(project, &data.#field_name),
         });
     }
 
     quote! {
 
-        pub struct #raw_data_name {
-            #raw_data_struct_fields
-        } 
         
         impl ObjSerialize for #name {
 
@@ -177,11 +174,19 @@ pub fn obj_serialize(input: TokenStream) -> TokenStream {
                 }}
             }
 
-            fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny, asset_file: &mut crate::project::saveload::asset_file::AssetFile, metadata: &mut crate::project::saveload::load::LoadingMetadata) -> Option<Self> {
+            fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: crate::project::obj::DynObjPtr, asset_file: &mut crate::project::saveload::asset_file::AssetFile, metadata: &mut crate::project::saveload::load::LoadingMetadata) -> Option<Self> {
                 let mut res = Self::default();
                 #deserialize_impl 
                 Some(res)
             }
+
+        }
+
+        pub struct #raw_data_name {
+            #raw_data_struct_fields
+        }
+
+        impl crate::project::obj::ToRawData for #name {
 
             type RawData = #raw_data_name;
 

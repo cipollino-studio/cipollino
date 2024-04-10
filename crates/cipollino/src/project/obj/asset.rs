@@ -6,13 +6,19 @@ use crate::{project::{action::ObjAction, folder::Folder, AssetPtr, Project}, uti
 use super::{child_obj::ChildObj, Obj, ObjBox, ObjPtr};
 
 
-pub trait Asset : Obj + ChildObj<Parent = Folder> {
+pub trait Asset : Obj + ChildObj<Parent = ObjPtr<Folder>> {
 
     fn name(&self) -> &String;
     fn name_mut(&mut self) -> &mut String;
     fn extension(&self) -> &str;
-    fn folder(&self) -> ObjPtr<Folder>;
-    fn folder_mut(&mut self) -> &mut ObjPtr<Folder>;
+
+    fn folder(&self) -> ObjPtr<Folder> {
+        self.parent()
+    }
+
+    fn folder_mut(&mut self) -> &mut ObjPtr<Folder> {
+        self.parent_mut()
+    }
 
     fn make_asset_ptr(ptr: ObjPtr<Self>) -> AssetPtr;
     
@@ -27,7 +33,7 @@ pub trait Asset : Obj + ChildObj<Parent = Folder> {
     }
 
     fn asset_add(project: &mut Project, folder: ObjPtr<Folder>, mut obj: Self) -> Option<(ObjPtr<Self>, Vec<ObjAction>)> {
-        let valid_name = next_valid_name(project, obj.name(), Self::get_sibling_list(project, folder)?);
+        let valid_name = next_valid_name(project, obj.name(), Self::get_list_in_parent(project, folder)?);
         *obj.name_mut() = valid_name;
         *obj.folder_mut() = folder;
         let (ptr, add_act) = Self::add(project, folder, obj)?;
@@ -61,10 +67,9 @@ pub trait Asset : Obj + ChildObj<Parent = Folder> {
 
     fn rename(project: &mut Project, obj_ptr: ObjPtr<Self>, name: String) -> Option<ObjAction> {
         let folder_ptr = Self::get_list_mut(project).get_mut(obj_ptr)?.folder();
-        let folder = project.folders.get(folder_ptr)?;
         let obj = Self::get_list(project).get(obj_ptr)?;
         let init_name = obj.name().clone();
-        let new_name = next_valid_name(project, &name, Self::get_list_in_parent(folder));
+        let new_name = next_valid_name(project, &name, Self::get_list_in_parent(&project, folder_ptr).unwrap());
 
         let redo = move |proj: &'_ mut Project| {
             let obj = Self::get_list(proj).get(obj_ptr).unwrap();
@@ -97,7 +102,7 @@ pub trait Asset : Obj + ChildObj<Parent = Folder> {
             return None;
         }
         let init_name = obj.name().clone();
-        let new_name = next_valid_name(project, &init_name, Self::get_sibling_list(project, new_folder)?);
+        let new_name = next_valid_name(project, &init_name, Self::get_list_in_parent(project, new_folder)?);
         if let Some(path) = obj.file_path(project) {
             util::fs::remove(&path);
         }
@@ -121,8 +126,8 @@ pub trait Asset : Obj + ChildObj<Parent = Folder> {
         })])
     }
 
-    fn find_by_name<'a>(project: &'a Project, folder: &'a Folder, name: &str) -> Option<&'a ObjBox<Self>> {
-        for other in Self::get_list_in_parent(folder) {
+    fn find_by_name<'a>(project: &'a Project, folder: ObjPtr<Folder>, name: &str) -> Option<&'a ObjBox<Self>> {
+        for other in Self::get_list_in_parent(project, folder)? {
             if other.get(project).name() == name {
                 return Some(other);
             }

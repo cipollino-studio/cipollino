@@ -1,8 +1,9 @@
 
 use glam::{Vec2, Mat4, vec3, vec2};
 use project_macros::{ObjClone, ObjSerialize, Object};
+use unique_type_id::UniqueTypeId;
 
-use super::{action::ObjAction, frame::Frame, graphic::Graphic, obj::{child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjPtrAny, ObjSerialize}, palette::PaletteColor, saveload::{asset_file::AssetFile, load::LoadingMetadata}, Project};
+use super::{action::ObjAction, frame::Frame, graphic::Graphic, obj::{child_obj::{ChildObj, HasRootAsset}, DynObjPtr, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjSerialize, ToRawData}, palette::PaletteColor, saveload::{asset_file::AssetFile, load::LoadingMetadata}, Project};
 
 #[derive(Clone, Copy, ObjClone, Default, ObjSerialize)]
 pub struct StrokePoint {
@@ -49,7 +50,7 @@ impl ObjSerialize for StrokeColor {
         self.obj_serialize(project, asset_file)
     }
 
-    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny, asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<Self> {
+    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: DynObjPtr, asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<Self> {
         if let Some(arr) = data.as_array() {
             let mut color = [0.0; 4];
             color[3] = 1.0;
@@ -66,6 +67,9 @@ impl ObjSerialize for StrokeColor {
             None
         }
     }
+}
+
+impl ToRawData for StrokeColor {
 
     type RawData = StrokeColor;
     fn to_raw_data(&self, _project: &Project) -> Self::RawData {
@@ -78,7 +82,7 @@ impl ObjSerialize for StrokeColor {
 
 }
 
-#[derive(Object, Clone, ObjClone, ObjSerialize)]
+#[derive(Object, Clone, ObjClone, ObjSerialize, UniqueTypeId)]
 pub struct Stroke {
     #[parent]
     pub frame: ObjPtr<Frame>,
@@ -123,19 +127,27 @@ impl Stroke {
 }
 
 impl ChildObj for Stroke {
-    type Parent = Frame;
+    type Parent = ObjPtr<Frame>;
 
-    fn parent_mut(&mut self) -> &mut ObjPtr<Self::Parent> {
+    fn parent(&self) -> Self::Parent {
+        self.frame
+    }
+
+    fn parent_mut(&mut self) -> &mut Self::Parent {
         &mut self.frame
     }
 
-    fn get_list_in_parent(parent: &Self::Parent) -> &Vec<ObjBox<Self>> {
-        &parent.strokes
+    fn get_list_in_parent(project: &Project, parent: Self::Parent) -> Option<&Vec<ObjBox<Self>>> {
+        Some(&project.frames.get(parent)?.strokes)
     }
 
-    fn get_list_in_parent_mut(parent: &mut Self::Parent) -> &mut Vec<ObjBox<Self>> {
-        &mut parent.strokes
+    fn get_list_in_parent_mut(project: &mut Project, parent: Self::Parent) -> Option<&mut Vec<ObjBox<Self>>> {
+        Some(&mut project.frames.get_mut(parent)?.strokes)
     }
+
+}
+
+impl HasRootAsset for Stroke {
 
     type RootAsset = Graphic;
     fn get_root_asset(project: &Project, stroke: ObjPtr<Self>) -> Option<ObjPtr<Self::RootAsset>> {

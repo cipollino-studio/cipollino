@@ -2,7 +2,7 @@
 
 use egui::{KeyboardShortcut, Modifiers};
 
-use crate::{editor::{selection::Selection, state::EditorState}, project::{action::Action, frame::Frame, layer::{Layer, LayerKind}, obj::{child_obj::ChildObj, ObjPtr}, sound_instance::SoundInstance}};
+use crate::{editor::{selection::Selection, state::EditorState}, project::{action::Action, frame::Frame, layer::{Layer, LayerKind}, obj::{child_obj::ChildObj, ObjBox, ObjPtr}, sound_instance::SoundInstance}};
 
 pub mod controls;
 pub mod header;
@@ -50,14 +50,18 @@ pub struct TimelinePanel {
     layer_edit_curr_name: String
 }
 
+#[derive(Clone, Copy)]
 pub enum FrameGridRowKind {
     AnimationLayer(ObjPtr<Layer>),
-    AudioLayer(ObjPtr<Layer>)
+    AudioLayer(ObjPtr<Layer>),
+    GroupLayer(ObjPtr<Layer>)
 }
 
 pub struct FrameGridRow {
     kind: FrameGridRowKind,
-    idx: usize
+    indent: u32,
+    global_idx: usize,
+    local_idx: usize
 }
 
 impl TimelinePanel {
@@ -82,18 +86,29 @@ impl TimelinePanel {
         }
     }
 
+    fn calc_grid_rows_rec(&mut self, state: &EditorState, layers: &Vec<ObjBox<Layer>>, rows: &mut Vec<(usize, FrameGridRowKind, u32)>, indent: u32) {
+        for (local_idx, layer) in layers.iter().enumerate() {
+            rows.push((local_idx, match layer.get(&state.project).kind {
+                LayerKind::Animation => FrameGridRowKind::AnimationLayer(layer.make_ptr()),
+                LayerKind::Audio => FrameGridRowKind::AudioLayer(layer.make_ptr()),
+                LayerKind::Group => FrameGridRowKind::GroupLayer(layer.make_ptr()), 
+            }, indent));
+            if layer.get(&state.project).kind == LayerKind::Group {
+                self.calc_grid_rows_rec(state, &layer.get(&state.project).layers, rows, indent + 1);
+            }
+        }
+    }
+
     fn calc_grid_rows(&mut self, state: &mut EditorState) -> Vec<FrameGridRow> {
         let gfx = state.project.graphics.get(state.open_graphic).unwrap();
-        let mut grid_rows = Vec::new();
-        for (idx, layer) in gfx.layers.iter().enumerate() {
-            grid_rows.push(FrameGridRow {
-                kind: match layer.get(&state.project).kind {
-                    LayerKind::Animation => FrameGridRowKind::AnimationLayer(layer.make_ptr()),
-                    LayerKind::Audio => FrameGridRowKind::AudioLayer(layer.make_ptr()) 
-                }, 
-                idx: idx 
-            });
-        }
+        let mut grid_row_kinds = Vec::new(); 
+        self.calc_grid_rows_rec(state, &gfx.layers, &mut grid_row_kinds, 0);
+        let grid_rows = grid_row_kinds.iter().enumerate().map(|(idx, (local_idx, kind, indent))| FrameGridRow {
+            kind: *kind,
+            indent: *indent,
+            global_idx: idx,
+            local_idx: *local_idx
+        }).collect();
         grid_rows
     }
 

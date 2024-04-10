@@ -7,7 +7,7 @@ use std::hash::Hash;
 
 use crate::util::{bson::{bson_get, bson_to_u64, u64_to_bson}, fs::{set_file_stem, trash_folder}, next_unique_name};
 
-use super::{action::ObjAction, folder::Folder, obj::{ObjClone, ObjPtr, ObjSerialize}, saveload::{asset_file::AssetFile, load::LoadingMetadata}, AssetPtr, Project};
+use super::{action::ObjAction, folder::Folder, obj::{ObjClone, ObjPtr, ObjSerialize, ToRawData}, saveload::{asset_file::AssetFile, load::LoadingMetadata}, AssetPtr, Project};
 
 pub mod audio;
 
@@ -335,7 +335,7 @@ impl<T: FileType> ObjSerialize for FilePtr<T> {
         self.obj_serialize(project, asset_file)
     }
 
-    fn obj_deserialize(_project: &mut Project, data: &bson::Bson, _parent: super::obj::ObjPtrAny, _asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<Self> {
+    fn obj_deserialize(_project: &mut Project, data: &bson::Bson, _parent: super::obj::DynObjPtr, _asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<Self> {
         let key = bson_to_u64(bson_get(data, "key")?)?;
         let res = Self {
             key, 
@@ -344,6 +344,11 @@ impl<T: FileType> ObjSerialize for FilePtr<T> {
         T::list_in_loading_metadata_mut(metadata).insert(res);
         Some(res)
     }
+
+
+}
+
+impl<T: FileType> ToRawData for FilePtr<T> {
 
     type RawData = Self;
 

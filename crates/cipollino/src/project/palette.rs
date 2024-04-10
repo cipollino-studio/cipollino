@@ -1,8 +1,9 @@
 
 use project_macros::{ObjClone, ObjSerialize, Object};
-use super::{action::ObjAction, folder::Folder, obj::{asset::Asset, child_obj::ChildObj, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjPtrAny, ObjSerialize}, Project, AssetPtr};
+use unique_type_id::UniqueTypeId;
+use super::{action::ObjAction, folder::Folder, obj::{asset::Asset, child_obj::{ChildObj, HasRootAsset}, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjSerialize}, AssetPtr, Project};
 
-#[derive(Object, Clone, ObjClone, ObjSerialize)]
+#[derive(Object, Clone, ObjClone, ObjSerialize, UniqueTypeId)]
 pub struct PaletteColor {
     #[field]
     pub color: glam::Vec4,
@@ -11,19 +12,27 @@ pub struct PaletteColor {
 }
 
 impl ChildObj for PaletteColor {
-    type Parent = Palette;
+    type Parent = ObjPtr<Palette>;
 
-    fn parent_mut(&mut self) -> &mut ObjPtr<Self::Parent> {
+    fn parent(&self) -> Self::Parent {
+        self.palette
+    }
+
+    fn parent_mut(&mut self) -> &mut Self::Parent {
         &mut self.palette
     }
 
-    fn get_list_in_parent(parent: &Self::Parent) -> &Vec<ObjBox<Self>> {
-        &parent.colors
+    fn get_list_in_parent(project: &Project, parent: Self::Parent) -> Option<&Vec<ObjBox<Self>>> {
+        Some(&project.palettes.get(parent)?.colors)
     }
 
-    fn get_list_in_parent_mut(parent: &mut Self::Parent) -> &mut Vec<ObjBox<Self>> {
-        &mut parent.colors
+    fn get_list_in_parent_mut(project: &mut Project, parent: Self::Parent) -> Option<&mut Vec<ObjBox<Self>>> {
+        Some(&mut project.palettes.get_mut(parent)?.colors)
     }
+
+}
+
+impl HasRootAsset for PaletteColor {
 
     type RootAsset = Palette;
     fn get_root_asset(project: &Project, palette_color: ObjPtr<Self>) -> Option<ObjPtr<Self::RootAsset>> {
@@ -43,7 +52,7 @@ impl Default for PaletteColor {
 
 }
 
-#[derive(Object, Clone, ObjClone, ObjSerialize)]
+#[derive(Object, Clone, ObjClone, ObjSerialize, UniqueTypeId)]
 pub struct Palette {
     #[field]
     pub name: String,
@@ -73,19 +82,27 @@ impl Default for Palette {
 }
 
 impl ChildObj for Palette {
-    type Parent = Folder;
+    type Parent = ObjPtr<Folder>;
 
-    fn parent_mut(&mut self) -> &mut ObjPtr<Self::Parent> {
+    fn parent(&self) -> Self::Parent {
+        self.folder
+    }
+
+    fn parent_mut(&mut self) -> &mut Self::Parent {
         &mut self.folder
     }
 
-    fn get_list_in_parent(parent: &Self::Parent) -> &Vec<ObjBox<Self>> {
-        &parent.palettes
+    fn get_list_in_parent(project: &Project, parent: Self::Parent) -> Option<&Vec<ObjBox<Self>>> {
+        Some(&project.folders.get(parent)?.palettes)
     }
 
-    fn get_list_in_parent_mut(parent: &mut Self::Parent) -> &mut Vec<ObjBox<Self>> {
-        &mut parent.palettes
+    fn get_list_in_parent_mut(project: &mut Project, parent: Self::Parent) -> Option<&mut Vec<ObjBox<Self>>> {
+        Some(&mut project.folders.get_mut(parent)?.palettes)
     }
+
+}
+
+impl HasRootAsset for Palette {
 
     type RootAsset = Palette;
     fn get_root_asset(_project: &Project, palette: ObjPtr<Self>) -> Option<ObjPtr<Self::RootAsset>> {
@@ -106,14 +123,6 @@ impl Asset for Palette {
 
     fn extension(&self) -> &str {
         "cippal"
-    }
-
-    fn folder(&self) -> ObjPtr<Folder> {
-        self.folder
-    }
-
-    fn folder_mut(&mut self) -> &mut ObjPtr<Folder> {
-        &mut self.folder 
     }
     
     fn make_asset_ptr(ptr: ObjPtr<Self>) -> AssetPtr {

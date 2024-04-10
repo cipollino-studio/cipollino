@@ -196,10 +196,10 @@ impl FrameGridRow {
     }
 
     fn frame_area(&self, timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_w: f32, frame_h: f32, state: &mut EditorState, response: &egui::Response, mouse_went_down: bool, rect: egui::Rect) {
-        
         match &self.kind {
-            FrameGridRowKind::AnimationLayer(layer) => self.frame_area_layer_animation(timeline, ui, frame_w, frame_h, state, rect, response, mouse_went_down, *layer),
-            FrameGridRowKind::AudioLayer(layer) => self.frame_area_layer_audio(timeline, ui, frame_w, frame_h, state, rect, response, mouse_went_down, *layer)
+            FrameGridRowKind::AnimationLayer(layer) => { self.frame_area_layer_animation(timeline, ui, frame_w, frame_h, state, rect, response, mouse_went_down, *layer); },
+            FrameGridRowKind::AudioLayer(layer) => { self.frame_area_layer_audio(timeline, ui, frame_w, frame_h, state, rect, response, mouse_went_down, *layer); },
+            _ => {}
         };
     }
 

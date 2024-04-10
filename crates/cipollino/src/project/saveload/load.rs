@@ -101,8 +101,7 @@ impl Project {
         }), folder.into(), &mut asset_file, metadata)?;
 
         *obj_box.get_mut(self).name_mut() = path.file_stem().unwrap().to_str().unwrap().to_owned();
-        let folder = self.folders.get_mut(folder).unwrap();
-        T::get_list_in_parent_mut(folder).push(obj_box);
+        T::get_list_in_parent_mut(self, folder)?.push(obj_box);
 
         Some(())
     }

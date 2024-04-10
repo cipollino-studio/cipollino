@@ -3,7 +3,7 @@ use std::{path::PathBuf, sync::{Arc, RwLock}};
 
 use egui_toast::{Toast, ToastKind, ToastOptions};
 
-use crate::{audio::{state::{AudioClip, AudioState}, AudioController}, project::{action::ActionManager, graphic::Graphic, layer::{Layer, LayerKind}, obj::ObjPtr, palette::Palette, stroke::{Stroke, StrokeColor}, Project}, tools::{bucket::Bucket, color_picker::ColorPicker, line::Line, pencil::Pencil, select::Select, Tool}};
+use crate::{audio::AudioController, project::{action::ActionManager, graphic::Graphic, layer::{Layer, LayerKind}, obj::ObjPtr, palette::Palette, stroke::{Stroke, StrokeColor}, Project}, tools::{bucket::Bucket, color_picker::ColorPicker, line::Line, pencil::Pencil, select::Select, Tool}};
 
 use super::{clipboard, selection::{self, Selection}, toasts::Toasts};
 
@@ -103,12 +103,29 @@ impl EditorState {
         state
     }
 
-    pub fn visible_strokes(&self) -> Vec<ObjPtr<Stroke>> {
-        if let Some(graphic) = self.project.graphics.get(self.open_graphic) {
-            visible_strokes(&self.project, graphic, self.frame()).collect()
-        } else {
-            Vec::new()
+    fn visible_strokes_in_layer(&self, layer: &Layer, time: i32, strokes: &mut Vec<ObjPtr<Stroke>>) {
+        if layer.kind == LayerKind::Animation {
+            if let Some(frame) = layer.get_frame_at(&self.project, time) {
+                let frame = frame.get(&self.project);
+                for stroke in &frame.strokes {
+                    strokes.push(stroke.make_ptr());
+                }
+            }
+        } else if layer.kind == LayerKind::Group {
+            for layer in &layer.layers {
+                self.visible_strokes_in_layer(layer.get(&self.project), time, strokes);
+            } 
         }
+    }
+
+    pub fn visible_strokes(&self) -> Vec<ObjPtr<Stroke>> {
+        let mut res = Vec::new();
+        if let Some(graphic) = self.project.graphics.get(self.open_graphic) {
+            for layer in &graphic.layers {
+                self.visible_strokes_in_layer(layer.get(&self.project), self.frame(), &mut res)
+            }            
+        }
+        res
     }
 
     pub fn pause(&mut self) {
@@ -154,43 +171,5 @@ impl EditorState {
     }
 
 
-    pub fn get_audio_state(&self, graphic: ObjPtr<Graphic>) -> Option<AudioState> {
-        let mut audio = AudioState::new();
-        audio.time = self.time;
 
-        let gfx = self.project.graphics.get(graphic)?;
-        for layer in &gfx.layers {
-            let layer = layer.get(&self.project);
-            if layer.kind != LayerKind::Audio {
-                continue;
-            }
-            if !layer.show {
-                continue; // Layer muted
-            }
-            for instance in &layer.sound_instances {
-                let instance = instance.get(&self.project);
-                if let Some(file) = self.project.audio_files.get(&instance.audio) {
-                    audio.clips.push(AudioClip {
-                        begin: instance.begin, 
-                        end: instance.end, 
-                        offset: instance.offset,
-                        samples: file.data.samples.clone(),
-                    });
-                }
-            }
-        }
-
-        Some(audio)
-    }
-
-}
-
-pub fn visible_strokes<'a>(project: &'a Project, graphic: &'a Graphic, time: i32) -> impl Iterator<Item = ObjPtr<Stroke>> + 'a {
-    graphic.layers.iter().filter(|layer| {
-        let layer = layer.get(project);
-        layer.show && layer.kind == LayerKind::Animation
-    })
-        .flat_map(move |layer| layer.get(project).get_frame_at(project, time))
-        .flat_map(|frame| frame.get(project).strokes.iter())
-        .map(|stroke| stroke.make_ptr())
 }

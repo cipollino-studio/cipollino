@@ -2,6 +2,8 @@
 use std::{cell::RefCell, collections::{HashMap, HashSet}, marker::PhantomData, sync::{Arc, Mutex}};
 use std::hash::Hash;
 
+use unique_type_id::{TypeId, UniqueTypeId};
+
 use super::{saveload::{asset_file::AssetFile, load::LoadingMetadata}, Project};
 
 pub mod obj_clone_impls;
@@ -116,6 +118,7 @@ impl<T: Obj> ObjList<T> {
 
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct ObjPtr<T: Obj> {
     pub key: u64,
     _marker: PhantomData<T>
@@ -157,23 +160,38 @@ impl<T: Obj> std::fmt::Debug for ObjPtr<T> {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct ObjPtrAny(u64);
+pub struct DynObjPtr {
+    key: u64,
+    obj_type: TypeId<u64>
+}
 
-impl<T: Obj> From<ObjPtrAny> for ObjPtr<T> {
+impl DynObjPtr {
 
-    fn from(value: ObjPtrAny) -> Self {
+    pub fn is<T: Obj>(&self) -> bool {
+        self.obj_type == T::id()
+    }
+
+}
+
+impl<T: Obj> From<DynObjPtr> for ObjPtr<T> {
+
+    fn from(value: DynObjPtr) -> Self {
+        assert!(value.obj_type == T::id(), "invalid obj ptr cast.");
         ObjPtr {
-            key: value.0,
+            key: value.key,
             _marker: PhantomData
         }
     }
 
 }
 
-impl<T: Obj> From<ObjPtr<T>> for ObjPtrAny {
+impl<T: Obj> From<ObjPtr<T>> for DynObjPtr {
 
     fn from(value: ObjPtr<T>) -> Self {
-        Self(value.key)
+        Self {
+            key: value.key,
+            obj_type: T::id()
+        }
     }
 
 }
@@ -262,16 +280,20 @@ pub trait ObjSerialize : Sized {
     // Used to write the entire object tree to disk, when creating an asset file
     fn obj_serialize_full(&self, project: &Project, asset_file: &mut AssetFile) -> bson::Bson;
     // Used to deserialize the entire object tree
-    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: ObjPtrAny, asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<Self>;
+    fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: DynObjPtr, asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<Self>;
 
-    // Used to take data out of the object tree, for undo/redo
+}
+
+// Used to take data out of the object tree, for undo/redo
+pub trait ToRawData {
+    
     type RawData: Send + Sync;
     fn to_raw_data(&self, project: &Project) -> Self::RawData;
     fn from_raw_data(project: &mut Project, data: &Self::RawData) -> Self;
 
 }
 
-pub trait Obj: Sized + ObjClone + Send + Sync {
+pub trait Obj: Sized + ObjClone + Send + Sync + UniqueTypeId<u64> {
 
     fn get_list(project: &Project) -> &ObjList<Self>;
     fn get_list_mut(project: &mut Project) -> &mut ObjList<Self>;
