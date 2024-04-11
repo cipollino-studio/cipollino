@@ -104,6 +104,9 @@ impl EditorState {
     }
 
     fn visible_strokes_in_layer(&self, layer: &Layer, time: i32, strokes: &mut Vec<ObjPtr<Stroke>>) {
+        if !layer.show {
+            return;
+        }
         if layer.kind == LayerKind::Animation {
             if let Some(frame) = layer.get_frame_at(&self.project, time) {
                 let frame = frame.get(&self.project);

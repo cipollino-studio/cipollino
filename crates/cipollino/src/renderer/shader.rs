@@ -63,6 +63,14 @@ impl Shader {
         }
     }
     
+    pub fn set_float(&mut self, name: &str, val: f32, gl: &Arc<Context>) {
+        unsafe {
+            if let Some(uniform_loc) = gl.get_uniform_location(self.program, name) {
+                gl.uniform_1_f32(Some(&uniform_loc), val); 
+            }
+        }
+    }
+    
     pub fn set_vec4(&mut self, name: &str, val: glam::Vec4, gl: &Arc<Context>) {
         unsafe {
             if let Some(uniform_loc) = gl.get_uniform_location(self.program, name) {

@@ -1,5 +1,5 @@
 
-use crate::{editor::state::EditorState, project::{action::Action, graphic::Graphic, layer::{Layer, LayerKind, LayerParent}, obj::child_obj::ChildObj}};
+use crate::{editor::state::EditorState, project::{action::Action, graphic::Graphic, layer::{BlendingMode, Layer, LayerKind, LayerParent}, obj::child_obj::ChildObj}};
 
 use super::{next_keyframe, prev_keyframe, TimelinePanel};
 
@@ -12,6 +12,8 @@ pub fn timeline_controls(timeline: &mut TimelinePanel, ui: &mut egui::Ui, state:
             show: true,
             open: false,
             kind: LayerKind::Animation, 
+            alpha: 1.0,
+            blending: BlendingMode::Normal,
             frames: Vec::new(),
             sound_instances: Vec::new(),
             layers: Vec::new()
@@ -27,6 +29,8 @@ pub fn timeline_controls(timeline: &mut TimelinePanel, ui: &mut egui::Ui, state:
             show: true,
             open: true,
             kind: LayerKind::Group, 
+            alpha: 1.0,
+            blending: BlendingMode::Normal,
             frames: Vec::new(),
             sound_instances: Vec::new(),
             layers: Vec::new()

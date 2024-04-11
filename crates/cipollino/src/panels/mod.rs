@@ -42,7 +42,7 @@ impl egui_dock::TabViewer for PanelViewer<'_, '_> {
         ui.set_enabled(self.enable);
         match &mut tab.1 {
             Panel::Assets(assets) => assets.render(ui, &mut self.state, self.systems),
-            Panel::Timeline(timeline) => timeline.render(ui, &mut self.state), 
+            Panel::Timeline(timeline) => timeline.render(ui, &mut self.state, self.systems), 
             Panel::Scene(scene) => scene.render(ui, &mut self.state, &mut self.systems),
             Panel::Tool(tool) => tool.render(ui, &mut self.state),
             Panel::Color(color) => color.render(ui, &mut self.state)

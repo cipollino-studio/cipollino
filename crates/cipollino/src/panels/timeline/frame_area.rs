@@ -210,9 +210,9 @@ pub fn frames(timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_w: f32, fra
     let gfx = state.project.graphics.get(state.open_graphic).unwrap();
 
     let gfx_len = gfx.len;
-    let total_height = ui.available_height().max(frame_h * (gfx.layers.len() as f32));
+    let total_height = ui.available_height().max(frame_h * (grid_rows.len() as f32));
 
-    let (rect, response) = ui.allocate_exact_size(Vec2::new((n_frames as f32) * frame_w, ((gfx.layers.len() as f32) * frame_h).max(ui.available_height())), egui::Sense::click_and_drag());
+    let (rect, response) = ui.allocate_exact_size(Vec2::new((n_frames as f32) * frame_w, total_height), egui::Sense::click_and_drag());
     let win_tl = rect.left_top(); 
     let mouse_down = response.is_pointer_button_down_on();
     let mouse_went_down = mouse_down && !timeline.prev_mouse_down;

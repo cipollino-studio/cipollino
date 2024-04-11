@@ -21,6 +21,40 @@ pub enum LayerParent {
 
 impl PrimitiveObjClone for LayerParent {}
 
+#[derive(Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq, Debug)]
+pub enum BlendingMode {
+    // Normal
+    Normal,
+
+    // Lighten
+    Add,
+    ColorDodge,
+
+    // Darken
+    Multiply,
+    ColorBurn,
+
+    // Contrast
+    Overlay
+}
+
+impl BlendingMode {
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            BlendingMode::Normal => "Normal",
+            BlendingMode::Add => "Add",
+            BlendingMode::ColorDodge => "Color Dodge",
+            BlendingMode::Multiply => "Multiply",
+            BlendingMode::ColorBurn => "Color Burn",
+            BlendingMode::Overlay => "Overlay",
+        } 
+    }
+
+}
+
+impl PrimitiveObjClone for BlendingMode {}
+
 #[derive(Object, Clone, ObjClone, ObjSerialize, UniqueTypeId)]
 pub struct Layer {
     #[parent]
@@ -33,6 +67,12 @@ pub struct Layer {
     pub open: bool, // Only used for layer groups
     #[field]
     pub kind: LayerKind,
+
+    #[field]
+    pub alpha: f32,
+    #[field]
+    pub blending: BlendingMode,
+
     pub frames: Vec<ObjBox<Frame>>,
     pub sound_instances: Vec<ObjBox<SoundInstance>>,
     pub layers: Vec<ObjBox<Layer>>
@@ -110,6 +150,10 @@ impl Layer {
         <Self as ChildObj>::transfer(project, layer, new_parent)
     }
 
+    pub fn requires_offscreen_render(&self) -> bool {
+        self.alpha < 0.999 || self.blending != BlendingMode::Normal || self.kind == LayerKind::Group
+    }
+
 }
 
 impl From<DynObjPtr> for LayerParent {
@@ -162,6 +206,8 @@ impl Default for Layer {
             show: true,
             open: true,
             kind: LayerKind::Animation,
+            alpha: 1.0,
+            blending: BlendingMode::Normal,
             frames: Vec::new(),
             sound_instances: Vec::new(),
             layers: Vec::new()

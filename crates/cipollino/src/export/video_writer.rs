@@ -97,7 +97,11 @@ impl VideoWriter {
         let mut frame_rgb = frame::Video::new(format::Pixel::RGB24, self.w, self.h);
         let plane = frame_rgb.plane_mut::<(u8, u8, u8)>(0);
         for i in 0..plane.len() {
-            plane[i] = (data[3 * i], data[3 * i + 1], data[3 * i + 2]);
+            plane[i] = (
+                data[3 * i],
+                data[3 * i + 1],
+                data[3 * i + 2]
+            );
         }
 
         let mut frame = frame::Video::empty();

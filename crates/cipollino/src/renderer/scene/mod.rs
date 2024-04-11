@@ -1,14 +1,32 @@
 
 mod meshgen;
+mod fb_manager;
 
 use std::{collections::HashMap, sync::Arc};
 
 use glam::vec4;
 use glow::{Context, HasContext};
 
-use crate::project::{graphic::Graphic, layer::{Layer, LayerKind}, obj::{ObjBox, ObjPtr}, stroke::Stroke, Project};
+use crate::project::{graphic::Graphic, layer::{BlendingMode, Layer, LayerKind}, obj::{ObjBox, ObjPtr}, stroke::Stroke, Project};
+
+use self::fb_manager::FramebufferManager;
 
 use super::{shader::Shader, fb::Framebuffer, mesh::Mesh};
+
+impl BlendingMode {
+
+    fn get_shader<'a>(&self, renderer: &'a mut SceneRenderer) -> &'a mut Shader {
+        match self {
+            BlendingMode::Normal => &mut renderer.blend_normal,
+            BlendingMode::Add => &mut renderer.blend_add,
+            BlendingMode::ColorDodge => &mut renderer.blend_color_dodge,
+            BlendingMode::Multiply => &mut renderer.blend_multiply,
+            BlendingMode::ColorBurn => &mut renderer.blend_color_burn,
+            BlendingMode::Overlay => &mut renderer.blend_overlay,
+        }
+    } 
+
+}
 
 pub struct SceneRenderer {
     pub flat_color_shader: Shader,
@@ -21,7 +39,16 @@ pub struct SceneRenderer {
     pub screen_quad: Mesh,
     pub screen_shader: Shader,
 
-    stroke_meshes: HashMap<ObjPtr<Stroke>, Mesh>
+    stroke_meshes: HashMap<ObjPtr<Stroke>, Mesh>,
+
+    framebuffers: FramebufferManager,
+
+    blend_normal: Shader,
+    blend_add: Shader,
+    blend_color_dodge: Shader,
+    blend_multiply: Shader,
+    blend_color_burn: Shader,
+    blend_overlay: Shader
 }
 
 impl SceneRenderer {
@@ -70,6 +97,16 @@ impl SceneRenderer {
             1, 2, 3
         ], gl);
 
+        macro_rules! blend_mode_shader {
+            ($mode:literal) => {
+                Shader::new(
+                    include_str!("shaders/screen_vs.glsl"),
+                    concat!(include_str!("shaders/blending/blend_fs_template_begin.glsl"), include_str!(concat!("shaders/blending/modes/", $mode, ".glsl")), include_str!("shaders/blending/blend_fs_template_end.glsl")),
+                    gl
+                ) 
+            };
+        }
+
         Self {
             flat_color_shader: Shader::new(include_str!("shaders/flat_color_vs.glsl"), include_str!("shaders/flat_color_fs.glsl"), gl),
             circle_shader: Shader::new(include_str!("shaders/circle_vs.glsl"), include_str!("shaders/circle_fs.glsl"), gl),
@@ -81,7 +118,16 @@ impl SceneRenderer {
             screen_quad,
             screen_shader: Shader::new(include_str!("shaders/screen_vs.glsl"), include_str!("shaders/screen_fs.glsl"), gl),
 
-            stroke_meshes: HashMap::new()
+            stroke_meshes: HashMap::new(),
+
+            framebuffers: FramebufferManager::new(),
+
+            blend_normal: blend_mode_shader!("normal"),
+            blend_add: blend_mode_shader!("add"),
+            blend_color_dodge: blend_mode_shader!("color_dodge"),
+            blend_multiply: blend_mode_shader!("multiply"),
+            blend_color_burn: blend_mode_shader!("color_burn"),
+            blend_overlay: blend_mode_shader!("overlay") 
         }
     }
 
@@ -232,21 +278,65 @@ impl SceneRenderer {
             }
         }
     }
+
+    fn render_layer_contents_with_blending<F>(&mut self, project: &Project, w: u32, h: u32,  layer: &Layer, prev_fb: &Framebuffer, render_contents: F, gl: &Arc<Context>) where F: FnOnce(&mut SceneRenderer, &Project, &Layer, &Framebuffer) {
+        if layer.requires_offscreen_render() {
+            let mut bottom = self.framebuffers.alloc(w, h, gl);
+            bottom.copy_from(prev_fb, gl);
+
+            let top = self.framebuffers.alloc(w, h, gl);
+            top.render_to(gl);
+            unsafe {
+                gl.clear_color(0.0, 0.0, 0.0, 0.0);
+                gl.clear(glow::COLOR_BUFFER_BIT | glow::DEPTH_BUFFER_BIT);
+            }
+
+            render_contents(self, project, layer, &top);
+
+            prev_fb.render_to(gl);
+            let blend_shader = layer.blending.get_shader(self);
+            unsafe {
+                gl.active_texture(glow::TEXTURE0);
+                gl.bind_texture(glow::TEXTURE_2D, Some(top.color));
+                gl.active_texture(glow::TEXTURE1);
+                gl.bind_texture(glow::TEXTURE_2D, Some(bottom.color));
+            }
+            blend_shader.enable(gl);
+            blend_shader.set_int("uTopLayer", 0, gl);
+            blend_shader.set_int("uBottomLayer", 1, gl);
+            blend_shader.set_float("uLayerAlpha", layer.alpha, gl);
+            unsafe {
+                gl.disable(glow::DEPTH_TEST);
+            }
+            self.screen_quad.render(gl);
+            self.flat_color_shader.enable(gl);
+        } else {
+            render_contents(self, project, layer, prev_fb);
+        }
+    }
     
-    fn render_main(&mut self, project: &Project, time: i32, layers: &Vec<ObjBox<Layer>>, gl: &Arc<Context>) { 
+    fn render_layer(&mut self, project: &Project, w: u32, h: u32, time: i32, layer: &Layer, prev_fb: &Framebuffer, gl: &Arc<Context>) {
+        self.render_layer_contents_with_blending(project, w, h, layer, prev_fb, |renderer: &mut SceneRenderer, project: &Project, layer: &Layer, _: &Framebuffer| {
+            if let Some(frame) = layer.get_frame_at(project, time) {
+                for stroke in &frame.get(project).strokes {
+                    renderer.render_stroke(project, stroke.make_ptr(), None, gl);
+                }
+            }
+        }, gl);
+    }
+
+    fn render_layers(&mut self, project: &Project, w: u32, h: u32, time: i32, layers: &Vec<ObjBox<Layer>>, prev_fb: &Framebuffer, gl: &Arc<Context>) { 
         for layer in layers.iter().rev() {
             let layer = layer.get(project);
             if !layer.show {
                 continue;
             }
             if layer.kind == LayerKind::Animation {
-                if let Some(frame) = layer.get_frame_at(project, time) {
-                    for stroke in &frame.get(project).strokes  {
-                        self.render_stroke(project, stroke.make_ptr(), None, gl);
-                    }
-                }
+                self.render_layer(project, w, h, time, layer, prev_fb, gl); 
             } else if layer.kind == LayerKind::Group {
-                self.render_main(project, time, &layer.layers, gl);
+                self.render_layer_contents_with_blending(project, w, h, layer, prev_fb, |renderer: &mut SceneRenderer, project: &Project, layer: &Layer, fb: &Framebuffer| {
+                    renderer.render_layers(project, w, h, time, &layer.layers, fb, gl);
+                }, gl);
             }
         }
     }
@@ -304,7 +394,7 @@ impl SceneRenderer {
         
         self.render_onion_skin(project, time, onion_before, onion_after, layer_iter.clone(), gl);
 
-        self.render_main(project, time, &gfx.layers, gl);
+        self.render_layers(project, w, h, time, &gfx.layers, fb, gl);
        
         if let Some((fb_pick, color_key_map)) = fb_pick {
             fb_pick.resize(w, h, gl);

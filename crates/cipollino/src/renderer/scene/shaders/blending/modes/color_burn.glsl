@@ -1,0 +1,1 @@
+mediump vec4 color = vec4(1.0) - ((vec4(1.0) - topColor) / (vec4(0.0001) + bottomColor)); 

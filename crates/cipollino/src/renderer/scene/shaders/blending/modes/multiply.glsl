@@ -1,0 +1,1 @@
+mediump vec4 color = topColor * bottomColor; 

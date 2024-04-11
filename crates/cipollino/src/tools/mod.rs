@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use glam::Vec2;
 
-use crate::{editor::state::EditorState, project::{action::ObjAction, frame::Frame, layer::{Layer, LayerKind, LayerParent}, obj::{child_obj::ChildObj, ObjPtr}, Project}};
+use crate::{editor::state::EditorState, project::{action::ObjAction, frame::Frame, layer::{BlendingMode, Layer, LayerKind, LayerParent}, obj::{child_obj::ChildObj, ObjPtr}, Project}};
 
 use super::panels::scene::{overlay::OverlayRenderer, ScenePanel};
 
@@ -54,6 +54,8 @@ pub fn active_frame(state: &mut EditorState) -> Option<(ObjPtr<Frame>, Vec<ObjAc
             show: true,
             open: false,
             kind: LayerKind::Animation,
+            alpha: 1.0,
+            blending: BlendingMode::Normal,
             frames: Vec::new(),
             sound_instances: Vec::new(),
             layers: Vec::new()

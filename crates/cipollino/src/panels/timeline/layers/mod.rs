@@ -1,9 +1,13 @@
 
 use egui::{vec2, Vec2};
 
-use crate::{editor::state::EditorState, project::{action::Action, layer::{Layer, LayerKind, LayerParent}, obj::{child_obj::ChildObj, ObjPtr}}, util::ui::dnd::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_widget}};
+use crate::{editor::{state::EditorState, EditorSystems}, project::{action::Action, layer::{Layer, LayerKind, LayerParent}, obj::{child_obj::ChildObj, ObjPtr}}, util::ui::dnd::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_widget}};
+
+use self::layer_property_dialog::LayerPropertyDialog;
 
 use super::{FrameGridRow, TimelinePanel};
+
+mod layer_property_dialog;
 
 impl FrameGridRow {
 
@@ -28,7 +32,7 @@ impl FrameGridRow {
         }
     }
 
-    fn layer_context_menu(&self, timeline: &mut TimelinePanel, layer: &Layer, response: &egui::Response, set_layer_kind: &mut Option<LayerKind>, delete_layer: &mut bool) {
+    fn layer_context_menu(&self, timeline: &mut TimelinePanel, layer: &Layer, response: &egui::Response, set_layer_kind: &mut Option<LayerKind>, delete_layer: &mut bool, systems: &mut EditorSystems) {
         response.context_menu(|ui| {
             if ui.button("Rename").clicked() {
                 timeline.layer_editing_name = self.layer;
@@ -46,6 +50,10 @@ impl FrameGridRow {
                         ui.close_menu(); 
                     }
                 });
+            }
+            if ui.button("Properties").clicked() {
+                systems.dialog.open_dialog(LayerPropertyDialog::new(self.layer));
+                ui.close_menu();
             }
             if ui.button("Delete").clicked() {
                 *delete_layer = true;
@@ -77,13 +85,13 @@ impl FrameGridRow {
         }
     }
 
-    fn render_layer(&self, timeline: &mut TimelinePanel, ui: &mut egui::Ui, rect: egui::Rect, state: &mut EditorState, response: &egui::Response, layer_drop_idx: &mut Option<(usize, LayerParent)>) -> Option<()> {
+    fn render_layer(&self, timeline: &mut TimelinePanel, ui: &mut egui::Ui, rect: egui::Rect, state: &mut EditorState, systems: &mut EditorSystems, response: &egui::Response, layer_drop_idx: &mut Option<(usize, LayerParent)>) -> Option<()> {
         let layer = state.project.layers.get(self.layer)?; 
 
         let mut set_name = false;
         let mut delete_layer = false;
         let mut show_hide_layer = false; 
-        let mut open_close_layer = false; 
+        let mut open_close_layer = false;
         let mut set_layer_kind = None;
 
         let indent_size = 10.0;
@@ -100,7 +108,7 @@ impl FrameGridRow {
             }
         } else {
             self.render_layer_name(layer, ui, &rect, indent_size, layer_group_triangle_width, &mut open_close_layer);
-            self.layer_context_menu(timeline, layer, response, &mut set_layer_kind, &mut delete_layer);
+            self.layer_context_menu(timeline, layer, response, &mut set_layer_kind, &mut delete_layer, systems);
             if response.clicked() && layer.kind == LayerKind::Animation {
                 state.active_layer = self.layer;
             }
@@ -197,7 +205,7 @@ fn drop_layer(state: &mut EditorState, layer_ptr: ObjPtr<Layer>, new_idx: usize,
     }
 }
 
-pub fn layers(timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_h: f32, state: &mut EditorState, grid_rows: &Vec<FrameGridRow>, sidebar_w: f32) {
+pub fn layers(timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_h: f32, state: &mut EditorState, systems: &mut EditorSystems, grid_rows: &Vec<FrameGridRow>, sidebar_w: f32) {
     let colors = dnd_drop_zone_setup_colors(ui);
     let init_stroke = std::mem::replace(&mut ui.visuals_mut().widgets.active.bg_stroke.color, egui::Color32::TRANSPARENT);
     let mut layer_drop_idx = None;
@@ -206,7 +214,7 @@ pub fn layers(timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_h: f32, sta
         for row in grid_rows {
             let mut render_layer = |ui: &mut egui::Ui, timeline: &mut TimelinePanel, _: bool| {
                 let (rect, response) = ui.allocate_exact_size(Vec2::new(sidebar_w, frame_h), egui::Sense::click());
-                row.render_layer(timeline, ui, rect, state, &response, &mut layer_drop_idx);
+                row.render_layer(timeline, ui, rect, state, systems, &response, &mut layer_drop_idx);
                 ((), response)
             };
             if row.draggable(timeline) {

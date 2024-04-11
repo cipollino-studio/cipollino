@@ -2,8 +2,6 @@ use std::sync::Arc;
 
 use glow::{Context, HasContext};
 
-
-
 pub struct Framebuffer {
 
     pub fbo: glow::NativeFramebuffer,
@@ -64,6 +62,15 @@ impl Framebuffer {
         unsafe {
             gl.bind_framebuffer(glow::FRAMEBUFFER, None);
             gl.viewport(0, 0, w as i32, h as i32);
+        }
+    }
+
+    pub fn copy_from(&mut self, other: &Framebuffer, gl: &Arc<Context>) {
+        self.resize(other.w, other.h, gl);
+        unsafe {
+            gl.bind_framebuffer(glow::FRAMEBUFFER, Some(self.fbo));
+            gl.bind_framebuffer(glow::READ_FRAMEBUFFER, Some(other.fbo));
+            gl.blit_framebuffer(0, 0, other.w as i32, other.h as i32, 0, 0, self.w as i32, self.h as i32, glow::COLOR_BUFFER_BIT, glow::LINEAR);
         }
     }
 

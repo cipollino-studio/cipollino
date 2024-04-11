@@ -2,7 +2,7 @@
 
 use egui::{KeyboardShortcut, Modifiers};
 
-use crate::{editor::{selection::Selection, state::EditorState}, project::{action::Action, frame::Frame, layer::{Layer, LayerKind}, obj::{child_obj::ChildObj, ObjBox, ObjPtr}, sound_instance::SoundInstance}};
+use crate::{editor::{selection::Selection, state::EditorState, EditorSystems}, project::{action::Action, frame::Frame, layer::{Layer, LayerKind}, obj::{child_obj::ChildObj, ObjBox, ObjPtr}, sound_instance::SoundInstance}};
 
 pub mod controls;
 pub mod header;
@@ -60,7 +60,6 @@ pub enum FrameGridRowKind {
 pub struct FrameGridRow {
     kind: FrameGridRowKind,
     indent: u32,
-    global_idx: usize,
     local_idx: usize,
     layer: ObjPtr<Layer>
 }
@@ -104,17 +103,16 @@ impl TimelinePanel {
         let gfx = state.project.graphics.get(state.open_graphic).unwrap();
         let mut grid_row_kinds = Vec::new(); 
         self.calc_grid_rows_rec(state, &gfx.layers, &mut grid_row_kinds, 0);
-        let grid_rows = grid_row_kinds.iter().enumerate().map(|(idx, (layer, local_idx, kind, indent))| FrameGridRow {
+        let grid_rows = grid_row_kinds.iter().map(|(layer, local_idx, kind, indent)| FrameGridRow {
             kind: *kind,
             indent: *indent,
-            global_idx: idx,
             local_idx: *local_idx,
             layer: *layer
         }).collect();
         grid_rows
     }
 
-    pub fn render(&mut self, ui: &mut egui::Ui, state: &mut EditorState) {
+    pub fn render(&mut self, ui: &mut egui::Ui, state: &mut EditorState, systems: &mut EditorSystems) {
 
         if let None = state.project.graphics.get(state.open_graphic) {
             ui.centered_and_justified(|ui| {
@@ -207,7 +205,7 @@ impl TimelinePanel {
                                 .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
                                 .vertical_scroll_offset(self.scroll_y);
                             scroll_area.show(ui, |ui| {
-                                layers::layers(self, ui, frame_h, state, &grid_rows, sidebar_w);
+                                layers::layers(self, ui, frame_h, state, systems, &grid_rows, sidebar_w);
                             });
                         });
                     hovering_layers
