@@ -1,23 +1,34 @@
+use egui::{InnerResponse, LayerId, Order};
+
 
 pub fn draggable_label<P>(ui: &mut egui::Ui, text: &str, payload: P) -> egui::Response where P: std::marker::Send + std::marker::Sync + 'static {
-    draggable_widget(ui, payload, |ui| {
-    let label = egui::Label::new(text).selectable(false).sense(egui::Sense::click());
-        let resp = ui.add(label);
-        (resp.clone(), resp)
+    draggable_widget(ui, payload, |ui, _| {
+        let label = egui::Label::new(text).selectable(false).sense(egui::Sense::click());
+            let resp = ui.add(label);
+            (resp.clone(), resp)
     })
 }
 
 pub fn draggable_widget<F, P, R>(ui: &mut egui::Ui, payload: P, mut add_contents: F) -> R
-    where F: FnMut(&mut egui::Ui) -> (R, egui::Response),
+    where F: FnMut(&mut egui::Ui, bool) -> (R, egui::Response),
           P: std::marker::Send + std::marker::Sync + 'static {
     let id = ui.next_auto_id();
     let dragged = ui.memory(|mem| mem.is_being_dragged(id));
     if dragged {
-        ui.dnd_drag_source(id, payload, |ui| {
-            add_contents(ui)
-        }).inner.0
+         
+        let layer_id = LayerId::new(Order::Tooltip, ui.next_auto_id());
+        let InnerResponse { inner, response } = ui.with_layer_id(layer_id, |ui| {
+            add_contents(ui, true)
+        });
+        
+        if let Some(pointer_pos) = ui.ctx().pointer_interact_pos() {
+            let delta = pointer_pos - response.rect.center();
+            ui.ctx().translate_layer(layer_id, delta);
+        }
+
+        inner.0
     } else {
-        let (val, resp) = add_contents(ui);
+        let (val, resp) = add_contents(ui, false);
         if resp.is_pointer_button_down_on() && ui.input(|i| i.pointer.delta()).length() > 1.0 {
             ui.memory_mut(|mem| mem.set_dragged_id(id));
             egui::DragAndDrop::set_payload(ui.ctx(), payload);

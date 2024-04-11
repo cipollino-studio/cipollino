@@ -30,6 +30,8 @@ pub struct Layer {
     #[field]
     pub show: bool,
     #[field]
+    pub open: bool, // Only used for layer groups
+    #[field]
     pub kind: LayerKind,
     pub frames: Vec<ObjBox<Frame>>,
     pub sound_instances: Vec<ObjBox<SoundInstance>>,
@@ -158,6 +160,7 @@ impl Default for Layer {
             parent: LayerParent::Graphic(ObjPtr::null()),
             name: "Layer".to_owned(),
             show: true,
+            open: true,
             kind: LayerKind::Animation,
             frames: Vec::new(),
             sound_instances: Vec::new(),

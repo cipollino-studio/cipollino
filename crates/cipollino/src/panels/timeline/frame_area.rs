@@ -78,15 +78,15 @@ impl FrameGridRow {
         }
     }
 
-    fn frame_area_layer_animation(&self, timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_w: f32, frame_h: f32, state: &mut EditorState, rect: egui::Rect, response: &egui::Response, mouse_went_down: bool, layer_ptr: ObjPtr<Layer>) -> Option<()> {
-        Self::active_frame_highlight(layer_ptr, state, ui, rect);
+    fn frame_area_layer_animation(&self, timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_w: f32, frame_h: f32, state: &mut EditorState, rect: egui::Rect, response: &egui::Response, mouse_went_down: bool) -> Option<()> {
+        Self::active_frame_highlight(self.layer, state, ui, rect);
 
-        let layer = state.project.layers.get(layer_ptr)?;
+        let layer = state.project.layers.get(self.layer)?;
 
         // If the user clicks anywhere in the layer, select the layer
         if let Some(hover_pos) = response.hover_pos() {
             if rect.contains(hover_pos) && response.clicked() {
-                state.active_layer = layer_ptr;
+                state.active_layer = self.layer;
             } 
         }
 
@@ -117,10 +117,10 @@ impl FrameGridRow {
         None
     }
 
-    fn frame_area_layer_audio(&self, timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_w: f32, frame_h: f32, state: &mut EditorState, rect: egui::Rect, response: &egui::Response, mouse_went_down: bool, layer_ptr: ObjPtr<Layer>) -> Option<()> {
-        Self::active_frame_highlight(layer_ptr, state, ui, rect);
+    fn frame_area_layer_audio(&self, timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_w: f32, frame_h: f32, state: &mut EditorState, rect: egui::Rect, response: &egui::Response, mouse_went_down: bool) -> Option<()> {
+        Self::active_frame_highlight(self.layer, state, ui, rect);
 
-        let layer = state.project.layers.get(layer_ptr)?;
+        let layer = state.project.layers.get(self.layer)?;
 
         // Sound instances
         for sound_instance_box in &layer.sound_instances {
@@ -183,7 +183,7 @@ impl FrameGridRow {
                                 ui.visuals().widgets.active.bg_stroke);
 
                             if response.dnd_release_payload::<(AssetPtr, ObjPtr<Folder>)>().is_some() {
-                                if let Some(acts) = add_sound_instance(&mut state.project, layer_ptr, *audio_file_ptr, begin) {
+                                if let Some(acts) = add_sound_instance(&mut state.project, self.layer, *audio_file_ptr, begin) {
                                     state.actions.add(Action::from_list(acts));
                                 }
                             }
@@ -197,8 +197,8 @@ impl FrameGridRow {
 
     fn frame_area(&self, timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_w: f32, frame_h: f32, state: &mut EditorState, response: &egui::Response, mouse_went_down: bool, rect: egui::Rect) {
         match &self.kind {
-            FrameGridRowKind::AnimationLayer(layer) => { self.frame_area_layer_animation(timeline, ui, frame_w, frame_h, state, rect, response, mouse_went_down, *layer); },
-            FrameGridRowKind::AudioLayer(layer) => { self.frame_area_layer_audio(timeline, ui, frame_w, frame_h, state, rect, response, mouse_went_down, *layer); },
+            FrameGridRowKind::AnimationLayer => { self.frame_area_layer_animation(timeline, ui, frame_w, frame_h, state, rect, response, mouse_went_down); },
+            FrameGridRowKind::AudioLayer => { self.frame_area_layer_audio(timeline, ui, frame_w, frame_h, state, rect, response, mouse_went_down); },
             _ => {}
         };
     }

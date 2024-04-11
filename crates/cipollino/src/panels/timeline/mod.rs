@@ -52,16 +52,17 @@ pub struct TimelinePanel {
 
 #[derive(Clone, Copy)]
 pub enum FrameGridRowKind {
-    AnimationLayer(ObjPtr<Layer>),
-    AudioLayer(ObjPtr<Layer>),
-    GroupLayer(ObjPtr<Layer>)
+    AnimationLayer,
+    AudioLayer,
+    GroupLayer
 }
 
 pub struct FrameGridRow {
     kind: FrameGridRowKind,
     indent: u32,
     global_idx: usize,
-    local_idx: usize
+    local_idx: usize,
+    layer: ObjPtr<Layer>
 }
 
 impl TimelinePanel {
@@ -86,14 +87,14 @@ impl TimelinePanel {
         }
     }
 
-    fn calc_grid_rows_rec(&mut self, state: &EditorState, layers: &Vec<ObjBox<Layer>>, rows: &mut Vec<(usize, FrameGridRowKind, u32)>, indent: u32) {
+    fn calc_grid_rows_rec(&mut self, state: &EditorState, layers: &Vec<ObjBox<Layer>>, rows: &mut Vec<(ObjPtr<Layer>, usize, FrameGridRowKind, u32)>, indent: u32) {
         for (local_idx, layer) in layers.iter().enumerate() {
-            rows.push((local_idx, match layer.get(&state.project).kind {
-                LayerKind::Animation => FrameGridRowKind::AnimationLayer(layer.make_ptr()),
-                LayerKind::Audio => FrameGridRowKind::AudioLayer(layer.make_ptr()),
-                LayerKind::Group => FrameGridRowKind::GroupLayer(layer.make_ptr()), 
+            rows.push((layer.make_ptr(), local_idx, match layer.get(&state.project).kind {
+                LayerKind::Animation => FrameGridRowKind::AnimationLayer,
+                LayerKind::Audio => FrameGridRowKind::AudioLayer,
+                LayerKind::Group => FrameGridRowKind::GroupLayer, 
             }, indent));
-            if layer.get(&state.project).kind == LayerKind::Group {
+            if layer.get(&state.project).kind == LayerKind::Group && layer.get(&state.project).open {
                 self.calc_grid_rows_rec(state, &layer.get(&state.project).layers, rows, indent + 1);
             }
         }
@@ -103,11 +104,12 @@ impl TimelinePanel {
         let gfx = state.project.graphics.get(state.open_graphic).unwrap();
         let mut grid_row_kinds = Vec::new(); 
         self.calc_grid_rows_rec(state, &gfx.layers, &mut grid_row_kinds, 0);
-        let grid_rows = grid_row_kinds.iter().enumerate().map(|(idx, (local_idx, kind, indent))| FrameGridRow {
+        let grid_rows = grid_row_kinds.iter().enumerate().map(|(idx, (layer, local_idx, kind, indent))| FrameGridRow {
             kind: *kind,
             indent: *indent,
             global_idx: idx,
-            local_idx: *local_idx
+            local_idx: *local_idx,
+            layer: *layer
         }).collect();
         grid_rows
     }

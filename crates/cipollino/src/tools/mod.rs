@@ -52,6 +52,7 @@ pub fn active_frame(state: &mut EditorState) -> Option<(ObjPtr<Frame>, Vec<ObjAc
             parent: LayerParent::Graphic(state.open_graphic),
             name: "Layer".to_owned(),
             show: true,
+            open: false,
             kind: LayerKind::Animation,
             frames: Vec::new(),
             sound_instances: Vec::new(),

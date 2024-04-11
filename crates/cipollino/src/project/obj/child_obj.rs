@@ -124,7 +124,10 @@ pub trait ChildObj: Obj + 'static + ObjSerialize + ToRawData {
         let parent = *obj.parent_mut();
         let sibling_list = Self::get_list_in_parent_mut(project, parent)?;
         let old_idx = sibling_list.iter().position(|other_obj| other_obj.make_ptr() == obj_ptr)?;
-        let new_idx = new_idx.clamp(0, sibling_list.len());
+        let mut new_idx = new_idx.clamp(0, sibling_list.len());
+        if new_idx > old_idx {
+            new_idx -= 1;
+        }
 
         let redo = move |proj: &'_ mut Project| {
             let obj = Self::get_list_mut(proj).get_mut(obj_ptr).unwrap();

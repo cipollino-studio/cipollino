@@ -275,7 +275,7 @@ impl AssetsPanel {
 
         let mut frame = egui::Frame::default().begin(ui);
         let mut inner_hovered = false;
-        let folder_resp = draggable_widget(&mut frame.content_ui, (AssetPtr::Folder(folder.make_ptr()), superfolder), |ui| {
+        let folder_resp = draggable_widget(&mut frame.content_ui, (AssetPtr::Folder(folder.make_ptr()), superfolder), |ui, _| {
             let resp = ui.collapsing(folder.get(&state.project).name.as_str(), |ui| {
                 inner_hovered |= self.render_folder_contents(ui, state, systems, folder.make_ptr(), open, delete, rename, asset_transfer).unwrap_or(false);
             }).header_response;

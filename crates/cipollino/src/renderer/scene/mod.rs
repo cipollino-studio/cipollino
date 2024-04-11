@@ -139,29 +139,33 @@ impl SceneRenderer {
         for layer in layer_iter { 
             let layer = layer.get(project);
             if let Some(frame) = layer.get_frame_at(project, time) {
-                let mut curr_time = frame.get(project).time;
-                for i in 0..onion_before {
-                    if let Some(frame) = layer.get_frame_before(project, curr_time) {
-                        for stroke in &frame.get(project).strokes {
-                            if stroke.get(&project).filled {
-                                continue;
+                if onion_before != 0 {
+                    let mut curr_time = frame.get(project).time;
+                    for i in 0..onion_before {
+                        if let Some(frame) = layer.get_frame_before(project, curr_time) {
+                            for stroke in &frame.get(project).strokes {
+                                if stroke.get(&project).filled {
+                                    continue;
+                                }
+                                onion_before_strokes[i as usize].push(stroke.make_ptr());
                             }
-                            onion_before_strokes[i as usize].push(stroke.make_ptr());
+                            
+                            curr_time = frame.get(project).time;
                         }
-                        
-                        curr_time = frame.get(project).time;
                     }
                 }
-                let mut curr_time = frame.get(project).time;
-                for i in 0..onion_after {
-                    if let Some(frame) = layer.get_frame_after(project, curr_time) {
-                        for stroke in &frame.get(project).strokes {
-                            if stroke.get(project).filled {
-                                continue;
+                if onion_after != 0 {
+                    let mut curr_time = frame.get(project).time;
+                    for i in 0..onion_after {
+                        if let Some(frame) = layer.get_frame_after(project, curr_time) {
+                            for stroke in &frame.get(project).strokes {
+                                if stroke.get(project).filled {
+                                    continue;
+                                }
+                                onion_after_strokes[i as usize].push(stroke.make_ptr());
                             }
-                            onion_after_strokes[i as usize].push(stroke.make_ptr());
+                            curr_time = frame.get(project).time;
                         }
-                        curr_time = frame.get(project).time;
                     }
                 }
             }

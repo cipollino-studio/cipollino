@@ -4,12 +4,6 @@ pub mod path;
 pub mod dnd;
 pub mod layout;
 
-pub fn label_size(ui: &mut egui::Ui, label: egui::Label) -> egui::Vec2 {
-    let (_, galley, _) = label.layout_in_ui(ui);
-    let text_rect = galley.rect;
-    text_rect.size()
-}
-
 use std::ops::RangeInclusive;
 pub fn drag_value<N>(ui: &mut egui::Ui, label: &str, val: &mut N, range: RangeInclusive<N>, change: Option<&mut (bool, bool)>) where N: egui::emath::Numeric {
     ui.horizontal(|ui| {
