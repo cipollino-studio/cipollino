@@ -1,8 +1,8 @@
 mediump float blendf(mediump float bottom, mediump float top) {
-    if(bottom < 0.5) {
-        return 2.0 * top * bottom;
+    if(top < 0.5) {
+        return 1.0 - (1.0 - bottom) / (0.001 + top);
     } else {
-        return 1.0 - 2.0 * (1.0 - top) * (1.0 - bottom);
+        return bottom / (1.0001 - top);
     }
 }
 

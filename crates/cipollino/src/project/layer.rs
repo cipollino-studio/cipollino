@@ -35,7 +35,13 @@ pub enum BlendingMode {
     ColorBurn,
 
     // Contrast
-    Overlay
+    Overlay,
+    SoftLight,
+    HardLight,
+    VividLight,
+
+    // Component
+    Color
 }
 
 impl BlendingMode {
@@ -48,7 +54,11 @@ impl BlendingMode {
             BlendingMode::Multiply => "Multiply",
             BlendingMode::ColorBurn => "Color Burn",
             BlendingMode::Overlay => "Overlay",
-        } 
+            BlendingMode::SoftLight => "Soft Light",
+            BlendingMode::HardLight => "Hard Light",
+            BlendingMode::VividLight => "Vivid Light",
+            BlendingMode::Color => "Color",
+        }
     }
 
 }

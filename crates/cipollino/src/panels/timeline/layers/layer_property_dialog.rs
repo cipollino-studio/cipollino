@@ -62,6 +62,11 @@ impl Dialog for LayerPropertyDialog {
                         blending_mode_option(ui, BlendingMode::ColorBurn);
                         ui.separator();
                         blending_mode_option(ui, BlendingMode::Overlay);
+                        blending_mode_option(ui, BlendingMode::SoftLight);
+                        blending_mode_option(ui, BlendingMode::HardLight);
+                        blending_mode_option(ui, BlendingMode::VividLight);
+                        ui.separator();
+                        blending_mode_option(ui, BlendingMode::Color);
                 });
                 ui.end_row();
 

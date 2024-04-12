@@ -23,6 +23,10 @@ impl BlendingMode {
             BlendingMode::Multiply => &mut renderer.blend_multiply,
             BlendingMode::ColorBurn => &mut renderer.blend_color_burn,
             BlendingMode::Overlay => &mut renderer.blend_overlay,
+            BlendingMode::SoftLight => &mut renderer.blend_soft_light,
+            BlendingMode::HardLight => &mut renderer.blend_hard_light,
+            BlendingMode::VividLight => &mut renderer.blend_vivid_light,
+            BlendingMode::Color => &mut renderer.blend_color,
         }
     } 
 
@@ -48,7 +52,11 @@ pub struct SceneRenderer {
     blend_color_dodge: Shader,
     blend_multiply: Shader,
     blend_color_burn: Shader,
-    blend_overlay: Shader
+    blend_overlay: Shader,
+    blend_soft_light: Shader,
+    blend_hard_light: Shader,
+    blend_vivid_light: Shader,
+    blend_color: Shader,
 }
 
 impl SceneRenderer {
@@ -127,7 +135,11 @@ impl SceneRenderer {
             blend_color_dodge: blend_mode_shader!("color_dodge"),
             blend_multiply: blend_mode_shader!("multiply"),
             blend_color_burn: blend_mode_shader!("color_burn"),
-            blend_overlay: blend_mode_shader!("overlay") 
+            blend_overlay: blend_mode_shader!("overlay"), 
+            blend_soft_light: blend_mode_shader!("soft_light"),
+            blend_hard_light: blend_mode_shader!("hard_light"), 
+            blend_vivid_light: blend_mode_shader!("vivid_light"), 
+            blend_color: blend_mode_shader!("color") 
         }
     }
 
