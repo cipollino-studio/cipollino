@@ -85,7 +85,7 @@ impl FrameGridRow {
         }
     }
 
-    fn render_layer(&self, timeline: &mut TimelinePanel, ui: &mut egui::Ui, rect: egui::Rect, state: &mut EditorState, systems: &mut EditorSystems, response: &egui::Response, layer_drop_idx: &mut Option<(usize, LayerParent)>) -> Option<()> {
+    fn render_layer(&self, timeline: &mut TimelinePanel, ui: &mut egui::Ui, rect: egui::Rect, state: &mut EditorState, systems: &mut EditorSystems, response: &egui::Response, layer_drop_idx: &mut Option<(usize, LayerParent)>, layer_group_triangle_width: f32) -> Option<()> {
         let layer = state.project.layers.get(self.layer)?; 
 
         let mut set_name = false;
@@ -95,7 +95,6 @@ impl FrameGridRow {
         let mut set_layer_kind = None;
 
         let indent_size = 10.0;
-        let layer_group_triangle_width = 20.0;
 
         if self.layer == state.active_layer {
             ui.painter().rect(rect, 0.0, super::HIGHLIGHT, egui::Stroke::NONE);
@@ -206,6 +205,7 @@ fn drop_layer(state: &mut EditorState, layer_ptr: ObjPtr<Layer>, new_idx: usize,
 }
 
 pub fn layers(timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_h: f32, state: &mut EditorState, systems: &mut EditorSystems, grid_rows: &Vec<FrameGridRow>, sidebar_w: f32) {
+    let layer_group_triangle_width = 20.0;
     let colors = dnd_drop_zone_setup_colors(ui);
     let init_stroke = std::mem::replace(&mut ui.visuals_mut().widgets.active.bg_stroke.color, egui::Color32::TRANSPARENT);
     let mut layer_drop_idx = None;
@@ -214,7 +214,7 @@ pub fn layers(timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_h: f32, sta
         for row in grid_rows {
             let mut render_layer = |ui: &mut egui::Ui, timeline: &mut TimelinePanel, _: bool| {
                 let (rect, response) = ui.allocate_exact_size(Vec2::new(sidebar_w, frame_h), egui::Sense::click());
-                row.render_layer(timeline, ui, rect, state, systems, &response, &mut layer_drop_idx);
+                row.render_layer(timeline, ui, rect, state, systems, &response, &mut layer_drop_idx, layer_group_triangle_width);
                 ((), response)
             };
             if row.draggable(timeline) {
@@ -226,6 +226,23 @@ pub fn layers(timeline: &mut TimelinePanel, ui: &mut egui::Ui, frame_h: f32, sta
             }
         }
         ui.spacing_mut().item_spacing = orig_item_spacing;
+
+        if ui.available_height() > 0.0 {
+            let (rect, response) = ui.allocate_exact_size(Vec2::new(sidebar_w, ui.available_height()), egui::Sense::hover()); 
+            if let (Some(pointer), Some(_)) = (
+                ui.input(|i| i.pointer.hover_pos()),
+                response.dnd_hover_payload::<ObjPtr<Layer>>()
+            ) {
+                if rect.contains(pointer) {
+                    let mut x_range = rect.x_range();
+                    x_range.min += layer_group_triangle_width;
+                    ui.painter().hline(x_range, rect.top(), egui::Stroke::new(1.0, egui::Color32::WHITE));
+                    if let Some(gfx) = state.project.graphics.get(state.open_graphic) {
+                        layer_drop_idx = Some((gfx.layers.len(), LayerParent::Graphic(state.open_graphic)));
+                    } 
+                }
+            }
+        }
     }) {
         if let Some((new_idx, new_parent)) = layer_drop_idx {
             let layer_ptr = *payload.as_ref();
