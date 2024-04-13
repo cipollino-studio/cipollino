@@ -28,6 +28,7 @@ pub enum BlendingMode {
 
     // Lighten
     Add,
+    Screen,
     ColorDodge,
 
     // Darken
@@ -50,6 +51,7 @@ impl BlendingMode {
         match self {
             BlendingMode::Normal => "Normal",
             BlendingMode::Add => "Add",
+            BlendingMode::Screen => "Screen",
             BlendingMode::ColorDodge => "Color Dodge",
             BlendingMode::Multiply => "Multiply",
             BlendingMode::ColorBurn => "Color Burn",

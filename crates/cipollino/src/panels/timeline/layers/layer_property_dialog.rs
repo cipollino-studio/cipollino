@@ -56,6 +56,7 @@ impl Dialog for LayerPropertyDialog {
                         blending_mode_option(ui, BlendingMode::Normal);
                         ui.separator();
                         blending_mode_option(ui, BlendingMode::Add);
+                        blending_mode_option(ui, BlendingMode::Screen);
                         blending_mode_option(ui, BlendingMode::ColorDodge);
                         ui.separator();
                         blending_mode_option(ui, BlendingMode::Multiply);

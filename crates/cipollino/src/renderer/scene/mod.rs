@@ -19,6 +19,7 @@ impl BlendingMode {
         match self {
             BlendingMode::Normal => &mut renderer.blend_normal,
             BlendingMode::Add => &mut renderer.blend_add,
+            BlendingMode::Screen => &mut renderer.blend_screen,
             BlendingMode::ColorDodge => &mut renderer.blend_color_dodge,
             BlendingMode::Multiply => &mut renderer.blend_multiply,
             BlendingMode::ColorBurn => &mut renderer.blend_color_burn,
@@ -49,6 +50,7 @@ pub struct SceneRenderer {
 
     blend_normal: Shader,
     blend_add: Shader,
+    blend_screen: Shader,
     blend_color_dodge: Shader,
     blend_multiply: Shader,
     blend_color_burn: Shader,
@@ -132,6 +134,7 @@ impl SceneRenderer {
 
             blend_normal: blend_mode_shader!("normal"),
             blend_add: blend_mode_shader!("add"),
+            blend_screen: blend_mode_shader!("screen"),
             blend_color_dodge: blend_mode_shader!("color_dodge"),
             blend_multiply: blend_mode_shader!("multiply"),
             blend_color_burn: blend_mode_shader!("color_burn"),
