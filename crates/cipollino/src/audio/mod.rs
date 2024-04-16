@@ -17,11 +17,11 @@ pub struct AudioController {
 
 impl AudioController {
 
-    pub fn new() -> Option<Self> {
+    pub fn new() -> Result<Self, String> {
         
         let cpal_host = cpal::default_host();
-        let device = cpal_host.default_output_device()?;
-        let mut config = device.supported_output_configs().ok()?.next()?.with_max_sample_rate().config();
+        let device = cpal_host.default_output_device().ok_or("Audio output device not found.")?;
+        let mut config = device.supported_output_configs().map_err(|err| err.to_string())?.next().ok_or("Audio output config missing.")?.with_max_sample_rate().config();
         config.buffer_size = cpal::BufferSize::Fixed(1000);
 
         let state = Arc::new(Mutex::new(AudioState::new()));
@@ -41,7 +41,7 @@ impl AudioController {
             
         }, None).unwrap();
 
-        Some(Self {
+        Ok(Self {
             stream,
             state: state_clone
         })

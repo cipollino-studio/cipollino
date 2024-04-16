@@ -1,4 +1,6 @@
 
+use std::env::{current_exe, set_current_dir};
+
 use editor::Editor;
 use renderer::scene::SceneRenderer;
 
@@ -12,6 +14,9 @@ pub mod tools;
 pub mod audio;
 
 fn main() -> Result<(), eframe::Error> {
+
+    set_current_dir(current_exe().unwrap().parent().unwrap()).unwrap();
+
     let (icon, w, h) = {
         let img = image::load_from_memory(include_bytes!("../../../res/icon256x256.png")).unwrap().into_rgba8();
         let (w, h) = img.dimensions();
@@ -31,8 +36,6 @@ fn main() -> Result<(), eframe::Error> {
         ..Default::default()
     };
 
-    ffmpeg::init().unwrap();
-    
     eframe::run_native(
         "Cipollino",
         options,

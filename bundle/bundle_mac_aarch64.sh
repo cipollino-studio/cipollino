@@ -13,3 +13,4 @@ mkdir $DIR/Contents/MacOS
 cp target/aarch64-apple-darwin/release/cipollino $DIR/Contents/MacOS/
 mkdir $DIR/Contents/Resources
 cp res/icon.icns $DIR/Contents/Resources/Cipollino.icns
+cp libs/bin/macos_arm64/ffmpeg $DIR/Contents/ffmpeg

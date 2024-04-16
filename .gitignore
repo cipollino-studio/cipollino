@@ -1,4 +1,5 @@
 /target
 **/.DS_Store
 mac_aarch64_bundle/
+windows_x86_64_bundle/
 **/types.toml

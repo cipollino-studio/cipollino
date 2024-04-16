@@ -1,9 +1,7 @@
 
 use std::{path::PathBuf, sync::{Arc, RwLock}};
 
-use egui_toast::{Toast, ToastKind, ToastOptions};
-
-use crate::{audio::AudioController, project::{action::ActionManager, graphic::Graphic, layer::{Layer, LayerKind}, obj::ObjPtr, palette::Palette, stroke::{Stroke, StrokeColor}, Project}, tools::{bucket::Bucket, color_picker::ColorPicker, line::Line, pencil::Pencil, select::Select, Tool}};
+use crate::{project::{action::ActionManager, graphic::Graphic, layer::{Layer, LayerKind}, obj::ObjPtr, palette::Palette, stroke::{Stroke, StrokeColor}, Project}, tools::{bucket::Bucket, color_picker::ColorPicker, line::Line, pencil::Pencil, select::Select, Tool}};
 
 use super::{clipboard, selection::{self, Selection}, toasts::Toasts};
 
@@ -46,17 +44,6 @@ pub struct EditorState {
 impl EditorState {
 
     pub fn new_with_project(project: Project) -> Self {
-
-        let mut toasts = egui_toast::Toasts::default().anchor(egui::Align2::RIGHT_BOTTOM, egui::pos2(-10.0, -10.0));
-
-        let audio = AudioController::new();
-        if audio.is_none() {
-            toasts.add(Toast {
-                kind: ToastKind::Error,
-                text: "Could not start audio thread. Playback will not work.".into(),
-                options: ToastOptions::default().show_progress(false),
-            });
-        }
 
         let select = Arc::new(RwLock::new(Select::new()));
         let pencil = Arc::new(RwLock::new(Pencil::new()));

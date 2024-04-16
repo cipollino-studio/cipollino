@@ -148,9 +148,9 @@ impl DialogManager {
             }
 
             window.show(ctx, |ui| {
-                    if dialog.dialog.render_dyn(ui, state, systems) {
-                        close = true; 
-                    }
+                if dialog.dialog.render_dyn(ui, state, systems) {
+                    close = true; 
+                }
             });
             if close {
                 open = false;

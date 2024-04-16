@@ -1,7 +1,7 @@
 
 use std::{fs, path::PathBuf, sync::{Arc, Mutex}};
 
-use crate::{audio::AudioController, export::Export, panels, project::{graphic::Graphic, obj::ObjPtr}, renderer::scene::SceneRenderer};
+use crate::{audio::AudioController, export::export_options::ExportOptionsDialog, panels, project::{graphic::Graphic, obj::ObjPtr}, renderer::scene::SceneRenderer};
 use egui::{KeyboardShortcut, Modifiers};
 
 use self::{clipboard::Clipboard, dialog::{DialogManager, DialogsToOpen}, dropped_files::handle_dropped_files, prefs::UserPrefs, splash_screen::SplashScreen, state::EditorState, toasts::Toasts};
@@ -26,7 +26,6 @@ pub struct Editor {
     prefs: UserPrefs,
     toasts: Toasts,
     config_path: PathBuf,
-    pub export: Export,
 
     project_open: bool,
 
@@ -67,17 +66,25 @@ impl Editor {
 
         let prefs = UserPrefs::new(config_path.join("prefs.json"));
 
+        let mut toasts = Toasts::new();
+        let audio = match AudioController::new() {
+            Ok(audio) => Some(audio),
+            Err(msg) => { 
+                toasts.error_toast(msg);
+                None
+            },
+        };
+
         let res = Self {
             state: state.clone(),
             panels,
             dialog,
             prefs,
-            toasts: Toasts::new(),
+            toasts: toasts,
             config_path,
-            export: Export::new(), 
             project_open: false,
 
-            audio: AudioController::new(),
+            audio,
             prev_open_graphic: ObjPtr::null(),
             prev_playing: false
         };
@@ -142,8 +149,6 @@ impl Editor {
                 self.panels.render(ctx, !editor_disabled, state, &mut systems);
             });
 
-        self.export.render(ctx, state, &mut systems);
-
         self.dialog.render(ctx, state, &mut systems);
 
         let _ = std::fs::write(self.config_path.join("dock.json"), serde_json::json!(self.panels).to_string());
@@ -198,7 +203,9 @@ impl Editor {
                     ui.close_menu();
                 }
                 if ui.button("Export").clicked() {
-                    self.export.dialog_open = true;
+                    let mut dialogs = DialogsToOpen::new();
+                    dialogs.open_dialog(ExportOptionsDialog::new());
+                    self.dialog.open_dialogs(dialogs);
                     ui.close_menu();
                 }
             });
@@ -268,7 +275,7 @@ impl Editor {
     }
 
     fn editor_disabled(&self) -> bool {
-        !self.project_open || self.export.exporting()
+        !self.project_open
     }
 
 }

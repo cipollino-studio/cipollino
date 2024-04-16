@@ -47,3 +47,8 @@ pub fn set_file_stem(path: &mut PathBuf, stem: &str) {
 pub fn trash_folder() -> PathBuf {
     directories::UserDirs::new().unwrap().home_dir().join(".Trash")
 }
+
+#[cfg(target_os = "windows")]
+pub fn trash_folder() -> PathBuf {
+    PathBuf::from("C:/$Recycle.Bin")
+}
