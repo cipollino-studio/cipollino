@@ -95,12 +95,18 @@ impl Project {
         let mut asset_file = AssetFile::open(root_asset_path, &T::RootAsset::type_magic_bytes(), T::RootAsset::type_name())?;
 
         let ptr = if let Some(ptr) = T::get_list(self).obj_file_ptrs.borrow().get(&obj_ptr) {
-            *ptr
+            Some(*ptr)
+        } else {
+            None
+        };
+        let ptr = if let Some(ptr) = ptr {
+            ptr
         } else {
             let ptr = asset_file.alloc_page()?;
             T::get_list(self).obj_file_ptrs.borrow_mut().insert(obj_ptr, ptr);
             ptr
         };
+
         let data = obj.obj_serialize(self, &mut asset_file).as_document().expect("objects should serialize to bson documents.").clone();
         let _ = asset_file.set_obj_data(ptr, data);
         Ok(())
