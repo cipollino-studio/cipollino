@@ -1,6 +1,4 @@
 
-use std::io;
-
 use super::{AssetFile, FIRST_FREE_PAGE};
 
 pub const FILE_PAGE_DATA_SIZE: u64 = 128;
@@ -12,7 +10,7 @@ pub const FILE_PAGE_DATA_OFFSET: u64 = FILE_PAGE_METADATA_SIZE;
 
 impl AssetFile {
 
-    pub fn alloc_page(&mut self) -> Result<u64, io::Error> {
+    pub fn alloc_page(&mut self) -> Result<u64, String> {
         let first_free_page = self.read_u64_from(FIRST_FREE_PAGE)?;
         if first_free_page != 0 {
             let next_free_page = self.read_u64_from(first_free_page + FILE_PAGE_NEXT_PTR_OFFSET)?;
@@ -30,7 +28,7 @@ impl AssetFile {
         Ok(new_page)
     }
 
-    pub fn free_page(&mut self, page: u64) -> Result<(), io::Error> {
+    pub fn free_page(&mut self, page: u64) -> Result<(), String> {
         let first_free_page = self.read_u64_from(FIRST_FREE_PAGE)?;
         self.write_u64_to(page + FILE_PAGE_NEXT_PTR_OFFSET, first_free_page)?;
         self.write_u64_to(FIRST_FREE_PAGE, page)?;
@@ -39,7 +37,7 @@ impl AssetFile {
         Ok(())
     }
 
-    pub fn free_page_chain(&mut self, page: u64) -> Result<(), io::Error> {
+    pub fn free_page_chain(&mut self, page: u64) -> Result<(), String> {
         let mut curr_page = page;
         while curr_page != 0 {
             let next_page = self.read_u64_from(curr_page + FILE_PAGE_NEXT_PTR_OFFSET)?;

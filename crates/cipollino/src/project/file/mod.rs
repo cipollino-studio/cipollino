@@ -13,7 +13,7 @@ pub mod audio;
 
 pub trait FileType: Sized + Send + Sync + Clone {
 
-    fn load(project: &Project, path: PathBuf) -> Option<Self>;
+    fn load(project: &Project, path: PathBuf) -> Result<Self, String>;
 
     fn get_list(project: &Project) -> &FileList<Self>;
     fn get_list_mut(project: &mut Project) -> &mut FileList<Self>;
@@ -280,8 +280,12 @@ impl<T: FileType> FileList<T> {
         })
     }
 
-    pub fn load_file(project: &mut Project, project_base_path: PathBuf, path: PathBuf, folder: ObjPtr<Folder>) -> Option<FilePtr<T>> {
-        let rel_path = pathdiff::diff_paths(path.clone(), project_base_path)?; 
+    pub fn load_file(project: &mut Project, project_base_path: PathBuf, path: PathBuf, folder: ObjPtr<Folder>) -> Result<FilePtr<T>, String> {
+        let rel_path = if let Some(rel_path) = pathdiff::diff_paths(path.clone(), project_base_path) {
+            rel_path
+        } else {
+            return Err(format!("Invalid path {}.", path.to_string_lossy()));
+        }; 
         let data = T::load(project, path)?;
         let list = T::get_list_mut(project);
 
@@ -310,7 +314,7 @@ impl<T: FileType> FileList<T> {
         });
         list.path_lookup.insert(rel_path, key);
 
-        Some(ptr)
+        Ok(ptr)
     }
 
     pub fn get<'a>(&'a self, ptr: &FilePtr<T>) -> Option<&'a FileBox<T>> {
@@ -335,8 +339,19 @@ impl<T: FileType> ObjSerialize for FilePtr<T> {
         self.obj_serialize(project, asset_file)
     }
 
-    fn obj_deserialize(_project: &mut Project, data: &bson::Bson, _parent: super::obj::DynObjPtr, _asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<Self> {
-        let key = bson_to_u64(bson_get(data, "key")?)?;
+    fn obj_deserialize(_project: &mut Project, data: &bson::Bson, parent: super::obj::DynObjPtr, _asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<Self> {
+        let key = if let Some(key) = bson_get(data, "key") {
+            key
+        } else {
+            metadata.deserialization_error("File key missing.", parent.key);
+            return None;
+        };
+        let key = if let Some(key) = bson_to_u64(key) {
+            key
+        } else {
+            metadata.deserialization_error("File key is not u64.", parent.key);
+            return None;
+        };
         let res = Self {
             key, 
             _marker: PhantomData

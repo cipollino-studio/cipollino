@@ -156,7 +156,9 @@ impl Editor {
         systems.toasts.render(ctx);
 
         if self.project_open {
-            state.project.save();
+            state.project.save(&mut |msg| {
+                systems.toasts.error_toast(msg);
+            });
         }
 
         if state.project.graphics.mutated() || state.project.layers.mutated() || state.project.sound_instances.mutated()

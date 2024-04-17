@@ -1,4 +1,5 @@
 
+#[cfg(not(debug_assertions))]
 use std::env::{current_exe, set_current_dir};
 
 use editor::Editor;
@@ -15,6 +16,7 @@ pub mod audio;
 
 fn main() -> Result<(), eframe::Error> {
 
+    #[cfg(not(debug_assertions))]
     set_current_dir(current_exe().unwrap().parent().unwrap()).unwrap();
 
     let (icon, w, h) = {

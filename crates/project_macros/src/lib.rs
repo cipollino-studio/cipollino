@@ -24,6 +24,7 @@ pub fn object(input: TokenStream) -> TokenStream {
     };
     let name = ast.ident;
     let list_name = Ident::new((name.to_string() + "s").to_case(convert_case::Case::Snake).as_str(), name.span()); 
+    let type_name = name.to_string().to_case(convert_case::Case::Lower);
 
     let mut field_setters = quote!{};
     for field in fields {
@@ -57,6 +58,10 @@ pub fn object(input: TokenStream) -> TokenStream {
 
             fn get_list_mut(project: &mut Project) -> &mut ObjList<Self> {
                 &mut project.#list_name
+            }
+
+            fn type_name() -> &'static str {
+                #type_name 
             }
 
         } 

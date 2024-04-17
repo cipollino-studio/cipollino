@@ -55,7 +55,11 @@ impl ObjSerialize for StrokeColor {
             let mut color = [0.0; 4];
             color[3] = 1.0;
             for i in 0..(arr.len().min(4)) {
-                color[i] = arr[i].as_f64()? as f32;
+                if let Some(val) = arr[i].as_f64() {
+                    color[i] = val as f32;
+                } else {
+                    metadata.deserialization_error(format!("Stroke color channel {} should be a f64.", i), parent.key);
+                } 
             } 
             let color = glam::Vec4::from_slice(&color);
             Some(StrokeColor::Color(color))
@@ -64,6 +68,7 @@ impl ObjSerialize for StrokeColor {
             let backup = obj.get(&"backup".to_owned()).map(|data| glam::Vec4::obj_deserialize(project, data, parent, asset_file, metadata).unwrap_or(glam::vec4(0.0, 0.0, 0.0, 1.0))).unwrap_or(glam::vec4(0.0, 0.0, 0.0, 1.0));
             Some(Self::Palette(ptr, backup))
         } else {
+            metadata.deserialization_error("Could not deserialize stroke color.", parent.key); 
             None
         }
     }

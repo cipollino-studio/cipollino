@@ -10,7 +10,9 @@ pub trait Asset : Obj + ChildObj<Parent = ObjPtr<Folder>> {
 
     fn name(&self) -> &String;
     fn name_mut(&mut self) -> &mut String;
+
     fn extension(&self) -> &str;
+    fn type_magic_bytes() -> [u8; 4];
 
     fn folder(&self) -> ObjPtr<Folder> {
         self.parent()

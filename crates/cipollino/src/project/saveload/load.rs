@@ -10,15 +10,28 @@ use super::asset_file::AssetFile;
 
 use super::super::{file::{audio::AudioFile, FileType}, folder::Folder, obj::{asset::Asset, ObjPtr, ObjSerialize}, palette::Palette};
 
+pub struct LoadingError {
+    pub msg: String,
+    pub asset: PathBuf
+} 
+
 pub struct LoadingMetadata {
-    pub audio_file_ptrs: HashSet<FilePtr<AudioFile>> 
+    pub audio_file_ptrs: HashSet<FilePtr<AudioFile>>, 
+    pub errors: Vec<LoadingError>,
+
+    pub curr_asset_path: PathBuf,
+    pub curr_ptr: u64
 }
 
 impl LoadingMetadata {
 
     pub fn new() -> Self {
         Self {
-            audio_file_ptrs: HashSet::new() 
+            audio_file_ptrs: HashSet::new(),
+            errors: Vec::new(),
+
+            curr_asset_path: PathBuf::new(),
+            curr_ptr: 0
         }
     }
 
@@ -33,7 +46,21 @@ impl LoadingMetadata {
     }
 
     pub fn display_errors(&self, state: &mut EditorState, toasts: &mut Toasts) {
-        self.display_file_missing_errors::<AudioFile>(state, toasts)
+        self.display_file_missing_errors::<AudioFile>(state, toasts);
+        for error in &self.errors {
+            toasts.error_toast(format!("Error loading {},\n{}", error.asset.to_string_lossy(), error.msg));
+        }
+    }
+
+    pub fn error<T>(&mut self, msg: T) where T: Into<String> {
+        self.errors.push(LoadingError {
+            msg: msg.into(),
+            asset: self.curr_asset_path.clone()
+        });
+    }
+
+    pub fn deserialization_error<T>(&mut self, msg: T, key: u64) where T: Into<String> {
+        self.error(format!("Deserialization error: {}\nAt address {} in file, for object {}.", msg.into(), self.curr_ptr, key));
     }
 
 }
@@ -84,31 +111,39 @@ impl Project {
         res
     } 
 
-    fn load_asset<T: Asset + ObjSerialize>(&mut self, path: PathBuf, folder: ObjPtr<Folder>, metadata: &mut LoadingMetadata) -> Option<()> {
-        let mut asset_file = AssetFile::open(path.clone()).ok()?;
+    fn load_asset<T: Asset + ObjSerialize>(&mut self, path: PathBuf, folder: ObjPtr<Folder>, metadata: &mut LoadingMetadata) -> Result<(), String> {
+        metadata.curr_asset_path = path.clone();
+        let mut asset_file = AssetFile::open(path.clone(), &T::type_magic_bytes(), T::type_name())?;
 
         let root_obj_ptr = if T::get_list(self).get(ObjPtr::from_key(asset_file.root_obj_key)).is_some() {
             T::get_list_mut(self).next_ptr()
         } else {
             ObjPtr::from_key(asset_file.root_obj_key)
         };
-        asset_file.set_root_obj_key(root_obj_ptr.key).ok()?;
+        asset_file.set_root_obj_key(root_obj_ptr.key)?;
         
         T::get_list_mut(self).obj_file_ptrs.borrow_mut().insert(root_obj_ptr, asset_file.root_obj_ptr);
         let obj_box = ObjBox::<T>::obj_deserialize(self, &bson!({
             "key": u64_to_bson(asset_file.root_obj_key),
             "ptr": u64_to_bson(asset_file.root_obj_ptr) 
-        }), folder.into(), &mut asset_file, metadata)?;
+        }), folder.into(), &mut asset_file, metadata).ok_or(format!("Could not load {} at {}.", T::type_name(), path.to_string_lossy()))?;
 
         *obj_box.get_mut(self).name_mut() = path.file_stem().unwrap().to_str().unwrap().to_owned();
-        T::get_list_in_parent_mut(self, folder)?.push(obj_box);
+        T::get_list_in_parent_mut(self, folder).ok_or("Folder missing.")?.push(obj_box);
 
-        Some(())
+        Ok(())
     }
 
-    fn load_file_asset<T: FileType>(&mut self, path: PathBuf, folder: ObjPtr<Folder>) -> Option<()> {
+    fn load_file_asset<T: FileType>(&mut self, path: PathBuf, folder: ObjPtr<Folder>, metadata: &mut LoadingMetadata) -> Option<()> {
         let base_path = self.base_path();
-        let file = FileList::<T>::load_file(self, base_path, path, folder)?;
+        metadata.curr_asset_path = path.clone();
+        let file = match FileList::<T>::load_file(self, base_path, path, folder) {
+            Ok(file) => file,
+            Err(msg) => {
+                metadata.error(msg);
+                return None;
+            },
+        };
         T::list_in_folder_mut(self.folders.get_mut(folder)?).push(file);
         Some(())
     }
@@ -121,13 +156,17 @@ impl Project {
         if let Some(ext) = path.extension() {
             match ext.to_str().unwrap() {
                 "cipgfx" => {
-                    let _ = self.load_asset::<Graphic>(path.clone(), folder_ptr, metadata);
+                    if let Err(msg) = self.load_asset::<Graphic>(path.clone(), folder_ptr, metadata) {
+                        metadata.error(msg);
+                    }
                 },
                 "cippal" => {
-                    let _ = self.load_asset::<Palette>(path.clone(), folder_ptr, metadata);
+                    if let Err(msg) = self.load_asset::<Palette>(path.clone(), folder_ptr, metadata) {
+                        metadata.error(msg);
+                    }
                 },
                 "mp3" => {
-                    let _ = self.load_file_asset::<AudioFile>(path.clone(), folder_ptr);
+                    self.load_file_asset::<AudioFile>(path.clone(), folder_ptr, metadata);
                 },
                 _ => {}
             }

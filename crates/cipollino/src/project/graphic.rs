@@ -80,6 +80,10 @@ impl Asset for Graphic {
         "cipgfx"
     }
 
+    fn type_magic_bytes() -> [u8; 4] {
+        *b"gfx_"
+    }
+
     fn make_asset_ptr(ptr: ObjPtr<Self>) -> AssetPtr {
         AssetPtr::Graphic(ptr)
     }

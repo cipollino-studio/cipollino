@@ -124,6 +124,10 @@ impl Asset for Palette {
     fn extension(&self) -> &str {
         "cippal"
     }
+
+    fn type_magic_bytes() -> [u8; 4] {
+        *b"palt" 
+    }
     
     fn make_asset_ptr(ptr: ObjPtr<Self>) -> AssetPtr {
         AssetPtr::Palette(ptr)

@@ -71,6 +71,10 @@ impl Asset for Folder {
         ""
     }
 
+    fn type_magic_bytes() -> [u8; 4] {
+        panic!("folders do not have magic bytes.");
+    }
+
     fn make_asset_ptr(ptr: ObjPtr<Self>) -> AssetPtr {
         AssetPtr::Folder(ptr)
     }

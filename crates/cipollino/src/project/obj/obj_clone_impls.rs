@@ -29,7 +29,13 @@ impl<T: ObjSerialize> ObjSerialize for Vec<T> {
 
     fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: DynObjPtr, asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<Self> {
         let mut res = Vec::new(); 
-        for elem in data.as_array()? {
+        let elems = if let Some(elems) = data.as_array() {
+            elems
+        } else {
+            metadata.deserialization_error("Array corrupted.", parent.key);
+            return None;
+        };
+        for elem in elems { 
             res.push(T::obj_deserialize(project, elem, parent, asset_file, metadata)?);
         }
         Some(res)
@@ -65,8 +71,14 @@ impl<T: PrimitiveObjClone> ObjSerialize for T {
         self.obj_serialize(project, asset_file)
     }
 
-    fn obj_deserialize(_project: &mut Project, data: &bson::Bson, _parent: DynObjPtr, _asset_file: &mut AssetFile, _metadata: &mut LoadingMetadata) -> Option<Self> {
-        bson::from_bson(data.clone()).ok()
+    fn obj_deserialize(_project: &mut Project, data: &bson::Bson, parent: DynObjPtr, _asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<Self> {
+        match bson::from_bson(data.clone()) {
+            Ok(val) => val,
+            Err(msg) => {
+                metadata.deserialization_error(msg.to_string(), parent.key);
+                None
+            },
+        }
     }
 
 }
@@ -120,8 +132,13 @@ impl<T: Obj> ObjSerialize for ObjPtr<T> {
         u64_to_bson(self.key) 
     }
 
-    fn obj_deserialize(_project: &mut Project, data: &bson::Bson, _parent: DynObjPtr, _asset_file: &mut AssetFile, _metadata: &mut LoadingMetadata) -> Option<Self> {
-        Some(Self::from_key(bson_to_u64(data)?))
+    fn obj_deserialize(_project: &mut Project, data: &bson::Bson, parent: DynObjPtr, _asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<Self> {
+        if let Some(key) = bson_to_u64(data) {
+            Some(Self::from_key(key))
+        } else {
+            metadata.deserialization_error("Object pointer must be a u64.", parent.key); 
+            None
+        }
     }
 
 }
@@ -156,11 +173,32 @@ pub fn serialize_obj_box_full<T: Obj + ObjSerialize>(obj: &ObjBox<T>, project: &
     serialize_obj_box(obj, project)
 }
 
-pub fn deserialize_obj_box<T: Obj + ObjSerialize>(project: &mut Project, data: &bson::Bson, asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<(T, ObjPtr<T>)> {
-    let page_ptr = bson_to_u64(bson_get(data, "ptr")?)?;
+pub fn deserialize_obj_box<T: Obj + ObjSerialize>(project: &mut Project, data: &bson::Bson, parent: DynObjPtr, asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<(T, ObjPtr<T>)> {
+    let make_error_msg = |msg| {
+        format!("Could not deserialize {} ObjBox ({}).", T::type_name(), msg)
+    };
+
+    let page_ptr = if let Some(page_ptr) = bson_get(data, "ptr") {
+        page_ptr
+    } else {
+        metadata.deserialization_error(make_error_msg("pointer missing"), parent.key);
+        return None;
+    };
+    let page_ptr = if let Some(page_ptr) = bson_to_u64(page_ptr) {
+        page_ptr
+    } else {
+        metadata.deserialization_error(make_error_msg("pointer must be u64."), parent.key);
+        return None;
+    };
+    metadata.curr_ptr = page_ptr;
 
     let ptr = if let Some(key) = bson_get(data, "key") {
-        let key = bson_to_u64(key)?; 
+        let key = if let Some(key) = bson_to_u64(key) {
+            key
+        } else {
+            metadata.deserialization_error("key must be u64.", parent.key); 
+            return None;
+        };
         let ptr = ObjPtr::from_key(key);
         if T::get_list(project).get(ptr).is_some() {
             T::get_list_mut(project).next_ptr()
@@ -174,7 +212,13 @@ pub fn deserialize_obj_box<T: Obj + ObjSerialize>(project: &mut Project, data: &
 
     T::get_list_mut(project).obj_file_ptrs.borrow_mut().insert(ptr, page_ptr);
 
-    let obj_data = asset_file.get_obj_data(page_ptr).ok()??;
+    let obj_data = match asset_file.get_obj_data(page_ptr) {
+        Ok(obj_data) => obj_data,
+        Err(msg) => {
+            metadata.deserialization_error(msg, parent.key);
+            return None;
+        }
+    };
     let obj = T::obj_deserialize(project, &bson::Bson::Document(obj_data), ptr.into(), asset_file, metadata)?;
     Some((obj, ptr))
 }
@@ -190,7 +234,14 @@ impl<T: ChildObj + ObjSerialize> ObjSerialize for ObjBox<T> {
     }
 
     fn obj_deserialize(project: &mut Project, data: &bson::Bson, parent: DynObjPtr, asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<Self> {
-        let (mut obj, ptr) = deserialize_obj_box::<T>(project, data, asset_file, metadata)?; 
+        let prev_metadata_curr_ptr = metadata.curr_ptr;
+        let (mut obj, ptr) = if let Some((obj, ptr)) = deserialize_obj_box::<T>(project, data, parent, asset_file, metadata) {
+            (obj, ptr)
+        } else {
+            metadata.curr_ptr = prev_metadata_curr_ptr;
+            return None;
+        };
+        metadata.curr_ptr = prev_metadata_curr_ptr;
         *obj.parent_mut() = parent.into();
         Some(T::get_list_mut(project).add_with_ptr(obj, ptr)) // TODO: triggers an autosave
     }

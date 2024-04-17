@@ -161,7 +161,7 @@ impl<T: Obj> std::fmt::Debug for ObjPtr<T> {
 
 #[derive(Clone, Copy, Debug)]
 pub struct DynObjPtr {
-    key: u64,
+    pub key: u64,
     obj_type: TypeId<u64>
 }
 
@@ -297,5 +297,6 @@ pub trait Obj: Sized + ObjClone + Send + Sync + UniqueTypeId<u64> {
 
     fn get_list(project: &Project) -> &ObjList<Self>;
     fn get_list_mut(project: &mut Project) -> &mut ObjList<Self>;
+    fn type_name() -> &'static str;
 
 }

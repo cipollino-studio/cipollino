@@ -18,12 +18,12 @@ pub struct AudioFile {
 
 impl FileType for AudioFile {
 
-    fn load(project: &Project, path: PathBuf) -> Option<Self> {
-        match path.extension()?.to_str()? {
+    fn load(project: &Project, path: PathBuf) -> Result<Self, String> {
+        match path.extension().ok_or("No extension")?.to_str().unwrap() {
             "mp3" => {
-                Some(Self::new(read_samples(path, project.sample_rate as u32)?))
+                Ok(Self::new(read_samples(path, project.sample_rate as u32)?))
             },
-            _ => None
+            _ => Err("Invalid extension.".to_owned()) 
         }
     }
 
