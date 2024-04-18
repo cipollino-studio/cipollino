@@ -40,7 +40,7 @@ macro_rules! keybind {
     };
 }
 
-keybind!(UndoKeybind, "Undo", COMMAND, X);
+keybind!(UndoKeybind, "Undo", COMMAND, Z);
 keybind!(RedoKeybind, "Redo", COMMAND, Y);
 keybind!(DeleteKeybind, "Delete", NONE, X);
 
