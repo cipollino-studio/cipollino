@@ -2,7 +2,7 @@
 use std::{sync::Arc, collections::{VecDeque, HashSet, HashMap}};
 
 use glam::{Vec2, vec2};
-use crate::{editor::state::EditorState, panels::scene::ScenePanel, project::{action::Action, obj::child_obj::ChildObj, stroke::{Stroke, StrokePoint}}, util::{curve::{bezier_bounding_box, bezier_dsample, bezier_sample, bezier_to_discrete_t_vals, fit_curve}, geo::segment_intersect}};
+use crate::{editor::{state::EditorState, EditorSystems}, keybind, panels::scene::ScenePanel, project::{action::Action, obj::child_obj::ChildObj, stroke::{Stroke, StrokePoint}}, util::{curve::{bezier_bounding_box, bezier_dsample, bezier_sample, bezier_to_discrete_t_vals, fit_curve}, geo::segment_intersect}};
 
 use super::{Tool, active_frame};
 
@@ -363,8 +363,10 @@ impl Tool for Bucket {
         "Bucket"
     }
 
-    fn shortcut(&self) -> egui::KeyboardShortcut {
-        egui::KeyboardShortcut::new(egui::Modifiers::NONE, egui::Key::B)
+    fn shortcut(&self, systems: &mut EditorSystems) -> egui::KeyboardShortcut {
+        systems.prefs.get::<BucketToolKeybind>()
     }
 
 }
+
+keybind!(BucketToolKeybind, "Bucket", NONE, B);

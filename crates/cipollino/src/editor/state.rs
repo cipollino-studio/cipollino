@@ -152,14 +152,8 @@ impl EditorState {
         (self.time_secs() / self.frame_len()).floor() as i32
     }  
 
-    pub fn delete_shortcut(&self) -> egui::KeyboardShortcut {
-        egui::KeyboardShortcut::new(egui::Modifiers::NONE, egui::Key::X)
-    }
-
     pub fn reset_tool(&mut self) {
         self.curr_tool.clone().write().unwrap().reset(self);
     }
-
-
 
 }

@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use glam::{vec2, vec3, Mat4, Vec2};
 
-use crate::{editor::{selection::Selection, state::EditorState}, panels::scene::{overlay::OverlayRenderer, ScenePanel}, project::{action::Action, stroke::Stroke}, util::curve};
+use crate::{editor::{selection::Selection, state::EditorState, EditorSystems}, keybind, panels::scene::{overlay::OverlayRenderer, ScenePanel}, project::{action::Action, stroke::Stroke}, util::curve};
 
 
 use self::scale::ScalePivot;
@@ -217,8 +217,10 @@ impl Tool for Select {
         "Select"
     }
 
-    fn shortcut(&self) -> egui::KeyboardShortcut {
-        egui::KeyboardShortcut::new(egui::Modifiers::NONE, egui::Key::V)
+    fn shortcut(&self, systems: &mut EditorSystems) -> egui::KeyboardShortcut {
+        systems.prefs.get::<SelectToolKeybind>()
     }
 
 }
+
+keybind!(SelectToolKeybind, "Select", NONE, V);

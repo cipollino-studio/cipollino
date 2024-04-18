@@ -3,7 +3,7 @@ use std::{mem, sync::Arc};
 
 use glam::vec2;
 
-use crate::{editor::state::EditorState, panels::scene::ScenePanel, project::{action::{Action, ObjAction}, frame::Frame, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokePoint}}, util::curve};
+use crate::{editor::{state::EditorState, EditorSystems}, keybind, panels::scene::ScenePanel, project::{action::{Action, ObjAction}, frame::Frame, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokePoint}}, util::curve};
 
 use super::{active_frame, Tool};
 
@@ -151,8 +151,10 @@ impl Tool for Pencil {
         "Pencil"
     }
 
-    fn shortcut(&self) -> egui::KeyboardShortcut {
-        egui::KeyboardShortcut::new(egui::Modifiers::NONE, egui::Key::D)
+    fn shortcut(&self, systems: &mut EditorSystems) -> egui::KeyboardShortcut {
+        systems.prefs.get::<PencilToolKeybind>()
     }
 
 }
+
+keybind!(PencilToolKeybind, "Pencil", NONE, D);

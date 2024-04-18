@@ -3,6 +3,7 @@ pub mod color;
 pub mod path;
 pub mod dnd;
 pub mod layout;
+pub mod keybind;
 
 use std::ops::RangeInclusive;
 pub fn drag_value<N>(ui: &mut egui::Ui, label: &str, val: &mut N, range: RangeInclusive<N>, change: Option<&mut (bool, bool)>) where N: egui::emath::Numeric {

@@ -6,7 +6,7 @@ use glow::HasContext;
 pub mod overlay;
 
 use crate::{
-    editor::{clipboard::Clipboard, selection::Selection, EditorSystems, state::EditorState}, project::{action::Action, graphic::Graphic, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokeColor}}, renderer::fb::Framebuffer, util::ui::color::color_picker
+    editor::{clipboard::Clipboard, keybind::{DeleteKeybind, Keybind}, selection::Selection, state::EditorState, EditorSystems}, project::{action::Action, graphic::Graphic, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokeColor}}, renderer::fb::Framebuffer, util::ui::{color::color_picker, keybind::consume_shortcut}
 };
 
 use super::super::tools::active_frame_proj_layer_frame;
@@ -73,7 +73,7 @@ impl ScenePanel {
                 .exact_width(35.0)
                 .frame(no_margin)
                 .show_inside(ui, |ui| {
-                    self.toolbar(state, ui);
+                    self.toolbar(state, systems, ui);
                 });
             let response = egui::CentralPanel::default()
                 .frame(no_margin)
@@ -90,9 +90,8 @@ impl ScenePanel {
         }
 
         // Deleting strokes
-        let delete_shortcut = state.delete_shortcut();
         if let Selection::Scene(strokes) = &mut state.selection {
-            if ui.input_mut(|i| i.consume_shortcut(&delete_shortcut)) {
+            if DeleteKeybind::consume(ui, systems.prefs) {
                 let mut action = Action::new();
                 for stroke_ptr in strokes {
                     if let Some(act) = Stroke::delete(&mut state.project, *stroke_ptr) {
@@ -132,7 +131,7 @@ impl ScenePanel {
 
     }
 
-    fn toolbar(&mut self, state: &mut EditorState, ui: &mut egui::Ui) {
+    fn toolbar(&mut self, state: &mut EditorState, systems: &mut EditorSystems, ui: &mut egui::Ui) {
 
         let toolbar_button_size = ui.available_width() - ui.spacing().window_margin.right;
 
@@ -142,9 +141,9 @@ impl ScenePanel {
             let resp = ui.add_enabled(
                 tool.name() != state.curr_tool.read().unwrap().name(),
                 egui::Button::new(egui::RichText::new(format!("{}", tool.get_icon())).size(toolbar_button_size - 10.0)).min_size(egui::Vec2::splat(toolbar_button_size)));
-            let shortcut = tool.shortcut();
+            let shortcut = tool.shortcut(systems);
             let resp = resp.on_hover_text(format!("{} ({})", tool.name(), ui.ctx().format_shortcut(&shortcut)));
-            if resp.clicked() || ui.input_mut(|i| i.consume_shortcut(&shortcut)) {
+            if resp.clicked() || consume_shortcut(ui, &shortcut) {
                 new_tool = Some(tool_rc.clone());
             }
         }

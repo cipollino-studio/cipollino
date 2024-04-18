@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use glam::Vec2;
 
-use crate::{editor::state::EditorState, project::{action::ObjAction, frame::Frame, layer::{BlendingMode, Layer, LayerKind, LayerParent}, obj::{child_obj::ChildObj, ObjPtr}, Project}};
+use crate::{editor::{state::EditorState, EditorSystems}, project::{action::ObjAction, frame::Frame, layer::{BlendingMode, Layer, LayerKind, LayerParent}, obj::{child_obj::ChildObj, ObjPtr}, Project}};
 
 use super::panels::scene::{overlay::OverlayRenderer, ScenePanel};
 
@@ -27,7 +27,7 @@ pub trait Tool {
 
     fn get_icon(&self) -> &str;
     fn name(&self) -> &str;
-    fn shortcut(&self) -> egui::KeyboardShortcut;
+    fn shortcut(&self, systems: &mut EditorSystems) -> egui::KeyboardShortcut;
 
 }
 

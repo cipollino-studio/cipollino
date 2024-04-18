@@ -2,7 +2,7 @@
 
 use egui::{KeyboardShortcut, Modifiers};
 
-use crate::{editor::{selection::Selection, state::EditorState, EditorSystems}, project::{action::Action, frame::Frame, layer::{Layer, LayerKind}, obj::{child_obj::ChildObj, ObjBox, ObjPtr}, sound_instance::SoundInstance}};
+use crate::{editor::{keybind::{DeleteKeybind, Keybind, NewFrameKeybind, NextFrameKeybind, PlayKeybind, PrevFrameKeybind, StepBackKeybind, StepForwardKeybind}, selection::Selection, state::EditorState, EditorSystems}, project::{action::Action, frame::Frame, layer::{Layer, LayerKind}, obj::{child_obj::ChildObj, ObjBox, ObjPtr}, sound_instance::SoundInstance}};
 
 pub mod controls;
 pub mod header;
@@ -121,30 +121,30 @@ impl TimelinePanel {
             return;
         };
 
-        if ui.input_mut(|i| i.consume_shortcut(&PLAY_SHORTCUT)) {
+        if PlayKeybind::consume(ui, systems.prefs) {
             if state.playing {
                 state.pause();
             } else {
                 state.play();
             }
         }
-        if ui.input_mut(|i| i.consume_shortcut(&FRAME_SHORTCUT)) {
+        if NewFrameKeybind::consume(ui, systems.prefs) {
             state.pause();
             new_frame(state);
         }
-        if ui.input_mut(|i| i.consume_shortcut(&PREV_FRAME_SHORTCUT)) {
+        if StepBackKeybind::consume(ui, systems.prefs) {
             state.pause();
             state.time = (((state.frame() - 1) as f32) * state.frame_len() / state.sample_len()).floor() as i64 + 1;
         }
-        if ui.input_mut(|i| i.consume_shortcut(&NEXT_FRAME_SHORTCUT)) {
+        if StepForwardKeybind::consume(ui, systems.prefs) {
             state.pause();
             state.time = (((state.frame() + 1) as f32) * state.frame_len() / state.sample_len()).floor() as i64 + 1;
         }
-        if ui.input_mut(|i| i.consume_shortcut(&PREV_KEYFRAME_SHORTCUT)) {
+        if PrevFrameKeybind::consume(ui, systems.prefs) {
             state.pause();
             prev_keyframe(state); 
         }
-        if ui.input_mut(|i| i.consume_shortcut(&NEXT_KEYFRAME_SHORTCUT)) {
+        if NextFrameKeybind::consume(ui, systems.prefs) {
             state.pause();
             next_keyframe(state); 
         }
@@ -265,9 +265,8 @@ impl TimelinePanel {
         }
 
         // Deleting frames
-        let delete_shortcut = state.delete_shortcut();
         if let Selection::Timeline(frames, sounds) = &mut state.selection {
-            if ui.input_mut(|i| i.consume_shortcut(&delete_shortcut)) {
+            if DeleteKeybind::consume(ui, systems.prefs) {
                 let mut action = Action::new();
                 for frame_ptr in frames {
                     if let Some(act) = Frame::delete(&mut state.project, *frame_ptr) {
@@ -318,7 +317,7 @@ pub fn prev_keyframe(state: &mut EditorState) {
 pub fn next_keyframe(state: &mut EditorState) {
     if let Some(layer) = state.project.layers.get(state.active_layer) {
         if let Some(frame) = layer.get_frame_after(&state.project, state.frame()) {
-            state.time = ((frame.get(&state.project).time as f32) * state.frame_len() / state.sample_len()).floor() as i64;
+            state.time = ((frame.get(&state.project).time as f32 + 0.5) * state.frame_len() / state.sample_len()).floor() as i64;
         }
     }
 }

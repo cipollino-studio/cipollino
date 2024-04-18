@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use glam::Vec2;
 
-use crate::{editor::state::EditorState, panels::scene::ScenePanel};
+use crate::{editor::{state::EditorState, EditorSystems}, keybind, panels::scene::ScenePanel};
 
 use super::Tool;
 
@@ -41,8 +41,10 @@ impl Tool for ColorPicker {
         "Color Picker"
     }
 
-    fn shortcut(&self) -> egui::KeyboardShortcut {
-        egui::KeyboardShortcut::new(egui::Modifiers::NONE, egui::Key::I)
+    fn shortcut(&self, systems: &mut EditorSystems) -> egui::KeyboardShortcut {
+        systems.prefs.get::<ColorPickerToolKeybind>()
     }
 
 }
+
+keybind!(ColorPickerToolKeybind, "Color Picker", NONE, I);

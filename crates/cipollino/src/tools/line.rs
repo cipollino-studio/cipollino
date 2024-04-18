@@ -4,7 +4,7 @@ use std::{mem, sync::Arc};
 
 use glam::{vec2, Vec2};
 
-use crate::{editor::state::EditorState, panels::scene::ScenePanel, project::{action::{Action, ObjAction}, frame::Frame, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokePoint}}};
+use crate::{editor::{state::EditorState, EditorSystems}, keybind, panels::scene::ScenePanel, project::{action::{Action, ObjAction}, frame::Frame, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokePoint}}};
 
 use super::{active_frame, Tool};
 
@@ -124,8 +124,10 @@ impl Tool for Line {
         "Line"
     }
 
-    fn shortcut(&self) -> egui::KeyboardShortcut {
-        egui::KeyboardShortcut::new(egui::Modifiers::NONE, egui::Key::L)
+    fn shortcut(&self, systems: &mut EditorSystems) -> egui::KeyboardShortcut {
+        systems.prefs.get::<LineToolKeybind>()
     }
 
 }
+
+keybind!(LineToolKeybind, "Line", NONE, L);

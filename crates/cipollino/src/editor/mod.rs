@@ -2,9 +2,8 @@
 use std::{fs, path::PathBuf, sync::{Arc, Mutex}};
 
 use crate::{audio::AudioController, export::export_options::ExportOptionsDialog, panels, project::{graphic::Graphic, obj::ObjPtr}, renderer::scene::SceneRenderer};
-use egui::{KeyboardShortcut, Modifiers};
 
-use self::{clipboard::Clipboard, dialog::{DialogManager, DialogsToOpen}, dropped_files::handle_dropped_files, prefs::UserPrefs, splash_screen::SplashScreen, state::EditorState, toasts::Toasts};
+use self::{clipboard::Clipboard, dialog::{DialogManager, DialogsToOpen}, dropped_files::handle_dropped_files, keybind::{Keybind, RedoKeybind, UndoKeybind}, prefs::{prefs_dialog::PrefsDialog, UserPrefs}, splash_screen::SplashScreen, state::EditorState, toasts::Toasts};
 
 pub mod selection;
 pub mod clipboard;
@@ -15,9 +14,7 @@ pub mod new_project;
 pub mod prefs;
 pub mod dropped_files;
 pub mod toasts;
-
-pub const UNDO_SHORTCUT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, egui::Key::Z);
-pub const REDO_SHORTCUT: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, egui::Key::Y);
+pub mod keybind;
 
 pub struct Editor {
     state: Arc<Mutex<EditorState>>,
@@ -210,16 +207,23 @@ impl Editor {
                     self.dialog.open_dialogs(dialogs);
                     ui.close_menu();
                 }
+                ui.separator();
+                if ui.button("Preferences").clicked() {
+                    let mut dialogs_to_open = DialogsToOpen::new();
+                    dialogs_to_open.open_dialog(PrefsDialog::new());
+                    self.dialog.open_dialogs(dialogs_to_open);
+                    ui.close_menu();
+                }
             });
             ui.menu_button("Edit", |ui| {
                 if ui.add_enabled(
                     state.actions.can_undo(),
-                    egui::Button::new("Undo").shortcut_text(ui.ctx().format_shortcut(&UNDO_SHORTCUT))).clicked() {
+                    egui::Button::new("Undo").shortcut_text(ui.ctx().format_shortcut(&self.prefs.get::<UndoKeybind>()))).clicked() {
                     state.actions.undo(&mut state.project);
                 }
                 if ui.add_enabled(
                     state.actions.can_redo(),
-                    egui::Button::new("Redo").shortcut_text(ui.ctx().format_shortcut(&REDO_SHORTCUT))).clicked() {
+                    egui::Button::new("Redo").shortcut_text(ui.ctx().format_shortcut(&self.prefs.get::<RedoKeybind>()))).clicked() {
                     state.actions.redo(&mut state.project);
                 }
             });
@@ -246,12 +250,12 @@ impl Editor {
     }
 
     fn shortcuts(&mut self, ui: &mut egui::Ui, state: &mut EditorState) {
-        if ui.input_mut(|i| i.consume_shortcut(&UNDO_SHORTCUT)) {
+        if UndoKeybind::consume(ui, &mut self.prefs) {
             state.pause();
             state.reset_tool();
             state.actions.undo(&mut state.project);
         }
-        if ui.input_mut(|i| i.consume_shortcut(&REDO_SHORTCUT)) {
+        if RedoKeybind::consume(ui, &mut self.prefs) {
             state.pause();
             state.reset_tool();
             state.actions.redo(&mut state.project);

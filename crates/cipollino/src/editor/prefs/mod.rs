@@ -5,6 +5,8 @@ use serde_json::{from_value, json, Map, Value};
 
 use crate::util::fs::{read_json_file, write_json_file};
 
+pub mod prefs_dialog;
+
 pub trait UserPref {
     type Type: serde::Serialize + for<'a> serde::Deserialize<'a>;
 
