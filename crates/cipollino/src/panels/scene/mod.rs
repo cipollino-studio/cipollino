@@ -6,7 +6,7 @@ use glow::HasContext;
 pub mod overlay;
 
 use crate::{
-    editor::{clipboard::Clipboard, keybind::{DeleteKeybind, Keybind}, selection::Selection, state::EditorState, EditorSystems}, project::{action::Action, graphic::Graphic, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokeColor}}, renderer::fb::Framebuffer, util::ui::{color::color_picker, keybind::consume_shortcut}
+    editor::{clipboard::Clipboard, keybind::{CenterSceneKeybind, DeleteKeybind, Keybind}, selection::Selection, state::EditorState, EditorSystems}, project::{action::Action, graphic::Graphic, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokeColor}}, renderer::fb::Framebuffer, util::ui::{color::color_picker, keybind::consume_shortcut}
 };
 
 use super::super::tools::active_frame_proj_layer_frame;
@@ -197,6 +197,11 @@ impl ScenePanel {
     }
 
     fn render_scene(&mut self, state: &mut EditorState, rect: &egui::Rect, response: &egui::Response, ui: &mut egui::Ui, gfx: ObjPtr<Graphic>, systems: &mut EditorSystems) {
+
+        if CenterSceneKeybind::consume(ui, systems.prefs) {
+            self.cam_pos = Vec2::ZERO;
+            self.cam_size = (state.project.graphics.get(gfx).unwrap().h as f32) * 0.6;
+        }
 
         // Tool interaction
         if let Some(mouse_pos) = response.hover_pos() {

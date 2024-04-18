@@ -50,3 +50,5 @@ keybind!(StepBackKeybind, "Step Back", NONE, Comma);
 keybind!(StepForwardKeybind, "Step Forward", NONE, Period);
 keybind!(PrevFrameKeybind, "Previous Frame", COMMAND, Comma);
 keybind!(NextFrameKeybind, "Next Frame", COMMAND, Period);
+
+keybind!(CenterSceneKeybind, "Center Scene", COMMAND, G);

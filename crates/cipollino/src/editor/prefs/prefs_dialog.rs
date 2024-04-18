@@ -1,7 +1,7 @@
 
 use unique_type_id::UniqueTypeId;
 
-use crate::{editor::{dialog::Dialog, keybind::{DeleteKeybind, Keybind, NewFrameKeybind, NextFrameKeybind, PlayKeybind, PrevFrameKeybind, RedoKeybind, StepBackKeybind, StepForwardKeybind, UndoKeybind}, state::EditorState, EditorSystems}, tools::{bucket::BucketToolKeybind, color_picker::ColorPickerToolKeybind, line::LineToolKeybind, pencil::PencilToolKeybind, select::SelectToolKeybind}};
+use crate::{editor::{dialog::Dialog, keybind::{CenterSceneKeybind, DeleteKeybind, Keybind, NewFrameKeybind, NextFrameKeybind, PlayKeybind, PrevFrameKeybind, RedoKeybind, StepBackKeybind, StepForwardKeybind, UndoKeybind}, state::EditorState, EditorSystems}, tools::{bucket::BucketToolKeybind, color_picker::ColorPickerToolKeybind, line::LineToolKeybind, pencil::PencilToolKeybind, select::SelectToolKeybind}};
 
 #[derive(UniqueTypeId)]
 pub struct PrefsDialog {
@@ -70,6 +70,8 @@ impl Dialog for PrefsDialog {
             self.render_keybind_setting::<StepForwardKeybind>(ui, systems, &key_down);
             self.render_keybind_setting::<PrevFrameKeybind>(ui, systems, &key_down);
             self.render_keybind_setting::<NextFrameKeybind>(ui, systems, &key_down);
+
+            self.render_keybind_setting::<CenterSceneKeybind>(ui, systems, &key_down);
         });
         false
     }
