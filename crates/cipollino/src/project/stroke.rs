@@ -3,6 +3,8 @@ use glam::{Vec2, Mat4, vec3, vec2};
 use project_macros::{ObjClone, ObjSerialize, Object};
 use unique_type_id::UniqueTypeId;
 
+use crate::util::curve::BezierSegment;
+
 use super::{action::ObjAction, frame::Frame, graphic::Graphic, obj::{child_obj::{ChildObj, HasRootAsset}, DynObjPtr, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjSerialize, ToRawData}, palette::PaletteColor, saveload::{asset_file::AssetFile, load::LoadingMetadata}, Project};
 
 #[derive(Clone, Copy, ObjClone, Default, ObjSerialize)]
@@ -87,6 +89,15 @@ impl ToRawData for StrokeColor {
 
 }
 
+pub fn iter_bezier_segments<'a>(pts: &'a Vec<StrokePoint>) -> impl Iterator<Item = BezierSegment<Vec2>> + 'a {
+    pts.windows(2).map(|arr| BezierSegment {
+        p0: arr[0].pt,
+        b0: arr[0].b,
+        a1: arr[1].a,
+        p1: arr[1].pt
+    })
+}
+
 #[derive(Object, Clone, ObjClone, ObjSerialize, UniqueTypeId)]
 pub struct Stroke {
     #[parent]
@@ -102,8 +113,8 @@ pub struct Stroke {
 
 impl Stroke {
 
-    pub fn iter_point_pairs(&self) -> impl Iterator<Item = (StrokePoint, StrokePoint)> + '_ {
-        self.points.iter().flat_map(|arr| arr.windows(2).map(|arr| (arr[0], arr[1])))
+    pub fn iter_bezier_segments(&self) -> impl Iterator<Item = BezierSegment<Vec2>> + '_ {
+        self.points.iter().flat_map(|pts| iter_bezier_segments(pts))
     }
 
     pub fn transform(project: &mut Project, stroke_ptr: ObjPtr<Stroke>, trans: Mat4) -> Option<ObjAction> {

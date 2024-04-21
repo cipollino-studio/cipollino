@@ -2,7 +2,7 @@
 use std::{sync::Arc, collections::{VecDeque, HashSet, HashMap}};
 
 use glam::{Vec2, vec2};
-use crate::{editor::{state::EditorState, EditorSystems}, keybind, panels::scene::ScenePanel, project::{action::Action, obj::child_obj::ChildObj, stroke::{Stroke, StrokePoint}}, util::{curve::{bezier_bounding_box, bezier_dsample, bezier_sample, bezier_to_discrete_t_vals, fit_curve}, geo::segment_intersect}};
+use crate::{editor::{state::EditorState, EditorSystems}, keybind, panels::scene::ScenePanel, project::{action::Action, obj::child_obj::ChildObj, stroke::{Stroke, StrokePoint}}, util::{curve::fit_curve, geo::LineSegment}};
 
 use super::{Tool, active_frame};
 
@@ -89,17 +89,15 @@ impl Tool for Bucket {
         for stroke in visible_strokes {
             if let Some(stroke) = state.project.strokes.get(stroke) {
                 let r = if !stroke.filled { (stroke.r - 0.4).max(0.0) } else { 0.0 };
-                for (p0, p1) in stroke.iter_point_pairs() {
-                    let (mut bb_min, mut bb_max) = bezier_bounding_box(p0.pt, p0.b, p1.a, p1.pt);
-                    bb_min -= Vec2::splat(r * 2.0);
-                    bb_max += Vec2::splat(r * 2.0);
+                for segment in stroke.iter_bezier_segments() {
 
                     let mut pts = Vec::new();
                     let mut top_pts = Vec::new();
                     let mut btm_pts = Vec::new();
-                    for t in bezier_to_discrete_t_vals(p0.pt, p0.b, p1.a, p1.pt, 10, true) {
-                        let pt = bezier_sample(t, p0.pt, p0.b, p1.a, p1.pt);
-                        let tang = bezier_dsample(t, p0.pt, p0.b, p1.a, p1.pt).normalize();
+                    for i in 0..10 {
+                        let t = (i as f32) / 9.0;
+                        let pt = segment.sample(t);
+                        let tang = segment.dsample(t).normalize();
                         let norm = vec2(tang.y, -tang.x);
                         pts.push(pt);
                         top_pts.push(pt + norm * r); 
@@ -180,7 +178,7 @@ impl Tool for Bucket {
                 ); 
                 if let Some(segments) = boundary_segments.get(&chunk) {
                     for segment in segments {
-                        if let Some(intersect) = segment_intersect(segment.a, segment.b, curr_unsnapped, next_unsnapped) {
+                        if let Some(intersect) = LineSegment::new(segment.a, segment.b).intersect(LineSegment::new(curr_unsnapped, next_unsnapped)) {
                             let t = (intersect - segment.a).length() / (segment.b - segment.a).length();
                             let src_intersect = (1.0 - t) * segment.src_a + t * segment.src_b;
                             boundary.insert(next, src_intersect);

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use glam::Vec2;
 
-use crate::{editor::state::EditorState, panels::scene::{overlay::OverlayRenderer, ScenePanel}, util::{curve::bezier_sample, geo::segment_intersect}};
+use crate::{editor::state::EditorState, panels::scene::{overlay::OverlayRenderer, ScenePanel}, util::geo::LineSegment};
 use super::Select;
 use crate::tools::Tool;
 
@@ -35,37 +35,50 @@ impl Lasso {
             select.lasso_pts.push(*pt);
             let inside_lasso = |pt: Vec2| {
                 let mut cnt = 0;
-                if !select.lasso_pts.is_empty() {
-                    let first = *select.lasso_pts.first().unwrap();
-                    let last = *select.lasso_pts.last().unwrap();
-                    if (first - pt).length() < 0.05 || (last - pt).length() < 0.05 {
-                        return true;
-                    } 
-                }
                 for pts in select.lasso_pts.windows(2) {
-                    if let Some(_intersection) = segment_intersect(pt, pt + Vec2::new(1000000.0, 0.0), pts[0], pts[1]) {
+                    if let Some(_intersection) = LineSegment::new(pts[0], pts[1]).intersect(LineSegment::new(pt, pt + Vec2::new(1000000.0, 0.0))) {
                         cnt += 1;
                     }
                 }
                 cnt % 2 == 1 
             };
 
-            for stroke_ptr in state.visible_strokes() {
+            'stroke_loop: for stroke_ptr in state.visible_strokes() {
                 let stroke = state.project.strokes.get(stroke_ptr);
                 if stroke.is_none() {
                     continue;
                 } 
                 let stroke = stroke.unwrap();
-                'pt_loop: for (p0, p1) in stroke.iter_point_pairs() {
-                    for i in 0..10 {
-                        let t = (i as f32) / 9.0;
-                        let pt = bezier_sample(t, p0.pt, p0.b, p1.a, p1.pt);
-                        if inside_lasso(pt) {
-                            state.selection.select_stroke_inverting(stroke_ptr);
-                            break 'pt_loop;
+
+                macro_rules! select {
+                    () => {
+                        state.selection.select_stroke_inverting(stroke_ptr); 
+                        continue 'stroke_loop;
+                    };
+                }
+
+                for chain in &stroke.points {
+                    if let Some(pt) = chain.first() {
+                        if inside_lasso(pt.pt) {
+                            select!();
                         }
                     }
+                    if let Some(pt) = chain.last() {
+                        if inside_lasso(pt.pt) {
+                            select!();
+                        }
+                    } 
                 }
+                
+                for bezier in stroke.iter_bezier_segments() {
+                    for pts in select.lasso_pts.windows(2) {
+                        let segment = LineSegment::new(pts[0], pts[1]);
+                        let intersections = bezier.intersect_segment(&segment);
+                        if !intersections.is_empty() {
+                            select!();
+                        }
+                    }
+                } 
             }
         }
 

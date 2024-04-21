@@ -33,6 +33,7 @@ egui_extras = {version = "*", features = ["all_loaders"]}
 bson = "2.9.0"
 walkdir = "2.5.0"
 include-lines = "1.1.2"
+roots = "0.0.8"
 
 [build-dependencies]
 cc = "1.0"

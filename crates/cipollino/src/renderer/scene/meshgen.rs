@@ -1,7 +1,7 @@
 
 use std::{f32::consts, sync::Arc};
 
-use crate::{renderer::mesh::Mesh, project::{Project, obj::ObjPtr, stroke::Stroke}, util::curve::{self, bezier_to_discrete_t_vals, bezier_to_discrete}};
+use crate::{project::{obj::ObjPtr, stroke::{iter_bezier_segments, Stroke}, Project}, renderer::mesh::Mesh};
 
 use super::SceneRenderer;
 
@@ -12,18 +12,16 @@ fn unfilled_mesh(project: &Project, stroke_ptr: ObjPtr<Stroke>, gl: &Arc<glow::C
     let mut top_pts = Vec::new();
     let mut btm_pts = Vec::new();
     let r = stroke.r;
-    let mut included_first = false;
-    for (p0, p1) in stroke.iter_point_pairs() { 
-        
-        for t in bezier_to_discrete_t_vals(p0.pt, p0.b, p1.a, p1.pt, 10, !included_first) {
-            let pt = curve::bezier_sample(t, p0.pt, p0.b, p1.a, p1.pt);
-            let tang = curve::bezier_dsample(t, p0.pt, p0.b, p1.a, p1.pt).normalize();
+    for segment in stroke.iter_bezier_segments() { 
+        for i in 0..10 {
+            let t = (i as f32) / 9.0; 
+            let pt = segment.sample(t); 
+            let tang = segment.dsample(t).normalize(); 
             let norm = glam::vec2(-tang.y, tang.x); 
 
             top_pts.push(pt + norm * r);
             btm_pts.push(pt - norm * r);
         }
-        included_first = true;
     }
 
     let mut curr_idx = 0;
@@ -106,10 +104,8 @@ fn filled_mesh(project: &Project, stroke_ptr: ObjPtr<Stroke>, gl: &Arc<glow::Con
 
     for chain in &stroke.points {
         let mut polygon_pts = Vec::new();
-        let mut included_first = false;
-        for (p0, p1) in chain.windows(2).map(|arr| (arr[0], arr[1])) { 
-            polygon_pts.append(&mut bezier_to_discrete(p0.pt, p0.b, p1.a, p1.pt, 20, !included_first)); 
-            included_first = true;
+        for segment in iter_bezier_segments(chain) { 
+            polygon_pts.extend_from_slice(segment.to_discrete::<10>().as_slice()); 
         }
         
         let first_pt_idx = verts.len() / 2;

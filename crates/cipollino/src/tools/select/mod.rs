@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use glam::{vec2, vec3, Mat4, Vec2};
 
-use crate::{editor::{selection::Selection, state::EditorState, EditorSystems}, keybind, panels::scene::{overlay::OverlayRenderer, ScenePanel}, project::{action::Action, stroke::Stroke}, util::curve};
+use crate::{editor::{selection::Selection, state::EditorState, EditorSystems}, keybind, panels::scene::{overlay::OverlayRenderer, ScenePanel}, project::{action::Action, stroke::Stroke}};
 
 
 use self::scale::ScalePivot;
@@ -66,7 +66,7 @@ impl Select {
             pivot: Vec2::ZERO,
             trans: glam::Mat4::IDENTITY,
             prev_mouse_pos: Vec2::ZERO,
-            transform_action: None
+            transform_action: None,
         }
     }
 
@@ -191,8 +191,8 @@ impl Tool for Select {
             self.bb_max = -Vec2::INFINITY;
             for stroke_ptr in strokes {
                 state.project.strokes.get_then(*stroke_ptr, |stroke| {
-                    for (p0, p1) in stroke.iter_point_pairs() {
-                        let (min, max) = curve::bezier_bounding_box(p0.pt, p0.b, p1.a, p1.pt);
+                    for segment in stroke.iter_bezier_segments() {
+                        let (min, max) = segment.bounding_box();
                         self.bb_min = self.bb_min.min(min);
                         self.bb_max = self.bb_max.max(max);
                     }

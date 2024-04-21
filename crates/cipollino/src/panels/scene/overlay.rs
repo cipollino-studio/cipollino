@@ -1,7 +1,7 @@
 
 use glam::Vec2;
 
-use crate::{editor::{selection::Selection, EditorSystems, state::EditorState}, project::{graphic::Graphic, obj::ObjPtr}, util::curve};
+use crate::{editor::{selection::Selection, EditorSystems, state::EditorState}, project::{graphic::Graphic, obj::ObjPtr}};
 use super::ScenePanel;
 use glow::HasContext;
 
@@ -69,15 +69,10 @@ impl ScenePanel {
             if let Selection::Scene(strokes) = &state.selection {
                 for stroke in strokes {
                     if let Some(stroke) = state.project.strokes.get(*stroke) {
-                        for (p0, p1) in stroke.iter_point_pairs() {
-                            let n = 8;
-                            for i in 0..n {
-                                let t = (i as f32) / (n as f32);
-                                overlay.line(
-                                    curve::bezier_sample(t, p0.pt, p0.b, p1.a, p1.pt),
-                                    curve::bezier_sample(t + 1.0 / (n as f32), p0.pt, p0.b, p1.a, p1.pt),
-                                    glam::vec4(0.0, 1.0, 1.0, 1.0) 
-                                );
+                        for segment in stroke.iter_bezier_segments() {
+                            let pts = segment.to_discrete::<8>();
+                            for pts in pts.windows(2) {
+                                overlay.line(pts[0], pts[1], glam::vec4(0.0, 1.0, 1.0, 1.0)); 
                             }
                         }
                     }
