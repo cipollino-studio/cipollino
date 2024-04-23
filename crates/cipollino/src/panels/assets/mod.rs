@@ -1,7 +1,7 @@
 
 use std::cmp;
 
-use crate::{editor::{state::EditorState, EditorSystems}, project::{action::Action, file::{audio::AudioFile, FilePtr, FileType}, folder::Folder, graphic::Graphic, obj::{asset::Asset, obj_list::ObjListTrait, ObjBox, ObjPtr}, palette::Palette, Project}, util::ui::dnd::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_label, draggable_widget}};
+use crate::{editor::{state::EditorState, EditorSystems}, project::{action::Action, resource::{audio::AudioFile, ResPtr, ResourceType}, folder::Folder, graphic::Graphic, obj::{asset::Asset, obj_list::ObjListTrait, ObjBox, ObjPtr}, palette::Palette, Project}, util::ui::dnd::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_label, draggable_widget}};
 use crate::project::AssetPtr;
 
 use self::graphic_dialogs::{GraphicPropertiesDialog, NewGraphicDialog};
@@ -181,7 +181,7 @@ impl AssetsPanel {
         }
     }
 
-    fn render_file_asset<T>(&mut self, ui: &mut egui::Ui, project: &Project, file_ptr: &FilePtr<T>, folder: ObjPtr<Folder>, delete: &mut Option<AssetPtr>, rename: &mut bool) -> Option<()> where T: FileType {
+    fn render_file_asset<T>(&mut self, ui: &mut egui::Ui, project: &Project, file_ptr: &ResPtr<T>, folder: ObjPtr<Folder>, delete: &mut Option<AssetPtr>, rename: &mut bool) -> Option<()> where T: ResourceType {
         if self.editing_name.is_none() || T::make_asset_ptr(file_ptr) != self.editing_name.as_ref().unwrap().0 {
             let file = file_ptr.get(project)?;
             let asset_text = format!("{} {}", T::icon(), file.name());
@@ -213,8 +213,8 @@ impl AssetsPanel {
         res
     }
 
-    fn sort_file_asset_list<'a, T: FileType>(project: &'a Project, file_assets: &'a Vec<FilePtr<T>>) -> Vec<&'a FilePtr<T>> {
-        let mut res = file_assets.iter().map(|elem| elem).collect::<Vec<&'a FilePtr<T>>>();
+    fn sort_file_asset_list<'a, T: ResourceType>(project: &'a Project, file_assets: &'a Vec<ResPtr<T>>) -> Vec<&'a ResPtr<T>> {
+        let mut res = file_assets.iter().map(|elem| elem).collect::<Vec<&'a ResPtr<T>>>();
         res.sort_by(|a_ptr, b_ptr| {
             if let Some(a) = a_ptr.get(project) {
                 if let Some(b) = b_ptr.get(project) {

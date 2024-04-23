@@ -29,7 +29,7 @@ pub trait ObjListTrait {
     fn get_modified(&self) -> &HashSet<ObjPtr<Self::ObjType>>;
 
     fn mutated(&self) -> bool {
-        self.get_dropped().lock().unwrap().is_empty() || !self.get_modified().is_empty()
+        !self.get_dropped().lock().unwrap().is_empty() || !self.get_modified().is_empty()
     }
 
 }

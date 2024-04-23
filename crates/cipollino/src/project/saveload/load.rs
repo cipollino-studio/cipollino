@@ -1,4 +1,4 @@
-use crate::{editor::{state::EditorState, toasts::Toasts}, project::{file::{FileList, FilePtr}, Project}};
+use crate::{editor::{state::EditorState, toasts::Toasts}, project::{resource::{ResourceList, ResPtr}, Project}};
 
 use std::{collections::HashSet, fs, path::PathBuf};
 
@@ -6,7 +6,7 @@ use crate::{project::{graphic::Graphic, obj::ObjBox}, util::fs::read_json_file};
 
 use super::asset_file::AssetFile;
 
-use super::super::{file::{audio::AudioFile, FileType}, folder::Folder, obj::{asset::Asset, ObjPtr, ObjSerialize}, palette::Palette};
+use super::super::{resource::{audio::AudioFile, ResourceType}, folder::Folder, obj::{asset::Asset, ObjPtr, ObjSerialize}, palette::Palette};
 
 use crate::project::obj::obj_list::ObjListTrait;
 
@@ -16,7 +16,7 @@ pub struct LoadingError {
 } 
 
 pub struct LoadingMetadata {
-    pub audio_file_ptrs: HashSet<FilePtr<AudioFile>>, 
+    pub audio_file_ptrs: HashSet<ResPtr<AudioFile>>, 
     pub errors: Vec<LoadingError>,
 
     pub curr_asset_path: PathBuf,
@@ -35,10 +35,10 @@ impl LoadingMetadata {
         }
     }
 
-    fn display_file_missing_errors<T: FileType>(&self, project: &mut Project, toasts: &mut Toasts) {
+    fn display_file_missing_errors<T: ResourceType>(&self, project: &mut Project, toasts: &mut Toasts) {
         for (path, key) in T::get_list(project).path_lookup.iter() {
-            if let None = T::get_list(project).get(&FilePtr::from_key(*key)) {
-                if T::list_in_loading_metadata(self).contains(&FilePtr::from_key(*key)) {
+            if let None = T::get_list(project).get(&ResPtr::from_key(*key)) {
+                if T::list_in_loading_metadata(self).contains(&ResPtr::from_key(*key)) {
                     toasts.error_toast(format!("File '{}' missing.", path.to_str().unwrap()));
                 }
             }
@@ -136,17 +136,17 @@ impl Project {
         Ok(())
     }
 
-    fn load_file_asset<T: FileType>(&mut self, path: PathBuf, folder: ObjPtr<Folder>, metadata: &mut LoadingMetadata) -> Option<()> {
+    fn load_resource<T: ResourceType>(&mut self, path: PathBuf, folder: ObjPtr<Folder>, metadata: &mut LoadingMetadata) -> Option<()> {
         let base_path = self.base_path();
         metadata.curr_asset_path = path.clone();
-        let file = match FileList::<T>::load_file(self, base_path, path, folder) {
+        let resource = match ResourceList::<T>::load_resource(self, base_path, path, folder) {
             Ok(file) => file,
             Err(msg) => {
                 metadata.error(msg);
                 return None;
             },
         };
-        T::list_in_folder_mut(self.folders.get_mut(folder)?).push(file);
+        T::list_in_folder_mut(self.folders.get_mut(folder)?).push(resource);
         Some(())
     }
 
@@ -168,7 +168,7 @@ impl Project {
                     }
                 },
                 "mp3" => {
-                    self.load_file_asset::<AudioFile>(path.clone(), folder_ptr, metadata);
+                    self.load_resource::<AudioFile>(path.clone(), folder_ptr, metadata);
                 },
                 _ => {}
             }

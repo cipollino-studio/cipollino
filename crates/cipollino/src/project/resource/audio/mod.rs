@@ -5,7 +5,7 @@ use crate::{audio::generate::MAX_AUDIO_CHANNELS, project::{saveload::load::Loadi
 
 use self::reader::read_samples;
 
-use super::{FileList, FilePtr, FileType};
+use super::{ResourceList, ResPtr, ResourceType};
 
 pub const SAMPLES_PER_VOLUME_SUM: usize = 100;
 mod reader;
@@ -16,7 +16,7 @@ pub struct AudioFile {
     pub volumes: Vec<f32>
 }
 
-impl FileType for AudioFile {
+impl ResourceType for AudioFile {
 
     fn load(project: &Project, path: PathBuf) -> Result<Self, String> {
         match path.extension().ok_or("No extension")?.to_str().unwrap() {
@@ -27,31 +27,31 @@ impl FileType for AudioFile {
         }
     }
 
-    fn get_list(project: &Project) -> &FileList<Self> {
+    fn get_list(project: &Project) -> &ResourceList<Self> {
         &project.audio_files 
     }
 
-    fn get_list_mut(project: &mut Project) -> &mut FileList<Self> {
+    fn get_list_mut(project: &mut Project) -> &mut ResourceList<Self> {
         &mut project.audio_files 
     }
 
-    fn list_in_folder(folder: &crate::project::folder::Folder) -> &Vec<super::FilePtr<Self>> {
+    fn list_in_folder(folder: &crate::project::folder::Folder) -> &Vec<ResPtr<Self>> {
         &folder.audios
     }
 
-    fn list_in_folder_mut(folder: &mut crate::project::folder::Folder) -> &mut Vec<super::FilePtr<Self>> {
+    fn list_in_folder_mut(folder: &mut crate::project::folder::Folder) -> &mut Vec<ResPtr<Self>> {
         &mut folder.audios
     }
 
-    fn list_in_loading_metadata(metadata: &LoadingMetadata) -> &HashSet<FilePtr<Self>> {
+    fn list_in_loading_metadata(metadata: &LoadingMetadata) -> &HashSet<ResPtr<Self>> {
         &metadata.audio_file_ptrs
     }
 
-    fn list_in_loading_metadata_mut(metadata: &mut LoadingMetadata) -> &mut HashSet<FilePtr<Self>> { 
+    fn list_in_loading_metadata_mut(metadata: &mut LoadingMetadata) -> &mut HashSet<ResPtr<Self>> { 
         &mut metadata.audio_file_ptrs
     }
 
-    fn make_asset_ptr(ptr: &FilePtr<Self>) -> AssetPtr {
+    fn make_asset_ptr(ptr: &ResPtr<Self>) -> AssetPtr {
         AssetPtr::Audio(ptr.clone())
     }
 
@@ -81,6 +81,5 @@ impl AudioFile {
             volumes
         }
     }
-
 
 }

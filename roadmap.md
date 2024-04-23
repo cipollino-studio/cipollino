@@ -1,4 +1,2 @@
 
 - Cutting
-- Sound
-- Hierarchical Layers

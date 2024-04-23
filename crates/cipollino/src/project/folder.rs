@@ -4,8 +4,8 @@ use project_macros::{ObjClone, ObjSerialize, Object};
 use unique_type_id::UniqueTypeId;
 use crate::project::obj::Obj;
 use crate::project::Project;
-use super::file::audio::AudioFile;
-use super::file::FilePtr;
+use super::resource::audio::AudioFile;
+use super::resource::ResPtr;
 use super::graphic::Graphic;
 use super::obj::asset::Asset;
 use super::obj::child_obj::{ChildObj, HasRootAsset};
@@ -26,7 +26,7 @@ pub struct Folder {
     pub folder: ObjPtr<Folder>,
     pub graphics: Vec<ObjBox<Graphic>>,
     pub palettes: Vec<ObjBox<Palette>>,
-    pub audios: Vec<FilePtr<AudioFile>>,
+    pub audios: Vec<ResPtr<AudioFile>>,
     pub folders: Vec<ObjBox<Folder>>,
 }
 

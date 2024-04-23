@@ -1,15 +1,15 @@
 
 use egui::{vec2, Vec2};
 
-use crate::{editor::{selection::Selection, state::EditorState}, project::{action::{Action, ObjAction}, file::{audio::AudioFile, FilePtr}, folder::Folder, frame::Frame, layer::Layer, obj::{child_obj::ChildObj, obj_list::ObjListTrait, ObjPtr}, sound_instance::SoundInstance, AssetPtr, Project}};
+use crate::{editor::{selection::Selection, state::EditorState}, project::{action::{Action, ObjAction}, resource::{audio::AudioFile, ResPtr}, folder::Folder, frame::Frame, layer::Layer, obj::{child_obj::ChildObj, obj_list::ObjListTrait, ObjPtr}, sound_instance::SoundInstance, AssetPtr, Project}};
 
 use super::{FrameGridRow, FrameGridRowKind, TimelinePanel};
 
-fn add_sound_instance(project: &mut Project, layer_ptr: ObjPtr<Layer>, audio: FilePtr<AudioFile>, begin: i64) -> Option<Vec<ObjAction>> {
+fn add_sound_instance(project: &mut Project, layer_ptr: ObjPtr<Layer>, audio: ResPtr<AudioFile>, begin: i64) -> Option<Vec<ObjAction>> {
     let mut acts = Vec::new();
     
     let audio_file = audio.get(project)?;
-    let length = audio_file.data.samples.len() as i64;
+    let length = audio_file.get_data(project)?.samples.len() as i64;
     let end = begin + length;
 
     let layer = project.layers.get(layer_ptr)?;
@@ -151,18 +151,20 @@ impl FrameGridRow {
             }
 
             if let Some(audio) = state.project.audio_files.get(&sound_instance.audio) {
-                for x in (left as i32)..(right as i32) {
-                    let x = x as f32;
-                    let t = (x - left) / (right - left);
-                    let min_t = (sound_instance.offset as f32) / (audio.data.samples.len() as f32);
-                    let max_t = min_t + ((sound_instance.end - sound_instance.begin) as f32) / (audio.data.samples.len() as f32);
-                    let t = t * (max_t - min_t) + min_t; 
-                    let volume_sum_idx = (t * (audio.data.volumes.len() as f32)) as usize;
-                    let sum = audio.data.volumes[volume_sum_idx.clamp(0, audio.data.volumes.len() - 1)];
-                    ui.painter().rect_filled(
-                        egui::Rect::from_center_size(egui::pos2(x, rect.center().y), egui::vec2(1.0, (1.5 * sum).clamp(0.0, 1.0) * frame_h)),
-                        0.0,
-                        egui::Color32::from_rgba_premultiplied(0, 0, 0, 60));
+                if let Some(audio) = audio.get_data(&state.project) {
+                    for x in (left as i32)..(right as i32) {
+                        let x = x as f32;
+                        let t = (x - left) / (right - left);
+                        let min_t = (sound_instance.offset as f32) / (audio.samples.len() as f32);
+                        let max_t = min_t + ((sound_instance.end - sound_instance.begin) as f32) / (audio.samples.len() as f32);
+                        let t = t * (max_t - min_t) + min_t; 
+                        let volume_sum_idx = (t * (audio.volumes.len() as f32)) as usize;
+                        let sum = audio.volumes[volume_sum_idx.clamp(0, audio.volumes.len() - 1)];
+                        ui.painter().rect_filled(
+                            egui::Rect::from_center_size(egui::pos2(x, rect.center().y), egui::vec2(1.0, (1.5 * sum).clamp(0.0, 1.0) * frame_h)),
+                            0.0,
+                            egui::Color32::from_rgba_premultiplied(0, 0, 0, 60));
+                    }
                 }
             }
         }
@@ -173,18 +175,20 @@ impl FrameGridRow {
                 if let Some(payload) = response.dnd_hover_payload::<(AssetPtr, ObjPtr<Folder>)>() {
                     if let AssetPtr::Audio(audio_file_ptr) = &(*payload).0 {
                         if let Some(audio) = state.project.audio_files.get(audio_file_ptr) {
-                            let begin = (44100.0 * (hover_pos.x - rect.left()) / frame_w / 24.0).floor() as i64;
-                            let length = audio.data.samples.len() as i64;
+                            if let Some(data) = audio.get_data(&state.project) {
+                                let begin = (44100.0 * (hover_pos.x - rect.left()) / frame_w / 24.0).floor() as i64;
+                                let length = data.samples.len() as i64;
 
-                            ui.painter().rect_stroke(
-                                egui::Rect::from_min_size(
-                                    egui::pos2(hover_pos.x, rect.top()), egui::vec2(frame_w * (length as f32) * state.sample_len() / state.frame_len(), frame_h)),
-                                0.0,
-                                ui.visuals().widgets.active.bg_stroke);
+                                ui.painter().rect_stroke(
+                                    egui::Rect::from_min_size(
+                                        egui::pos2(hover_pos.x, rect.top()), egui::vec2(frame_w * (length as f32) * state.sample_len() / state.frame_len(), frame_h)),
+                                    0.0,
+                                    ui.visuals().widgets.active.bg_stroke);
 
-                            if response.dnd_release_payload::<(AssetPtr, ObjPtr<Folder>)>().is_some() {
-                                if let Some(acts) = add_sound_instance(&mut state.project, self.layer, *audio_file_ptr, begin) {
-                                    state.actions.add(Action::from_list(acts));
+                                if response.dnd_release_payload::<(AssetPtr, ObjPtr<Folder>)>().is_some() {
+                                    if let Some(acts) = add_sound_instance(&mut state.project, self.layer, *audio_file_ptr, begin) {
+                                        state.actions.add(Action::from_list(acts));
+                                    }
                                 }
                             }
                         }

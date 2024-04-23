@@ -41,14 +41,13 @@ fn audio_encoding_thread(out_path: PathBuf, mut audio_state: AudioState, len: i6
         .arg("-")
         .arg(out_path.to_str().unwrap())
         .stdin(Stdio::piped())
+        .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
         .spawn().unwrap();
     let mut stdin = process.stdin.take().unwrap();
+    let _stderr = process.stderr.take().unwrap();
+    let _stdout = process.stdout.take().unwrap();
     let mut byte_buffer = Vec::new();
-
-    let mut flush_buffer = |byte_buffer: &mut Vec<u8>| {
-        let _ = stdin.write_all(&byte_buffer);
-        byte_buffer.clear();
-    };
 
     while audio_state.time < len {
         let sample = audio_state.next_audio_sample(); 
@@ -57,11 +56,8 @@ fn audio_encoding_thread(out_path: PathBuf, mut audio_state: AudioState, len: i6
             let sample = (sample * (i16::MAX as f32)) as i16;
             byte_buffer.extend_from_slice(&sample.to_le_bytes());
         }
-        if byte_buffer.len() > 1024 * 16 {
-            flush_buffer(&mut byte_buffer);
-        }
     }
-    flush_buffer(&mut byte_buffer);
+    let _ = stdin.write_all(&byte_buffer);
 
     drop(stdin);
 

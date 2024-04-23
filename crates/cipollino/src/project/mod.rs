@@ -9,7 +9,7 @@ pub mod action;
 pub mod saveload;
 pub mod palette;
 pub mod sound_instance;
-pub mod file;
+pub mod resource;
 
 use std::{collections::HashSet, path::PathBuf};
 
@@ -17,7 +17,7 @@ use serde_json::json;
 
 use crate::util::fs::write_json_file;
 
-use self::{file::{audio::AudioFile, FileList, FilePtr}, folder::Folder, frame::Frame, graphic::Graphic, layer::Layer, obj::{asset_list::AssetList, obj_list::{ObjList, ObjListTrait}, ObjBox, ObjPtr}, palette::{Palette, PaletteColor}, sound_instance::SoundInstance, stroke::Stroke};
+use self::{resource::{audio::AudioFile, ResourceList, ResPtr}, folder::Folder, frame::Frame, graphic::Graphic, layer::Layer, obj::{asset_list::AssetList, obj_list::{ObjList, ObjListTrait}, ObjBox, ObjPtr}, palette::{Palette, PaletteColor}, sound_instance::SoundInstance, stroke::Stroke};
 
 pub struct Project {
     pub fps: f32,
@@ -32,7 +32,7 @@ pub struct Project {
     pub palette_colors: ObjList<PaletteColor>,
     pub sound_instances: ObjList<SoundInstance>,
 
-    pub audio_files: FileList<AudioFile>, 
+    pub audio_files: ResourceList<AudioFile>, 
 
     pub root_folder: ObjBox<Folder>,
 
@@ -70,7 +70,7 @@ impl Project {
             palette_colors: ObjList::new(),
             sound_instances: ObjList::new(),
 
-            audio_files: FileList::new(),
+            audio_files: ResourceList::new(),
 
             root_folder: root,
 
@@ -102,5 +102,5 @@ pub enum AssetPtr {
     Folder(ObjPtr<Folder>),
     Graphic(ObjPtr<Graphic>),
     Palette(ObjPtr<Palette>),
-    Audio(FilePtr<AudioFile>)
+    Audio(ResPtr<AudioFile>)
 }

@@ -160,6 +160,7 @@ impl Editor {
 
         if state.project.graphics.mutated() || state.project.layers.mutated() || state.project.sound_instances.mutated()
            || self.prev_open_graphic != state.open_graphic || self.prev_playing != state.playing {
+            // println!("{}")
             set_audio_data(state, &mut self.audio); 
         }
         self.prev_open_graphic = state.open_graphic; 

@@ -1,5 +1,5 @@
 
-use std::{collections::{HashMap, HashSet}, marker::PhantomData, path::PathBuf, sync::{Arc, Mutex}};
+use std::{cell::RefCell, collections::{HashMap, HashSet}, marker::PhantomData, path::PathBuf, sync::{Arc, Mutex}};
 
 use serde_json::{json, Map, Value};
 
@@ -11,29 +11,29 @@ use super::{action::ObjAction, folder::Folder, obj::{obj_list::ObjListTrait, Obj
 
 pub mod audio;
 
-pub trait FileType: Sized + Send + Sync + Clone {
+pub trait ResourceType: Sized + Send + Sync + Clone {
 
     fn load(project: &Project, path: PathBuf) -> Result<Self, String>;
 
-    fn get_list(project: &Project) -> &FileList<Self>;
-    fn get_list_mut(project: &mut Project) -> &mut FileList<Self>;
-    fn list_in_folder(folder: &Folder) -> &Vec<FilePtr<Self>>;
-    fn list_in_folder_mut(folder: &mut Folder) -> &mut Vec<FilePtr<Self>>;
-    fn list_in_loading_metadata(metadata: &LoadingMetadata) -> &HashSet<FilePtr<Self>>;
-    fn list_in_loading_metadata_mut(metadata: &mut LoadingMetadata) -> &mut HashSet<FilePtr<Self>>; 
+    fn get_list(project: &Project) -> &ResourceList<Self>;
+    fn get_list_mut(project: &mut Project) -> &mut ResourceList<Self>;
+    fn list_in_folder(folder: &Folder) -> &Vec<ResPtr<Self>>;
+    fn list_in_folder_mut(folder: &mut Folder) -> &mut Vec<ResPtr<Self>>;
+    fn list_in_loading_metadata(metadata: &LoadingMetadata) -> &HashSet<ResPtr<Self>>;
+    fn list_in_loading_metadata_mut(metadata: &mut LoadingMetadata) -> &mut HashSet<ResPtr<Self>>; 
 
-    fn make_asset_ptr(ptr: &FilePtr<Self>) -> AssetPtr;
+    fn make_asset_ptr(ptr: &ResPtr<Self>) -> AssetPtr;
 
     fn icon() -> &'static str;
 
-    fn delete(project: &mut Project, ptr: FilePtr<Self>) -> Option<ObjAction> where Self: 'static {
-        let file = ptr.get(project)?;
-        let path = file.path.clone();
-        let absolute_path = file.absolute_path(project);
+    fn delete(project: &mut Project, ptr: ResPtr<Self>) -> Option<ObjAction> where Self: 'static {
+        let resource = ptr.get(project)?;
+        let path = resource.path.clone();
+        let absolute_path = resource.absolute_path(project);
         let key = ptr.key;
-        Self::list_in_folder_mut(project.folders.get_mut(file.folder)?).retain(|other_ptr| *other_ptr != ptr);
+        Self::list_in_folder_mut(project.folders.get_mut(resource.folder)?).retain(|other_ptr| *other_ptr != ptr);
         Self::get_list_mut(project).path_lookup.remove(&path)?;
-        let file = Self::get_list_mut(project).files.remove(&ptr.key)?;
+        let resource = Self::get_list_mut(project).resources.remove(&ptr.key)?;
 
         let mut graveyard_path = trash_folder().join(absolute_path.file_name()?);
         if graveyard_path.exists() {
@@ -48,13 +48,13 @@ pub trait FileType: Sized + Send + Sync + Clone {
 
         std::fs::rename(absolute_path.clone(), graveyard_path.clone()).ok()?;
 
-        let file_box = Arc::new(Mutex::new(Some(file)));
+        let file_box = Arc::new(Mutex::new(Some(resource)));
         let absolute_path_1 = absolute_path.clone();
         let graveyard_path_1 = graveyard_path.clone();
         let file_box_1 = file_box.clone();
         Some(ObjAction::new(move |proj| {
             if std::fs::rename(absolute_path.clone(), graveyard_path.clone()).is_ok() {
-                let file = Self::get_list_mut(proj).files.remove(&key).unwrap();
+                let file = Self::get_list_mut(proj).resources.remove(&key).unwrap();
                 Self::get_list_mut(proj).path_lookup.remove(&file.path);
                 Self::list_in_folder_mut(proj.folders.get_mut(file.folder).unwrap()).retain(|other_file| other_file != &file.ptr);
                 *file_box.lock().unwrap() = Some(file);
@@ -64,14 +64,14 @@ pub trait FileType: Sized + Send + Sync + Clone {
                 let file = std::mem::replace(&mut *file_box_1.lock().unwrap(), None).unwrap();
                 Self::get_list_mut(proj).path_lookup.insert(path.clone(), key);
                 Self::list_in_folder_mut(proj.folders.get_mut(file.folder).unwrap()).push(file.ptr);
-                Self::get_list_mut(proj).files.insert(file.ptr.key, file);
+                Self::get_list_mut(proj).resources.insert(file.ptr.key, file);
             }
         }))
     }
 
-    fn rename(project: &mut Project, ptr: &FilePtr<Self>, name: String) -> Option<ObjAction> where Self: 'static {
+    fn rename(project: &mut Project, ptr: &ResPtr<Self>, name: String) -> Option<ObjAction> where Self: 'static {
         let file = Self::get_list(project).get(ptr)?;
-        let new_name = next_unique_name(&name, Self::list_in_folder(project.folders.get(file.folder)?).iter().map(|file_ptr| file_ptr.get(&project).map_or("", |file| file.name())));
+        let new_name = next_unique_name(&name, Self::list_in_folder(project.folders.get(file.folder)?).iter().map(|file_ptr| file_ptr.get(project).map_or("", |file| file.name())));
         let old_name = file.name().to_owned(); 
 
         let old_path = file.absolute_path(project);
@@ -108,7 +108,7 @@ pub trait FileType: Sized + Send + Sync + Clone {
         }))
     }
 
-    fn transfer(project: &mut Project, ptr: &FilePtr<Self>, from: ObjPtr<Folder>, to: ObjPtr<Folder>) -> Option<ObjAction> where Self: 'static {
+    fn transfer(project: &mut Project, ptr: &ResPtr<Self>, from: ObjPtr<Folder>, to: ObjPtr<Folder>) -> Option<ObjAction> where Self: 'static {
         if from == to {
             return None;
         }
@@ -163,12 +163,12 @@ pub trait FileType: Sized + Send + Sync + Clone {
 
 }
 
-pub struct FilePtr<T: FileType> {
+pub struct ResPtr<T: ResourceType> {
     key: u64, 
     _marker: PhantomData<T>
 }
 
-impl<T: FileType> FilePtr<T> {
+impl<T: ResourceType> ResPtr<T> {
 
     pub fn from_key(key: u64) -> Self {
         Self {
@@ -181,13 +181,17 @@ impl<T: FileType> FilePtr<T> {
         Self::from_key(0)
     }
 
-    pub fn get<'a>(&'a self, project: &'a Project) -> Option<&'a FileBox<T>> {
+    pub fn get<'a>(&'a self, project: &'a Project) -> Option<&'a ResBox<T>> {
         T::get_list(project).get(self)
+    }
+
+    pub fn get_mut<'a>(&'a self, project: &'a mut Project) -> Option<&'a mut ResBox<T>> {
+        T::get_list_mut(project).get_mut(self)
     }
 
 }
 
-impl<T: FileType> Hash for FilePtr<T> {
+impl<T: ResourceType> Hash for ResPtr<T> {
 
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.key.hash(state);
@@ -195,7 +199,7 @@ impl<T: FileType> Hash for FilePtr<T> {
 
 }
 
-impl<T: FileType> Clone for FilePtr<T> {
+impl<T: ResourceType> Clone for ResPtr<T> {
 
     fn clone(&self) -> Self {
         Self {
@@ -206,11 +210,11 @@ impl<T: FileType> Clone for FilePtr<T> {
 
 }
 
-impl<T: FileType> Copy for FilePtr<T> {} 
+impl<T: ResourceType> Copy for ResPtr<T> {} 
 
-impl<T: FileType> ObjClone for FilePtr<T> {}
+impl<T: ResourceType> ObjClone for ResPtr<T> {}
 
-impl<T: FileType> PartialEq for FilePtr<T> {
+impl<T: ResourceType> PartialEq for ResPtr<T> {
 
     fn eq(&self, other: &Self) -> bool {
         self.key == other.key
@@ -218,17 +222,17 @@ impl<T: FileType> PartialEq for FilePtr<T> {
 
 }
 
-impl<T: FileType> Eq for FilePtr<T> {}
+impl<T: ResourceType> Eq for ResPtr<T> {}
 
-pub struct FileBox<T: FileType> {
-    pub data: T,
-    pub ptr: FilePtr<T>,
+pub struct ResBox<T: ResourceType> {
+    pub data: RefCell<Option<Arc<T>>>,
+    pub ptr: ResPtr<T>,
     // Path to the file, relative to the root folder of the project
     pub path: PathBuf,
     pub folder: ObjPtr<Folder>
 }
 
-impl<T: FileType> FileBox<T> {
+impl<T: ResourceType> ResBox<T> {
     
     pub fn name<'a>(&'a self) -> &'a str {
         self.path.file_stem().unwrap().to_str().unwrap()
@@ -238,19 +242,31 @@ impl<T: FileType> FileBox<T> {
         project.base_path().join(self.path.clone())
     }
 
+    pub fn get_data(&self, project: &Project) -> Option<Arc<T>> {
+        let mut data = self.data.borrow_mut(); 
+        if let Some(data) = &*data {
+            return Some(data.clone());
+        }
+
+        let loaded_data = Arc::new(T::load(project, self.absolute_path(project)).ok()?); 
+        *data = Some(loaded_data.clone());
+
+        Some(loaded_data) 
+    }
+
 }
 
-pub struct FileList<T: FileType> {
-    files: HashMap<u64, FileBox<T>>,
+pub struct ResourceList<T: ResourceType> {
+    resources: HashMap<u64, ResBox<T>>,
     pub path_lookup: HashMap<PathBuf, u64>,
     curr_key: u64
 }
 
-impl<T: FileType> FileList<T> {
+impl<T: ResourceType> ResourceList<T> {
 
     pub fn new() -> Self {
         Self {
-            files: HashMap::new(),
+            resources: HashMap::new(),
             path_lookup: HashMap::new(),
             curr_key: 1
         }
@@ -280,13 +296,12 @@ impl<T: FileType> FileList<T> {
         })
     }
 
-    pub fn load_file(project: &mut Project, project_base_path: PathBuf, path: PathBuf, folder: ObjPtr<Folder>) -> Result<FilePtr<T>, String> {
+    pub fn load_resource(project: &mut Project, project_base_path: PathBuf, path: PathBuf, folder: ObjPtr<Folder>) -> Result<ResPtr<T>, String> {
         let rel_path = if let Some(rel_path) = pathdiff::diff_paths(path.clone(), project_base_path) {
             rel_path
         } else {
             return Err(format!("Invalid path {}.", path.to_string_lossy()));
-        }; 
-        let data = T::load(project, path)?;
+        };
         let list = T::get_list_mut(project);
 
         let mut key = if let Some(key) = list.path_lookup.get(&rel_path) {
@@ -296,18 +311,18 @@ impl<T: FileType> FileList<T> {
         };
         list.curr_key = list.curr_key.max(key + 1);
 
-        if list.files.contains_key(&key) {
+        if list.resources.contains_key(&key) {
             key = list.curr_key;
             list.curr_key += 1; 
         }
 
-        let ptr = FilePtr {
+        let ptr = ResPtr {
             key,
             _marker: PhantomData
         };
 
-        list.files.insert(key, FileBox {
-            data,
+        list.resources.insert(key, ResBox {
+            data: RefCell::new(None),
             ptr: ptr.clone(),
             path: rel_path.clone(),
             folder
@@ -317,17 +332,17 @@ impl<T: FileType> FileList<T> {
         Ok(ptr)
     }
 
-    pub fn get<'a>(&'a self, ptr: &FilePtr<T>) -> Option<&'a FileBox<T>> {
-        self.files.get(&ptr.key)
+    pub fn get<'a>(&'a self, ptr: &ResPtr<T>) -> Option<&'a ResBox<T>> {
+        self.resources.get(&ptr.key)
     }
     
-    pub fn get_mut<'a>(&'a mut self, ptr: &FilePtr<T>) -> Option<&'a mut FileBox<T>> {
-        self.files.get_mut(&ptr.key)
+    pub fn get_mut<'a>(&'a mut self, ptr: &ResPtr<T>) -> Option<&'a mut ResBox<T>> {
+        self.resources.get_mut(&ptr.key)
     }
 
 }
 
-impl<T: FileType> ObjSerialize for FilePtr<T> {
+impl<T: ResourceType> ObjSerialize for ResPtr<T> {
 
     fn obj_serialize(&self, _project: &Project, _asset_file: &mut AssetFile) -> bson::Bson {
         bson::bson!({
@@ -343,13 +358,13 @@ impl<T: FileType> ObjSerialize for FilePtr<T> {
         let key = if let Some(key) = bson_get(data, "key") {
             key
         } else {
-            metadata.deserialization_error("File key missing.", parent.key);
+            metadata.deserialization_error("Resource key missing.", parent.key);
             return None;
         };
         let key = if let Some(key) = bson_to_u64(key) {
             key
         } else {
-            metadata.deserialization_error("File key is not u64.", parent.key);
+            metadata.deserialization_error("Resource key is not u64.", parent.key);
             return None;
         };
         let res = Self {
@@ -363,7 +378,7 @@ impl<T: FileType> ObjSerialize for FilePtr<T> {
 
 }
 
-impl<T: FileType> ToRawData for FilePtr<T> {
+impl<T: ResourceType> ToRawData for ResPtr<T> {
 
     type RawData = Self;
 

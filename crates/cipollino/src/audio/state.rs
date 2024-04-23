@@ -40,12 +40,14 @@ impl EditorState {
                 for instance in &layer.sound_instances {
                     let instance = instance.get(&self.project);
                     if let Some(file) = self.project.audio_files.get(&instance.audio) {
-                        audio.clips.push(AudioClip {
-                            begin: instance.begin, 
-                            end: instance.end, 
-                            offset: instance.offset,
-                            samples: file.data.samples.clone(),
-                        });
+                        if let Some(data) = file.get_data(&self.project) {
+                            audio.clips.push(AudioClip {
+                                begin: instance.begin, 
+                                end: instance.end, 
+                                offset: instance.offset,
+                                samples: data.samples.clone(),
+                            });
+                        }
                     }
                 }
             } else if layer.kind == LayerKind::Group {

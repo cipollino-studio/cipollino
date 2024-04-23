@@ -1,7 +1,7 @@
 
 use project_macros::{ObjClone, ObjSerialize, Object};
 use unique_type_id::UniqueTypeId;
-use super::{action::ObjAction, file::{audio::AudioFile, FilePtr}, graphic::Graphic, layer::Layer, obj::{child_obj::{ChildObj, HasRootAsset}, Obj, ObjBox, ObjClone, ObjPtr, ObjSerialize}, Project};
+use super::{action::ObjAction, resource::{audio::AudioFile, ResPtr}, graphic::Graphic, layer::Layer, obj::{child_obj::{ChildObj, HasRootAsset}, Obj, ObjBox, ObjClone, ObjPtr, ObjSerialize}, Project};
 use crate::project::obj::obj_list::ObjListTrait;
 
 #[derive(Object, Clone, ObjClone, ObjSerialize, UniqueTypeId)]
@@ -15,7 +15,7 @@ pub struct SoundInstance {
     pub end: i64,
     #[field]
     pub offset: i64,
-    pub audio: FilePtr<AudioFile>
+    pub audio: ResPtr<AudioFile>
 }
 
 impl ChildObj for SoundInstance {
@@ -56,7 +56,7 @@ impl Default for SoundInstance {
             begin: 0,
             end: 0,
             offset: 0,
-            audio: FilePtr::null()
+            audio: ResPtr::null()
         }
     }
 

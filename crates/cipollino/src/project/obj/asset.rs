@@ -122,11 +122,11 @@ pub trait Asset : Obj<ListType = AssetList<Self>> + ChildObj<Parent = ObjPtr<Fol
         Some(vec![ObjAction::new(move |proj| {
             let obj = Self::get_list_mut(proj).get_mut(asset).unwrap();
             *obj.name_mut() = new_name.clone();
-            std::fs::rename(init_path.clone(), new_path.clone());
+            let _ = std::fs::rename(init_path.clone(), new_path.clone());
         }, |_| {}), transfer_act, ObjAction::new(|_| {}, move |proj| {
             let obj = Self::get_list_mut(proj).get_mut(asset).unwrap();
             *obj.name_mut() = init_name.clone();
-            std::fs::rename(new_path_1.clone(), init_path_1.clone());
+            let _ = std::fs::rename(new_path_1.clone(), init_path_1.clone());
         })])
     }
 
