@@ -2,9 +2,11 @@
 use project_macros::{ObjClone, ObjSerialize, Object};
 use unique_type_id::UniqueTypeId;
 
-use super::{action::ObjAction, folder::Folder, layer::Layer, obj::{asset::Asset, child_obj::{ChildObj, HasRootAsset}, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjSerialize}, AssetPtr, Project};
+use super::{action::ObjAction, folder::Folder, layer::Layer, obj::{asset::Asset, child_obj::{ChildObj, HasRootAsset}, Obj, ObjBox, ObjClone, ObjPtr, ObjSerialize}, AssetPtr, Project};
+use crate::project::obj::obj_list::ObjListTrait;
 
 #[derive(Object, Clone, ObjClone, ObjSerialize, UniqueTypeId)]
+#[asset]
 pub struct Graphic {
     #[field]
     pub name: String,
@@ -76,7 +78,7 @@ impl Asset for Graphic {
         &mut self.name
     }
 
-    fn extension(&self) -> &str {
+    fn extension() -> &'static str {
         "cipgfx"
     }
 

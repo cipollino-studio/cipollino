@@ -1,7 +1,8 @@
 
 use project_macros::{ObjClone, ObjSerialize, Object};
 use unique_type_id::UniqueTypeId;
-use super::{action::ObjAction, folder::Folder, obj::{asset::Asset, child_obj::{ChildObj, HasRootAsset}, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjSerialize}, AssetPtr, Project};
+use super::{action::ObjAction, folder::Folder, obj::{asset::Asset, child_obj::{ChildObj, HasRootAsset}, Obj, ObjBox, ObjClone, ObjPtr, ObjSerialize}, AssetPtr, Project};
+use crate::project::obj::obj_list::ObjListTrait;
 
 #[derive(Object, Clone, ObjClone, ObjSerialize, UniqueTypeId)]
 pub struct PaletteColor {
@@ -53,6 +54,7 @@ impl Default for PaletteColor {
 }
 
 #[derive(Object, Clone, ObjClone, ObjSerialize, UniqueTypeId)]
+#[asset]
 pub struct Palette {
     #[field]
     pub name: String,
@@ -121,7 +123,7 @@ impl Asset for Palette {
         &mut self.name
     }
 
-    fn extension(&self) -> &str {
+    fn extension() -> &'static str {
         "cippal"
     }
 

@@ -39,7 +39,7 @@ pub fn handle_dropped_files(ctx: &egui::Context, state: &mut EditorState, system
                     systems.toasts.error_toast(format!("Could not move file: {}.", err.to_string()));
                 } 
             }
-            metadata.display_errors(state, systems.toasts);
+            metadata.display_errors(&mut state.project, systems.toasts);
 
         }     
 

@@ -1,7 +1,7 @@
 
 use std::{fs, path::PathBuf, sync::{Arc, Mutex}};
 
-use crate::{audio::AudioController, export::export_options::ExportOptionsDialog, panels, project::{graphic::Graphic, obj::ObjPtr}, renderer::scene::SceneRenderer};
+use crate::{audio::AudioController, export::export_options::ExportOptionsDialog, panels, project::{graphic::Graphic, obj::{obj_list::ObjListTrait, ObjPtr}}, renderer::scene::SceneRenderer};
 
 use self::{clipboard::Clipboard, dialog::{DialogManager, DialogsToOpen}, dropped_files::handle_dropped_files, keybind::{Keybind, RedoKeybind, UndoKeybind}, prefs::{prefs_dialog::PrefsDialog, UserPrefs}, splash_screen::SplashScreen, state::EditorState, toasts::Toasts};
 

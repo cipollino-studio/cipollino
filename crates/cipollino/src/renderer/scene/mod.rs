@@ -7,7 +7,7 @@ use std::{collections::HashMap, sync::Arc};
 use glam::vec4;
 use glow::{Context, HasContext};
 
-use crate::project::{graphic::Graphic, layer::{BlendingMode, Layer, LayerKind}, obj::{ObjBox, ObjPtr}, stroke::Stroke, Project};
+use crate::project::{graphic::Graphic, layer::{BlendingMode, Layer, LayerKind}, obj::{obj_list::ObjListTrait, ObjBox, ObjPtr}, stroke::Stroke, Project};
 
 use self::fb_manager::FramebufferManager;
 

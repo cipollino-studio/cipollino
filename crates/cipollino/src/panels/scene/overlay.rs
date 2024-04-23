@@ -1,7 +1,7 @@
 
 use glam::Vec2;
 
-use crate::{editor::{selection::Selection, EditorSystems, state::EditorState}, project::{graphic::Graphic, obj::ObjPtr}};
+use crate::{editor::{selection::Selection, state::EditorState, EditorSystems}, project::{graphic::Graphic, obj::{obj_list::ObjListTrait, ObjPtr}}};
 use super::ScenePanel;
 use glow::HasContext;
 

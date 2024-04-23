@@ -2,7 +2,7 @@
 use std::{sync::Arc, collections::{VecDeque, HashSet, HashMap}};
 
 use glam::{Vec2, vec2};
-use crate::{editor::{state::EditorState, EditorSystems}, keybind, panels::scene::ScenePanel, project::{action::Action, obj::child_obj::ChildObj, stroke::{Stroke, StrokePoint}}, util::{curve::fit_curve, geo::LineSegment}};
+use crate::{editor::{state::EditorState, EditorSystems}, keybind, panels::scene::ScenePanel, project::{action::Action, obj::{child_obj::ChildObj, obj_list::ObjListTrait}, stroke::{Stroke, StrokePoint}}, util::{curve::fit_curve, geo::LineSegment}};
 
 use super::{Tool, active_frame};
 

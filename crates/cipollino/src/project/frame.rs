@@ -2,7 +2,8 @@
 use project_macros::{ObjClone, ObjSerialize, Object};
 use unique_type_id::UniqueTypeId;
 
-use super::{action::ObjAction, graphic::Graphic, layer::Layer, obj::{child_obj::{ChildObj, HasRootAsset}, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjSerialize}, stroke::Stroke, Project};
+use super::{action::ObjAction, graphic::Graphic, layer::Layer, obj::{child_obj::{ChildObj, HasRootAsset}, Obj, ObjBox, ObjClone, ObjPtr, ObjSerialize}, stroke::Stroke, Project};
+use crate::project::obj::obj_list::ObjListTrait;
 
 #[derive(Object, Clone, ObjClone, ObjSerialize, UniqueTypeId)]
 pub struct Frame {

@@ -1,7 +1,7 @@
 
 use std::sync::Arc;
 
-use crate::{editor::state::EditorState, project::{graphic::Graphic, layer::{Layer, LayerKind}, obj::{ObjBox, ObjPtr}}};
+use crate::{editor::state::EditorState, project::{graphic::Graphic, layer::{Layer, LayerKind}, obj::{obj_list::ObjListTrait, ObjBox, ObjPtr}}};
 
 use super::generate::MAX_AUDIO_CHANNELS;
 

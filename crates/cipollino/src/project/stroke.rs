@@ -5,7 +5,8 @@ use unique_type_id::UniqueTypeId;
 
 use crate::util::curve::BezierSegment;
 
-use super::{action::ObjAction, frame::Frame, graphic::Graphic, obj::{child_obj::{ChildObj, HasRootAsset}, DynObjPtr, Obj, ObjBox, ObjClone, ObjList, ObjPtr, ObjSerialize, ToRawData}, palette::PaletteColor, saveload::{asset_file::AssetFile, load::LoadingMetadata}, Project};
+use super::{action::ObjAction, frame::Frame, graphic::Graphic, obj::{child_obj::{ChildObj, HasRootAsset}, DynObjPtr, Obj, ObjBox, ObjClone, ObjPtr, ObjSerialize, ToRawData}, palette::PaletteColor, saveload::{asset_file::AssetFile, load::LoadingMetadata}, Project};
+use crate::project::obj::obj_list::ObjListTrait;
 
 #[derive(Clone, Copy, ObjClone, Default, ObjSerialize)]
 pub struct StrokePoint {

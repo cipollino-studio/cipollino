@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use glam::{vec2, vec3, Mat4, Vec2};
 
-use crate::{editor::{selection::Selection, state::EditorState, EditorSystems}, keybind, panels::scene::{overlay::OverlayRenderer, ScenePanel}, project::{action::Action, stroke::Stroke}};
+use crate::{editor::{selection::Selection, state::EditorState, EditorSystems}, keybind, panels::scene::{overlay::OverlayRenderer, ScenePanel}, project::{action::Action, obj::obj_list::ObjListTrait, stroke::Stroke}};
 
 
 use self::scale::ScalePivot;

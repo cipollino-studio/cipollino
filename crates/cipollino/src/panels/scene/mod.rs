@@ -6,7 +6,7 @@ use glow::HasContext;
 pub mod overlay;
 
 use crate::{
-    editor::{clipboard::Clipboard, keybind::{CenterSceneKeybind, DeleteKeybind, Keybind}, selection::Selection, state::EditorState, EditorSystems}, project::{action::Action, graphic::Graphic, obj::{child_obj::ChildObj, ObjPtr}, stroke::{Stroke, StrokeColor}}, renderer::fb::Framebuffer, util::ui::{color::color_picker, keybind::consume_shortcut}
+    editor::{clipboard::Clipboard, keybind::{CenterSceneKeybind, DeleteKeybind, Keybind}, selection::Selection, state::EditorState, EditorSystems}, project::{action::Action, graphic::Graphic, obj::{child_obj::ChildObj, obj_list::ObjListTrait, ObjPtr}, stroke::{Stroke, StrokeColor}}, renderer::fb::Framebuffer, util::ui::{color::color_picker, keybind::consume_shortcut}
 };
 
 use super::super::tools::active_frame_proj_layer_frame;

@@ -2,7 +2,7 @@
 
 use egui::{KeyboardShortcut, Modifiers};
 
-use crate::{editor::{keybind::{DeleteKeybind, Keybind, NewFrameKeybind, NextFrameKeybind, PlayKeybind, PrevFrameKeybind, StepBackKeybind, StepForwardKeybind}, selection::Selection, state::EditorState, EditorSystems}, project::{action::Action, frame::Frame, layer::{Layer, LayerKind}, obj::{child_obj::ChildObj, ObjBox, ObjPtr}, sound_instance::SoundInstance}};
+use crate::{editor::{keybind::{DeleteKeybind, Keybind, NewFrameKeybind, NextFrameKeybind, PlayKeybind, PrevFrameKeybind, StepBackKeybind, StepForwardKeybind}, selection::Selection, state::EditorState, EditorSystems}, project::{action::Action, frame::Frame, layer::{Layer, LayerKind}, obj::{child_obj::ChildObj, obj_list::ObjListTrait, ObjBox, ObjPtr}, sound_instance::SoundInstance}};
 
 pub mod controls;
 pub mod header;

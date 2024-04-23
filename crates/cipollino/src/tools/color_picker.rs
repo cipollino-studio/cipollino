@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use glam::Vec2;
 
-use crate::{editor::{state::EditorState, EditorSystems}, keybind, panels::scene::ScenePanel};
+use crate::{editor::{state::EditorState, EditorSystems}, keybind, panels::scene::ScenePanel, project::obj::obj_list::ObjListTrait};
 
 use super::Tool;
 

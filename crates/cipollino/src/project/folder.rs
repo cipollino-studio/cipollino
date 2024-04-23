@@ -2,7 +2,7 @@
 use std::path::PathBuf;
 use project_macros::{ObjClone, ObjSerialize, Object};
 use unique_type_id::UniqueTypeId;
-use crate::project::obj::{Obj, ObjList};
+use crate::project::obj::Obj;
 use crate::project::Project;
 use super::file::audio::AudioFile;
 use super::file::FilePtr;
@@ -14,8 +14,10 @@ use super::action::ObjAction;
 use super::palette::Palette;
 use super::AssetPtr;
 use super::obj::ObjSerialize;
+use crate::project::obj::obj_list::ObjListTrait;
 
 #[derive(Object, Clone, ObjClone, ObjSerialize, UniqueTypeId)]
+#[asset]
 pub struct Folder {
     #[field]
     pub name: String,
@@ -67,7 +69,7 @@ impl Asset for Folder {
         &mut self.name
     }
 
-    fn extension(&self) -> &str {
+    fn extension() -> &'static str {
         ""
     }
 

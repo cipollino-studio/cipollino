@@ -3,6 +3,8 @@ use crate::project::{frame::Frame, obj::{Obj, ObjBox, ObjPtr}, sound_instance::S
 
 use super::selection::Selection;
 
+use crate::project::obj::obj_list::ObjListTrait;
+
 pub enum Clipboard {
     None,
     Scene(Vec<ObjBox<Stroke>>),

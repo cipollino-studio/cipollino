@@ -2,8 +2,9 @@
 use std::sync::Arc;
 
 use crate::{project::{saveload::{asset_file::AssetFile, load::LoadingMetadata}, Project}, util::bson::{bson_get, bson_to_u64, u64_to_bson}};
-use super::{child_obj::ChildObj, DynObjPtr, Obj, ObjBox, ObjClone, ObjPtr, ObjSerialize, ToRawData};
+use super::{child_obj::{ChildObj, HasRootAsset}, DynObjPtr, Obj, ObjBox, ObjClone, ObjPtr, ObjSerialize, ToRawData};
 use bson::bson;
+use crate::project::obj::obj_list::ObjListTrait;
 
 impl<T: ObjClone> ObjClone for Vec<T> {
 
@@ -122,23 +123,31 @@ impl<T: Obj> ObjClone for ObjBox<T> {
 
 }
 
-impl<T: Obj> ObjSerialize for ObjPtr<T> {
+impl<T: Obj + HasRootAsset> ObjSerialize for ObjPtr<T> {
 
-    fn obj_serialize(&self, _project: &Project, _asset_file: &mut AssetFile) -> bson::Bson {
-        u64_to_bson(self.key) 
+    fn obj_serialize(&self, project: &Project, _asset_file: &mut AssetFile) -> bson::Bson {
+        let root = T::get_root_asset(project, *self).unwrap();
+        bson!({
+            "key": u64_to_bson(self.key),
+            "asset": u64_to_bson(root.key)
+        })
     }
     
-    fn obj_serialize_full(&self, _project: &Project, _asset_file: &mut AssetFile) -> bson::Bson {
-        u64_to_bson(self.key) 
+    fn obj_serialize_full(&self, project: &Project, asset_file: &mut AssetFile) -> bson::Bson {
+        self.obj_serialize(project, asset_file)
     }
 
-    fn obj_deserialize(_project: &mut Project, data: &bson::Bson, parent: DynObjPtr, _asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<Self> {
-        if let Some(key) = bson_to_u64(data) {
-            Some(Self::from_key(key))
-        } else {
-            metadata.deserialization_error("Object pointer must be a u64.", parent.key); 
-            None
+    fn obj_deserialize(project: &mut Project, data: &bson::Bson, _parent: DynObjPtr, _asset_file: &mut AssetFile, metadata: &mut LoadingMetadata) -> Option<Self> {
+        let key_data = bson_get(data, "key")?;
+        let key = bson_to_u64(key_data)?;
+        let asset_data = bson_get(data, "asset")?;
+        let asset_key = bson_to_u64(asset_data)?;
+        let asset_ptr = ObjPtr::from_key(asset_key); 
+        if let Err(err) = <T::RootAsset as Obj>::ListType::load(project, asset_ptr, metadata) {
+            metadata.error(err);
         }
+
+        Some(ObjPtr::from_key(key))
     }
 
 }
@@ -157,7 +166,7 @@ impl<T: Obj> ToRawData for ObjPtr<T> {
 }
 
 pub fn serialize_obj_box<T: Obj + ObjSerialize>(obj: &ObjBox<T>, project: &Project) -> bson::Bson {
-    let ptr = *T::get_list(project).obj_file_ptrs.borrow().get(&obj.ptr).expect("pointer missing. might be caused by parent being saved before child.");
+    let ptr = T::get_list(project).use_obj_file_ptrs(|ptrs| *ptrs.get(&obj.ptr).expect("pointer missing. might be caused by parent being saved before child."));
     bson!({
         "key": u64_to_bson(obj.ptr.key),
         "ptr": u64_to_bson(ptr)
@@ -166,9 +175,10 @@ pub fn serialize_obj_box<T: Obj + ObjSerialize>(obj: &ObjBox<T>, project: &Proje
 
 pub fn serialize_obj_box_full<T: Obj + ObjSerialize>(obj: &ObjBox<T>, project: &Project, asset_file: &mut AssetFile) -> bson::Bson {
     let list = T::get_list(project);
-    list.obj_file_ptrs.borrow_mut().insert(obj.ptr, asset_file.alloc_page().expect("could not allocate page."));
+    let new_page_ptr = asset_file.alloc_page().expect("could not allocate page.");
+    list.use_obj_file_ptrs(|ptrs| ptrs.insert(obj.ptr, new_page_ptr));
     let obj_data = obj.get(project).obj_serialize_full(project, asset_file);
-    let ptr = *list.obj_file_ptrs.borrow().get(&obj.ptr).unwrap();
+    let ptr = list.use_obj_file_ptrs(|ptrs| *ptrs.get(&obj.ptr).unwrap());
     let _ = asset_file.set_obj_data(ptr, obj_data.as_document().expect("object must serialize to a bson document").clone());
     serialize_obj_box(obj, project)
 }
@@ -203,14 +213,14 @@ pub fn deserialize_obj_box<T: Obj + ObjSerialize>(project: &mut Project, data: &
         if T::get_list(project).get(ptr).is_some() {
             T::get_list_mut(project).next_ptr()
         } else {
-            T::get_list_mut(project).curr_key = T::get_list_mut(project).curr_key.max(key + 1);
+            *T::get_list_mut(project).curr_key() = (*T::get_list_mut(project).curr_key()).max(key + 1);
             ptr
         }
     } else {
         T::get_list_mut(project).next_ptr()
     }; 
 
-    T::get_list_mut(project).obj_file_ptrs.borrow_mut().insert(ptr, page_ptr);
+    T::get_list_mut(project).use_obj_file_ptrs(|ptrs| ptrs.insert(ptr, page_ptr));
 
     let obj_data = match asset_file.get_obj_data(page_ptr) {
         Ok(obj_data) => obj_data,

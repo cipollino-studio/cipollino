@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use glam::Vec2;
 
-use crate::{editor::state::EditorState, panels::scene::{overlay::OverlayRenderer, ScenePanel}, util::geo::LineSegment};
+use crate::{editor::state::EditorState, panels::scene::{overlay::OverlayRenderer, ScenePanel}, project::obj::obj_list::ObjListTrait, util::geo::LineSegment};
 use super::Select;
 use crate::tools::Tool;
 

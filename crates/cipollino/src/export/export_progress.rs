@@ -3,7 +3,7 @@ use std::{io::Write, path::PathBuf, process::{Command, Stdio}, thread::{self, Jo
 
 use unique_type_id::UniqueTypeId;
 
-use crate::{audio::{generate::MAX_AUDIO_CHANNELS, state::AudioState}, editor::{dialog::Dialog, state::EditorState, EditorSystems}, project::{graphic::Graphic, obj::ObjPtr}, renderer::fb::Framebuffer, util::ffmpeg::FFMPEG_PATH};
+use crate::{audio::{generate::MAX_AUDIO_CHANNELS, state::AudioState}, editor::{dialog::Dialog, state::EditorState, EditorSystems}, project::{graphic::Graphic, obj::{obj_list::ObjListTrait, ObjPtr}}, renderer::fb::Framebuffer, util::ffmpeg::FFMPEG_PATH};
 
 use super::video_writer::VideoWriter;
 

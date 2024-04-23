@@ -17,18 +17,18 @@ use serde_json::json;
 
 use crate::util::fs::write_json_file;
 
-use self::{file::{audio::AudioFile, FileList, FilePtr}, folder::Folder, frame::Frame, graphic::Graphic, layer::Layer, obj::{ObjBox, ObjList, ObjPtr}, palette::{Palette, PaletteColor}, sound_instance::SoundInstance, stroke::Stroke};
+use self::{file::{audio::AudioFile, FileList, FilePtr}, folder::Folder, frame::Frame, graphic::Graphic, layer::Layer, obj::{asset_list::AssetList, obj_list::{ObjList, ObjListTrait}, ObjBox, ObjPtr}, palette::{Palette, PaletteColor}, sound_instance::SoundInstance, stroke::Stroke};
 
 pub struct Project {
     pub fps: f32,
     pub sample_rate: f32,
 
-    pub folders: ObjList<Folder>,
-    pub graphics: ObjList<Graphic>,
+    pub folders: AssetList<Folder>,
+    pub graphics: AssetList<Graphic>,
     pub layers: ObjList<Layer>,
     pub frames: ObjList<Frame>,
     pub strokes: ObjList<Stroke>,
-    pub palettes: ObjList<Palette>,
+    pub palettes: AssetList<Palette>,
     pub palette_colors: ObjList<PaletteColor>,
     pub sound_instances: ObjList<SoundInstance>,
 
@@ -55,18 +55,18 @@ impl Project {
     }
 
     pub fn new(path: PathBuf, fps: f32, sample_rate: f32) -> Self {
-        let mut folder_list = ObjList::new();
+        let mut folder_list = AssetList::new();
         let root = folder_list.add(Folder::new(ObjPtr::null()));
 
         Self {
             fps,
             sample_rate,
             folders: folder_list,
-            graphics: ObjList::new(),
+            graphics: AssetList::new(),
             layers: ObjList::new(),
             frames: ObjList::new(),
             strokes: ObjList::new(),
-            palettes: ObjList::new(),
+            palettes: AssetList::new(),
             palette_colors: ObjList::new(),
             sound_instances: ObjList::new(),
 

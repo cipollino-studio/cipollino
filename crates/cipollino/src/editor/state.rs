@@ -1,7 +1,7 @@
 
 use std::{path::PathBuf, sync::{Arc, RwLock}};
 
-use crate::{project::{action::ActionManager, graphic::Graphic, layer::{Layer, LayerKind}, obj::ObjPtr, palette::Palette, stroke::{Stroke, StrokeColor}, Project}, tools::{bucket::Bucket, color_picker::ColorPicker, line::Line, pencil::Pencil, select::Select, Tool}};
+use crate::{project::{action::ActionManager, graphic::Graphic, layer::{Layer, LayerKind}, obj::{obj_list::ObjListTrait, ObjPtr}, palette::Palette, stroke::{Stroke, StrokeColor}, Project}, tools::{bucket::Bucket, color_picker::ColorPicker, line::Line, pencil::Pencil, select::Select, Tool}};
 
 use super::{clipboard, selection::{self, Selection}, toasts::Toasts};
 
@@ -85,7 +85,7 @@ impl EditorState {
     pub fn load_project(path: PathBuf, toasts: &mut Toasts) -> Self {
         let (project, metadata) = Project::load(path);
         let mut state = Self::new_with_project(project);
-        metadata.display_errors(&mut state, toasts);
+        metadata.display_errors(&mut state.project, toasts);
 
         state
     }

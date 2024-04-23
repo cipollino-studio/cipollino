@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use unique_type_id::UniqueTypeId;
 
-use crate::{editor::{dialog::Dialog, state::EditorState, EditorSystems}, util::ui::path::path_selector};
+use crate::{editor::{dialog::Dialog, state::EditorState, EditorSystems}, project::obj::obj_list::ObjListTrait, util::ui::path::path_selector};
 
 use super::export_progress::ExportProgressDialog;
 

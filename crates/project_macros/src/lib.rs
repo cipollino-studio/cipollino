@@ -1,20 +1,24 @@
 
 use convert_case::Casing;
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, Data, DeriveInput, Field, Ident};
+use syn::{parse_macro_input, Attribute, Data, DeriveInput, Field, Ident};
 use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 
-fn field_has_attr(field: &Field, attr: &str) -> bool {
+fn attr_list_contains(attrs: &Vec<Attribute>, attr: &str) -> bool {
     let attr = format!("#[{}]", attr);
-    for other_attr in &field.attrs {
+    for other_attr in attrs {
         if other_attr.to_token_stream().to_string() == attr {
             return true;
         } 
     }
-    return false;
+    false
 }
 
-#[proc_macro_derive(Object, attributes(field))]
+fn field_has_attr(field: &Field, attr: &str) -> bool {
+    attr_list_contains(&field.attrs, attr) 
+}
+
+#[proc_macro_derive(Object, attributes(field, asset))]
 pub fn object(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
     let fields = if let Data::Struct(data) = ast.data {
@@ -25,6 +29,8 @@ pub fn object(input: TokenStream) -> TokenStream {
     let name = ast.ident;
     let list_name = Ident::new((name.to_string() + "s").to_case(convert_case::Case::Snake).as_str(), name.span()); 
     let type_name = name.to_string().to_case(convert_case::Case::Lower);
+
+    let is_asset = attr_list_contains(&ast.attrs, "asset");
 
     let mut field_setters = quote!{};
     for field in fields {
@@ -49,14 +55,22 @@ pub fn object(input: TokenStream) -> TokenStream {
         }
     }
 
+    let list_type = if is_asset {
+        quote! { crate::project::obj::asset_list::AssetList<Self> }
+    } else {
+        quote! { crate::project::obj::obj_list::ObjList<Self> }
+    };
+
     quote! {
         impl Obj for #name {
 
-            fn get_list(project: &Project) -> &ObjList<Self> {
+            type ListType = #list_type;
+
+            fn get_list(project: &Project) -> &Self::ListType {
                 &project.#list_name
             }
 
-            fn get_list_mut(project: &mut Project) -> &mut ObjList<Self> {
+            fn get_list_mut(project: &mut Project) -> &mut Self::ListType {
                 &mut project.#list_name
             }
 

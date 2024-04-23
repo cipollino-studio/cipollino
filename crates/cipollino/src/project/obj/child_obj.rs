@@ -2,7 +2,9 @@ use std::sync::{Arc, Mutex};
 
 use crate::project::{action::ObjAction, Project};
 
-use super::{asset::Asset, DynObjPtr, Obj, ObjBox, ObjPtr, ObjSerialize, ToRawData};
+use super::{asset::Asset, asset_list::AssetList, DynObjPtr, Obj, ObjBox, ObjPtr, ObjSerialize, ToRawData};
+
+use crate::project::obj::obj_list::ObjListTrait;
 
 pub trait ChildObj: Obj + 'static + ObjSerialize + ToRawData {
     type Parent: Copy + Send + Sync + Eq + From<DynObjPtr>;
@@ -154,7 +156,7 @@ pub trait ChildObj: Obj + 'static + ObjSerialize + ToRawData {
 
 pub trait HasRootAsset: Obj {
 
-    type RootAsset: Asset;
+    type RootAsset: Asset + Obj<ListType = AssetList<Self::RootAsset>>;
     fn get_root_asset(project: &Project, ptr: ObjPtr<Self>) -> Option<ObjPtr<Self::RootAsset>>;
 
 }

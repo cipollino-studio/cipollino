@@ -1,122 +1,19 @@
 
-use std::{cell::RefCell, collections::{HashMap, HashSet}, marker::PhantomData, sync::{Arc, Mutex}};
+use std::{marker::PhantomData, path::PathBuf, sync::{Arc, Mutex}};
 use std::hash::Hash;
 
 use unique_type_id::{TypeId, UniqueTypeId};
 
+use self::{asset::Asset, asset_list::AssetList, obj_list::ObjListTrait};
+
 use super::{saveload::{asset_file::AssetFile, load::LoadingMetadata}, Project};
 
+pub mod obj_list;
+pub mod child_obj;
 pub mod obj_clone_impls;
 pub mod asset;
-pub mod child_obj;
+pub mod asset_list;
 
-
-pub struct ObjList<T: Obj> {
-    objs: HashMap<u64, T>,
-
-    /*
-        When an ObjBox is dropped, we want to automatically destroy the object it contained.
-        A reference to list is given to each ObjBox, allowing the list to "garbage collect" deleted objects.
-    */
-    pub dropped: Arc<Mutex<Vec<u64>>>,
-
-    pub created: HashSet<ObjPtr<T>>,
-    pub modified: HashSet<ObjPtr<T>>,
-
-    pub curr_key: u64,
-    
-    // First page pointers of every object in their respective asset files(see saveload::asset_file)
-    pub obj_file_ptrs: RefCell<HashMap<ObjPtr<T>, u64>>
-}
-
-impl<T: Obj> ObjList<T> {
-
-    pub fn new() -> Self {
-        Self {
-            objs: HashMap::new(),
-            dropped: Arc::new(Mutex::new(Vec::new())),
-            created: HashSet::new(),
-            modified: HashSet::new(),
-            curr_key: 1,
-            obj_file_ptrs: RefCell::new(HashMap::new())
-        }
-    }
-
-    pub fn next_ptr(&mut self) -> ObjPtr<T> {
-        self.curr_key += 1;
-        ObjPtr {
-            key: self.curr_key - 1,
-            _marker: PhantomData
-        }
-    }
-
-    pub fn add(&mut self, obj: T) -> ObjBox<T> {
-        self.objs.insert(self.curr_key, obj);
-        self.curr_key += 1;
-        let ptr = ObjPtr {
-            key: self.curr_key - 1,
-            _marker: PhantomData
-        };
-        self.created.insert(ptr);
-        self.modified.insert(ptr);
-        ObjBox {
-            ptr,
-            dropped: self.dropped.clone(),
-        }
-    }
-
-    pub fn add_with_ptr(&mut self, obj: T, ptr: ObjPtr<T>) -> ObjBox<T> {
-        self.objs.insert(ptr.key, obj);
-        self.created.insert(ptr);
-        self.modified.insert(ptr);
-        ObjBox {
-            ptr,
-            dropped: self.dropped.clone(),
-        }
-    }
-
-    pub fn get(&self, ptr: ObjPtr<T>) -> Option<&T> {
-        self.objs.get(&ptr.key)
-    }
-
-    pub fn get_mut(&mut self, ptr: ObjPtr<T>) -> Option<&mut T> {
-        self.modified.insert(ptr);
-        self.objs.get_mut(&ptr.key)
-    }
-
-    pub fn get_then<F, R>(&self, ptr: ObjPtr<T>, callback: F) -> Option<R> where F: FnOnce(&T) -> R {
-        self.get(ptr).map(callback)
-    }
-
-    pub fn get_then_mut<F, R>(&mut self, ptr: ObjPtr<T>, callback: F) -> Option<R> where F: FnOnce(&mut T) -> R {
-        self.get_mut(ptr).map(callback)
-    }
-
-    pub fn garbage_collect_objs(&mut self) {
-        loop {
-            let mut dropped = self.dropped.lock().unwrap();
-            let dropped_clone = dropped.clone();
-            dropped.clear();
-            drop(dropped);
-
-            for key in dropped_clone {
-                self.objs.remove(&key);
-            }
-
-            if self.dropped.lock().unwrap().is_empty() {
-                break;
-            }
-        }
-
-        self.created.clear();
-        self.modified.clear();
-    } 
-
-    pub fn mutated(&self) -> bool {
-        !self.dropped.lock().unwrap().is_empty() || !self.modified.is_empty()
-    }
-
-}
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct ObjPtr<T: Obj> {
@@ -237,8 +134,8 @@ impl<T: Obj> Hash for ObjPtr<T> {
 
 #[derive(Clone)]
 pub struct ObjBox<T: Obj> {
-    ptr: ObjPtr<T>,
-    dropped: Arc<Mutex<Vec<u64>>>,
+    pub ptr: ObjPtr<T>,
+    pub dropped: Arc<Mutex<Vec<u64>>>,
 }
 
 impl<T: Obj> ObjBox<T> {
@@ -253,6 +150,18 @@ impl<T: Obj> ObjBox<T> {
 
     pub fn make_ptr(&self) -> ObjPtr<T> {
         self.ptr
+    }
+
+}
+
+impl<T: Asset + Obj<ListType = AssetList<T>>> ObjBox<T> {
+
+    pub fn get_name(&self, project: &Project) -> String {
+        T::get_list(project).get_name(self.ptr).unwrap()
+    }
+
+    pub fn get_path(&self, project: &Project) -> Option<PathBuf> {
+        T::get_list(project).get_path(self.ptr, project)
     }
 
 }
@@ -295,8 +204,10 @@ pub trait ToRawData {
 
 pub trait Obj: Sized + ObjClone + Send + Sync + UniqueTypeId<u64> {
 
-    fn get_list(project: &Project) -> &ObjList<Self>;
-    fn get_list_mut(project: &mut Project) -> &mut ObjList<Self>;
+    type ListType: ObjListTrait<ObjType = Self>;
+
+    fn get_list(project: &Project) -> &Self::ListType;
+    fn get_list_mut(project: &mut Project) -> &mut Self::ListType;
     fn type_name() -> &'static str;
 
 }

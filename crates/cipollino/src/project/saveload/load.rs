@@ -2,13 +2,13 @@ use crate::{editor::{state::EditorState, toasts::Toasts}, project::{file::{FileL
 
 use std::{collections::HashSet, fs, path::PathBuf};
 
-use bson::bson;
-
-use crate::{project::{graphic::Graphic, obj::ObjBox}, util::{bson::u64_to_bson, fs::read_json_file}};
+use crate::{project::{graphic::Graphic, obj::ObjBox}, util::fs::read_json_file};
 
 use super::asset_file::AssetFile;
 
 use super::super::{file::{audio::AudioFile, FileType}, folder::Folder, obj::{asset::Asset, ObjPtr, ObjSerialize}, palette::Palette};
+
+use crate::project::obj::obj_list::ObjListTrait;
 
 pub struct LoadingError {
     pub msg: String,
@@ -35,9 +35,9 @@ impl LoadingMetadata {
         }
     }
 
-    fn display_file_missing_errors<T: FileType>(&self, state: &mut EditorState, toasts: &mut Toasts) {
-        for (path, key) in T::get_list(&state.project).path_lookup.iter() {
-            if let None = T::get_list(&state.project).get(&FilePtr::from_key(*key)) {
+    fn display_file_missing_errors<T: FileType>(&self, project: &mut Project, toasts: &mut Toasts) {
+        for (path, key) in T::get_list(project).path_lookup.iter() {
+            if let None = T::get_list(project).get(&FilePtr::from_key(*key)) {
                 if T::list_in_loading_metadata(self).contains(&FilePtr::from_key(*key)) {
                     toasts.error_toast(format!("File '{}' missing.", path.to_str().unwrap()));
                 }
@@ -45,8 +45,8 @@ impl LoadingMetadata {
         } 
     }
 
-    pub fn display_errors(&self, state: &mut EditorState, toasts: &mut Toasts) {
-        self.display_file_missing_errors::<AudioFile>(state, toasts);
+    pub fn display_errors(&self, project: &mut Project, toasts: &mut Toasts) {
+        self.display_file_missing_errors::<AudioFile>(project, toasts);
         for error in &self.errors {
             toasts.error_toast(format!("Error loading {},\n{}", error.asset.to_string_lossy(), error.msg));
         }
@@ -92,6 +92,8 @@ impl Project {
 
         let folder_path = proj_file_path.parent().unwrap();
         res.root_folder = res.load_folder(&folder_path.to_owned(), ObjPtr::null(), &mut metadata); 
+        
+        res.garbage_collect_objs();
 
         (res, metadata)
     }
@@ -115,20 +117,20 @@ impl Project {
         metadata.curr_asset_path = path.clone();
         let mut asset_file = AssetFile::open(path.clone(), &T::type_magic_bytes(), T::type_name())?;
 
-        let root_obj_ptr = if T::get_list(self).get(ObjPtr::from_key(asset_file.root_obj_key)).is_some() {
+        let root_obj_ptr = if T::get_list(self).get_name(ObjPtr::from_key(asset_file.root_obj_key)).is_some() {
             T::get_list_mut(self).next_ptr()
         } else {
             ObjPtr::from_key(asset_file.root_obj_key)
         };
         asset_file.set_root_obj_key(root_obj_ptr.key)?;
         
-        T::get_list_mut(self).obj_file_ptrs.borrow_mut().insert(root_obj_ptr, asset_file.root_obj_ptr);
-        let obj_box = ObjBox::<T>::obj_deserialize(self, &bson!({
-            "key": u64_to_bson(asset_file.root_obj_key),
-            "ptr": u64_to_bson(asset_file.root_obj_ptr) 
-        }), folder.into(), &mut asset_file, metadata).ok_or(format!("Could not load {} at {}.", T::type_name(), path.to_string_lossy()))?;
+        T::get_list_mut(self).to_load.insert(root_obj_ptr, (folder, path.file_stem().unwrap().to_str().unwrap().to_owned()));
+        let obj_box = ObjBox {
+            ptr: root_obj_ptr,
+            dropped: T::get_list(self).get_dropped().clone(),
+        };
+        *T::get_list_mut(self).curr_key() = (*T::get_list_mut(self).curr_key()).max(root_obj_ptr.key + 1);
 
-        *obj_box.get_mut(self).name_mut() = path.file_stem().unwrap().to_str().unwrap().to_owned();
         T::get_list_in_parent_mut(self, folder).ok_or("Folder missing.")?.push(obj_box);
 
         Ok(())
@@ -185,5 +187,17 @@ impl Project {
     pub fn base_path(&self) -> PathBuf {
         self.save_path.parent().unwrap().to_owned()
     }
+
+    pub fn load_asset_with_key<T: Asset>(&mut self, ptr: ObjPtr<T>, toasts: &mut Toasts) {
+        let mut metadata = LoadingMetadata::new();
+        if let Err(err) = T::ListType::load(self, ptr, &mut metadata) {
+            metadata.error(err);
+        }
+        metadata.display_errors(self, toasts)
+    }
+
+}
+
+impl EditorState {
 
 }

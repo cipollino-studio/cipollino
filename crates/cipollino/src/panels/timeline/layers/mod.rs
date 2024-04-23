@@ -1,7 +1,7 @@
 
 use egui::{vec2, Vec2};
 
-use crate::{editor::{state::EditorState, EditorSystems}, project::{action::Action, layer::{Layer, LayerKind, LayerParent}, obj::{child_obj::ChildObj, ObjPtr}}, util::ui::dnd::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_widget}};
+use crate::{editor::{state::EditorState, EditorSystems}, project::{action::Action, layer::{Layer, LayerKind, LayerParent}, obj::{child_obj::ChildObj, obj_list::ObjListTrait, ObjPtr}}, util::ui::dnd::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_widget}};
 
 use self::layer_property_dialog::LayerPropertyDialog;
 

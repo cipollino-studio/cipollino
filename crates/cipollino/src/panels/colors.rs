@@ -1,5 +1,5 @@
 
-use crate::{editor::state::EditorState, project::{action::{Action, ObjAction}, obj::child_obj::ChildObj, palette::PaletteColor, stroke::StrokeColor}, util::ui::color::color_picker};
+use crate::{editor::state::EditorState, project::{action::{Action, ObjAction}, obj::{child_obj::ChildObj, obj_list::ObjListTrait}, palette::PaletteColor, stroke::StrokeColor}, util::ui::color::color_picker};
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct ColorPanel {

@@ -7,7 +7,7 @@ use std::hash::Hash;
 
 use crate::util::{bson::{bson_get, bson_to_u64, u64_to_bson}, fs::{set_file_stem, trash_folder}, next_unique_name};
 
-use super::{action::ObjAction, folder::Folder, obj::{ObjClone, ObjPtr, ObjSerialize, ToRawData}, saveload::{asset_file::AssetFile, load::LoadingMetadata}, AssetPtr, Project};
+use super::{action::ObjAction, folder::Folder, obj::{obj_list::ObjListTrait, ObjClone, ObjPtr, ObjSerialize, ToRawData}, saveload::{asset_file::AssetFile, load::LoadingMetadata}, AssetPtr, Project};
 
 pub mod audio;
 

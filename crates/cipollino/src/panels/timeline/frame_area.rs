@@ -1,7 +1,7 @@
 
 use egui::{vec2, Vec2};
 
-use crate::{editor::{selection::Selection, state::EditorState}, project::{action::{Action, ObjAction}, file::{audio::AudioFile, FilePtr}, folder::Folder, frame::Frame, layer::Layer, obj::{child_obj::ChildObj, ObjPtr}, sound_instance::SoundInstance, AssetPtr, Project}};
+use crate::{editor::{selection::Selection, state::EditorState}, project::{action::{Action, ObjAction}, file::{audio::AudioFile, FilePtr}, folder::Folder, frame::Frame, layer::Layer, obj::{child_obj::ChildObj, obj_list::ObjListTrait, ObjPtr}, sound_instance::SoundInstance, AssetPtr, Project}};
 
 use super::{FrameGridRow, FrameGridRowKind, TimelinePanel};
 

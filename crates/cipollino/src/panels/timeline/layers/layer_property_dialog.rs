@@ -1,7 +1,7 @@
 
 use unique_type_id::UniqueTypeId;
 
-use crate::{editor::{dialog::Dialog, state::EditorState, EditorSystems}, project::{action::{Action, ObjAction}, layer::{BlendingMode, Layer, LayerKind}, obj::ObjPtr}, util::ui::drag_value};
+use crate::{editor::{dialog::Dialog, state::EditorState, EditorSystems}, project::{action::{Action, ObjAction}, layer::{BlendingMode, Layer, LayerKind}, obj::{obj_list::ObjListTrait, ObjPtr}}, util::ui::drag_value};
 
 #[derive(UniqueTypeId)]
 pub struct LayerPropertyDialog {

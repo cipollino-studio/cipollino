@@ -1,7 +1,7 @@
 
 use std::{f32::consts, sync::Arc};
 
-use crate::{project::{obj::ObjPtr, stroke::{iter_bezier_segments, Stroke}, Project}, renderer::mesh::Mesh};
+use crate::{project::{obj::{obj_list::ObjListTrait, ObjPtr}, stroke::{iter_bezier_segments, Stroke}, Project}, renderer::mesh::Mesh};
 
 use super::SceneRenderer;
 
