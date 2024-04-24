@@ -7,8 +7,6 @@ use crate::{editor::{state::EditorState, EditorSystems}, keybind, panels::scene:
 
 use super::Tool;
 
-
-
 pub struct ColorPicker {
 
 }

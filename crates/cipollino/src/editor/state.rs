@@ -1,7 +1,7 @@
 
 use std::{path::PathBuf, sync::{Arc, RwLock}};
 
-use crate::{project::{action::ActionManager, graphic::Graphic, layer::{Layer, LayerKind}, obj::{obj_list::ObjListTrait, ObjPtr}, palette::Palette, stroke::{Stroke, StrokeColor}, Project}, tools::{bucket::Bucket, color_picker::ColorPicker, line::Line, pencil::Pencil, select::Select, Tool}};
+use crate::{project::{action::ActionManager, graphic::Graphic, layer::{Layer, LayerKind}, obj::{obj_list::ObjListTrait, ObjPtr}, palette::Palette, stroke::{Stroke, StrokeColor}, Project}, tools::{bucket::Bucket, color_picker::ColorPicker, line::Line, pencil::Pencil, scissors::Scissors, select::Select, Tool}};
 
 use super::{clipboard, selection::{self, Selection}, toasts::Toasts};
 
@@ -50,11 +50,12 @@ impl EditorState {
         let bucket = Arc::new(RwLock::new(Bucket::new()));
         let color_picker = Arc::new(RwLock::new(ColorPicker::new()));
         let line = Arc::new(RwLock::new(Line::new()));
+        let scissors = Arc::new(RwLock::new(Scissors::new()));
         Self {
             project: project, 
 
             actions: ActionManager::new(),
-            tools: vec![select.clone(), pencil, bucket, color_picker, line],
+            tools: vec![select.clone(), pencil, bucket, color_picker, line, scissors],
             curr_tool: select,
 
             open_graphic: ObjPtr::null(),

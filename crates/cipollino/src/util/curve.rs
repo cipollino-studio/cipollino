@@ -5,6 +5,11 @@ use roots::find_roots_cubic;
 
 use super::geo::LineSegment;
 
+fn lerp<T>(a: T, b: T, t: f32) -> T where T: Mul<f32, Output = T> + Add<T, Output = T> + Sub<T, Output = T> + Copy {
+    b * t + a * (1.0 - t)
+}
+
+#[derive(Clone, Copy)]
 pub struct BezierSegment<T> where T: Mul<f32, Output = T> + Add<T, Output = T> + Sub<T, Output = T> + Copy + Default {
     pub p0: T,
     pub b0: T,
@@ -46,6 +51,32 @@ impl<T> BezierSegment<T> where T: Mul<f32, Output = T> + Add<T, Output = T> + Su
             res[i] = self.sample(t);
         }
         res
+    }
+
+    pub fn split(&self, t: f32) -> (Self, Self) {
+        let m0 = lerp(self.p0, self.b0, t); 
+        let m1 = lerp(self.b0, self.a1, t); 
+        let m2 = lerp(self.a1, self.p1, t); 
+        
+        let q0 = lerp(m0, m1, t);
+        let q1 = lerp(m1, m2, t);
+
+        let pt = self.sample(t);
+
+        let seg_0t = BezierSegment {
+            p0: self.p0,
+            b0: m0,
+            a1: q0,
+            p1: pt,
+        };
+        let seg_t1 = BezierSegment {
+            p0: pt,
+            b0: q1,
+            a1: m2,
+            p1: self.p1,
+        };
+
+        (seg_0t, seg_t1)
     }
 
 }
@@ -131,6 +162,23 @@ impl BezierSegment<Vec2> {
 
     pub fn intersect_segment(&self, segment: &LineSegment) -> Vec<Vec2> {
         self.intersect_segment_ts(segment).iter().map(|t| self.sample(*t)).collect()
+    }
+
+    pub fn nearest_t(&self, pt: Vec2) -> f32 {
+        // TODO: replace this with newton's method or something
+
+        let mut best_dist = f32::MAX;
+        let mut best_t = 0.0;
+        for i in 0..50 {
+            let potential_t = (i as f32) / 49.0;
+            let dist = (pt - self.sample(potential_t)).length_squared();
+            if dist < best_dist {
+                best_dist = dist;
+                best_t = potential_t;
+            }
+        }
+
+        best_t
     }
 
 }

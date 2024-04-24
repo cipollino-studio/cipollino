@@ -1,7 +1,7 @@
 
 use unique_type_id::UniqueTypeId;
 
-use crate::{editor::{dialog::Dialog, keybind::{CenterSceneKeybind, DeleteKeybind, Keybind, NewFrameKeybind, NextFrameKeybind, PlayKeybind, PrevFrameKeybind, RedoKeybind, StepBackKeybind, StepForwardKeybind, UndoKeybind}, state::EditorState, EditorSystems}, tools::{bucket::BucketToolKeybind, color_picker::ColorPickerToolKeybind, line::LineToolKeybind, pencil::PencilToolKeybind, select::SelectToolKeybind}};
+use crate::{editor::{dialog::Dialog, keybind::{CenterSceneKeybind, DeleteKeybind, Keybind, NewFrameKeybind, NextFrameKeybind, PlayKeybind, PrevFrameKeybind, RedoKeybind, StepBackKeybind, StepForwardKeybind, UndoKeybind}, state::EditorState, EditorSystems}, tools::{bucket::BucketToolKeybind, color_picker::ColorPickerToolKeybind, line::LineToolKeybind, pencil::PencilToolKeybind, scissors::ScissorsToolKeybind, select::SelectToolKeybind}};
 
 #[derive(UniqueTypeId)]
 pub struct PrefsDialog {
@@ -63,6 +63,7 @@ impl Dialog for PrefsDialog {
             self.render_keybind_setting::<BucketToolKeybind>(ui, systems, &key_down);
             self.render_keybind_setting::<ColorPickerToolKeybind>(ui, systems, &key_down);
             self.render_keybind_setting::<LineToolKeybind>(ui, systems, &key_down);
+            self.render_keybind_setting::<ScissorsToolKeybind>(ui, systems, &key_down);
 
             self.render_keybind_setting::<PlayKeybind>(ui, systems, &key_down);
             self.render_keybind_setting::<NewFrameKeybind>(ui, systems, &key_down);
