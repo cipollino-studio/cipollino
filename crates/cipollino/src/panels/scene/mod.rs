@@ -21,6 +21,8 @@ pub struct ScenePanel {
     color_key_map: Vec<ObjPtr<Stroke>>, 
 
     #[serde(skip)]
+    pan_lock_point: Vec2,
+    #[serde(skip)]
     prev_mouse_down: bool,
 
     #[serde(skip)]
@@ -44,6 +46,7 @@ impl ScenePanel {
             fb: Arc::new(Mutex::new(None)),
             fb_pick: Arc::new(Mutex::new(None)),
             color_key_map: Vec::new(),
+            pan_lock_point: Vec2::ZERO,
             prev_mouse_down: false,
             cam_pos: glam::vec2(0.0, 0.0),
             cam_size: 600.0,
@@ -203,7 +206,6 @@ impl ScenePanel {
             self.cam_size = (state.project.graphics.get(gfx).unwrap().h as f32) * 0.6;
         }
 
-        // Tool interaction
         if let Some(mouse_pos) = response.hover_pos() {
             let mouse_pos = self.cam_size * (mouse_pos - rect.center()) / (rect.height() * 0.5);
             let mouse_pos = glam::vec2(mouse_pos.x, -mouse_pos.y) + self.cam_pos;
@@ -216,24 +218,44 @@ impl ScenePanel {
             self.cam_pos -= (mouse_pos - self.cam_pos) * (zoom_fac - 1.0);
             self.cam_size = next_cam_size;
 
-            let tool = state.curr_tool.clone();
             let mouse_down = response.is_pointer_button_down_on() || response.clicked();
-            if mouse_down && !self.prev_mouse_down {
-                tool.write().unwrap().mouse_click(mouse_pos, state, ui, self, systems.gl);
+
+            if ui.input(|i| i.modifiers.command) {
+                let cursor = if mouse_down {
+                    if !self.prev_mouse_down {
+                        self.pan_lock_point = mouse_pos;
+                    } else {
+                        let delta = mouse_pos - self.pan_lock_point;
+                        self.cam_pos -= delta;
+                    }
+                    egui::CursorIcon::Grabbing
+                } else {
+                    egui::CursorIcon::Grab
+                };
+                ui.output_mut(|o| o.cursor_icon = cursor);
+            } else {
+
+                // Tool interaction
+                let tool = state.curr_tool.clone();
+                if mouse_down && !self.prev_mouse_down {
+                    tool.write().unwrap().mouse_click(mouse_pos, state, ui, self, systems.gl);
+                }
+                if mouse_down && self.prev_mouse_down {
+                    tool.write().unwrap().mouse_down(mouse_pos, state, self);
+                }
+                if !mouse_down && self.prev_mouse_down {
+                    tool.write().unwrap().mouse_release(mouse_pos, state, ui, self, systems.gl);
+                }
+                if response.hovered() {
+                    ui.ctx().output_mut(|o| {
+                        let tool = state.curr_tool.clone();
+                        o.cursor_icon = tool.write().unwrap().mouse_cursor(mouse_pos, state, self, systems.gl);
+                    });
+                }
+
             }
-            if mouse_down && self.prev_mouse_down {
-                tool.write().unwrap().mouse_down(mouse_pos, state, self);
-            }
-            if !mouse_down && self.prev_mouse_down {
-                tool.write().unwrap().mouse_release(mouse_pos, state, ui, self, systems.gl);
-            }
+
             self.prev_mouse_down = mouse_down;
-            if response.hovered() {
-                ui.ctx().output_mut(|o| {
-                    let tool = state.curr_tool.clone();
-                    o.cursor_icon = tool.write().unwrap().mouse_cursor(mouse_pos, state, self, systems.gl);
-                });
-            }
         }
 
         // Render scene to framebuffer
