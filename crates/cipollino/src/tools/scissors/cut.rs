@@ -21,6 +21,9 @@ impl Cut {
 
     fn cut_unfilled_stroke(&self, project: &mut Project, stroke_ptr: ObjPtr<Stroke>, acts: &mut Vec<ObjAction>) -> Option<()> {
         let stroke = project.strokes.get(stroke_ptr)?;
+        if stroke.filled {
+            return None;
+        }
         let mut new_strokes = vec![vec![]];
         let frame = stroke.frame;
         let r = stroke.r;
