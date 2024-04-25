@@ -17,7 +17,7 @@ use serde_json::json;
 
 use crate::util::fs::write_json_file;
 
-use self::{resource::{audio::AudioFile, ResourceList, ResPtr}, folder::Folder, frame::Frame, graphic::Graphic, layer::Layer, obj::{asset_list::AssetList, obj_list::{ObjList, ObjListTrait}, ObjBox, ObjPtr}, palette::{Palette, PaletteColor}, sound_instance::SoundInstance, stroke::Stroke};
+use self::{folder::Folder, frame::Frame, graphic::Graphic, layer::Layer, obj::{asset_list::AssetList, child_obj::ChildObj, obj_list::{ObjList, ObjListTrait}, ObjBox, ObjPtr}, palette::{Palette, PaletteColor}, resource::{audio::AudioFile, ResPtr, ResourceList}, sound_instance::SoundInstance, stroke::Stroke};
 
 pub struct Project {
     pub fps: f32,
@@ -45,13 +45,36 @@ pub struct Project {
 
 impl Project {
 
-    pub fn create(path: PathBuf, fps: f32, sample_rate: f32) -> Self {
+    pub fn create(path: PathBuf, fps: f32, sample_rate: f32) -> (Self, ObjPtr<Graphic>, ObjPtr<Layer>) {
         let _ = std::fs::create_dir_all(path.parent().unwrap());
         write_json_file(&path, json!({
             "fps": fps,
             "sample_rate": sample_rate
         }));
-        Self::load(path).0
+        let mut res = Self::load(path).0;
+        let folder = res.root_folder.make_ptr();
+        let (gfx, _) = Graphic::add(&mut res, folder, Graphic {
+            name: "Clip".to_owned(),
+            len: 100,
+            clip: true,
+            w: 1920,
+            h: 1080,
+            layers: Vec::new(),
+            folder: folder,
+        }).unwrap();
+        let (layer, _) = Layer::add(&mut res, layer::LayerParent::Graphic(gfx), Layer {
+            parent: layer::LayerParent::Graphic(gfx),
+            name: "Layer".to_owned(),
+            show: true,
+            lock: false,
+            open: true,
+            kind: layer::LayerKind::Animation,
+            frames: Vec::new(),
+            sound_instances: Vec::new(),
+            layers: Vec::new(),
+            ..Layer::default()
+        }).unwrap();
+        (res, gfx, layer) 
     }
 
     pub fn new(path: PathBuf, fps: f32, sample_rate: f32) -> Self {

@@ -154,7 +154,10 @@ impl Dialog for NewProject {
                 let mut project_path = self.new_project_path();
                 project_path.push("proj.cip");
                 push_recent_project(systems.prefs, project_path.clone());
-                *state = EditorState::new_with_project(Project::create(project_path, self.project_fps, self.project_sample_rate));
+                let (proj, gfx, layer) = Project::create(project_path, self.project_fps, self.project_sample_rate);
+                *state = EditorState::new_with_project(proj);
+                state.open_graphic = gfx;
+                state.active_layer = layer;
                 close_dialog = true;
             }
         });
