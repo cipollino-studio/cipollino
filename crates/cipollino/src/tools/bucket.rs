@@ -2,7 +2,7 @@
 use std::{sync::Arc, collections::{VecDeque, HashSet, HashMap}};
 
 use glam::{Vec2, vec2};
-use crate::{editor::{state::EditorState, EditorSystems}, keybind, panels::scene::ScenePanel, project::{action::Action, obj::{child_obj::ChildObj, obj_list::ObjListTrait}, stroke::{Stroke, StrokePoint}}, util::{curve::fit_curve, geo::LineSegment}};
+use crate::{editor::{state::EditorState, EditorSystems}, keybind, panels::scene::ScenePanel, project::{action::Action, layer::Layer, obj::{child_obj::ChildObj, obj_list::ObjListTrait}, stroke::{Stroke, StrokePoint}}, util::{curve::fit_curve, geo::LineSegment}};
 
 use super::{Tool, active_frame};
 
@@ -35,6 +35,13 @@ impl Tool for Bucket {
 
         // If we click on an existing stroke, let's just change its color
         if let Some(stroke) = scene.sample_pick(mouse_pos, gl) {
+            if let Some(stroke) = state.project.strokes.get(stroke) {
+                if let Some(frame) = state.project.frames.get(stroke.frame) {
+                    if Layer::locked(&state.project, frame.layer) {
+                        return;
+                    }
+                }
+            }
             if let Some(act) = Stroke::set_color(&mut state.project, stroke, state.color) {
                 state.actions.add(Action::from_single(act));
                 return;
@@ -61,7 +68,7 @@ impl Tool for Bucket {
         };
 
         // Step 0: Precompute boundary line segments
-        let visible_strokes = state.visible_strokes(); 
+        let visible_strokes = state.visible_strokes(false); 
         let mut boundary_segments = HashMap::new();
         let chunk_size = 20.0;
 

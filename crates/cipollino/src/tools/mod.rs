@@ -54,6 +54,7 @@ pub fn active_frame(state: &mut EditorState) -> Option<(ObjPtr<Frame>, Vec<ObjAc
             parent: LayerParent::Graphic(state.open_graphic),
             name: "Layer".to_owned(),
             show: true,
+            lock: false,
             open: false,
             kind: LayerKind::Animation,
             alpha: 1.0,
@@ -67,7 +68,8 @@ pub fn active_frame(state: &mut EditorState) -> Option<(ObjPtr<Frame>, Vec<ObjAc
     } else {
         None
     };
-    if state.project.layers.get(state.active_layer).unwrap().kind != LayerKind::Animation {
+    let layer = state.project.layers.get(state.active_layer).unwrap();
+    if layer.kind != LayerKind::Animation || layer.lock {
         return None;
     }
     let (frame, frame_act) = active_frame_proj_layer_frame(&mut state.project, state.active_layer, frame)?;

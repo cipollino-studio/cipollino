@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use glam::Vec2;
 
-use crate::{editor::state::EditorState, panels::scene::{overlay::OverlayRenderer, ScenePanel}, project::obj::obj_list::ObjListTrait, util::geo::LineSegment};
+use crate::{editor::state::EditorState, panels::scene::{overlay::OverlayRenderer, ScenePanel}, project::{layer::Layer, obj::obj_list::ObjListTrait}, util::geo::LineSegment};
 use super::Select;
 use crate::tools::Tool;
 
@@ -28,8 +28,14 @@ impl Lasso {
         state.pause();
 
         if select.lasso_pts.len() == 1 {
-            if let Some(stroke_key) = scene.sample_pick(select.lasso_pts[0], gl) {
-                state.selection.select_stroke_inverting(stroke_key);
+            if let Some(stroke_ptr) = scene.sample_pick(select.lasso_pts[0], gl) {
+                if let Some(stroke) = state.project.strokes.get(stroke_ptr) {
+                    if let Some(frame) = state.project.frames.get(stroke.frame) {
+                        if !Layer::locked(&state.project, frame.layer) {
+                            state.selection.select_stroke_inverting(stroke_ptr);
+                        }
+                    }
+                }
             }
         } else if let Some(pt) = select.lasso_pts.first() {
             select.lasso_pts.push(*pt);
@@ -43,7 +49,7 @@ impl Lasso {
                 cnt % 2 == 1 
             };
 
-            'stroke_loop: for stroke_ptr in state.visible_strokes() {
+            'stroke_loop: for stroke_ptr in state.visible_strokes(true) {
                 let stroke = state.project.strokes.get(stroke_ptr);
                 if stroke.is_none() {
                     continue;

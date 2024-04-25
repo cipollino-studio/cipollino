@@ -1,7 +1,7 @@
 
 use egui::{vec2, Vec2};
 
-use crate::{editor::{state::EditorState, EditorSystems}, project::{action::Action, layer::{Layer, LayerKind, LayerParent}, obj::{child_obj::ChildObj, obj_list::ObjListTrait, ObjPtr}}, util::ui::dnd::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_widget}};
+use crate::{editor::{state::EditorState, EditorSystems}, project::{action::Action, layer::{Layer, LayerKind, LayerParent}, obj::{child_obj::ChildObj, obj_list::ObjListTrait, ObjPtr}, Project}, util::ui::dnd::{dnd_drop_zone_reset_colors, dnd_drop_zone_setup_colors, draggable_widget}};
 
 use self::layer_property_dialog::LayerPropertyDialog;
 
@@ -63,7 +63,9 @@ impl FrameGridRow {
     } 
 
     // The show/hide icon on animation layers, mute/unmute on audio layers
-    fn render_layer_icons(&self, layer: &Layer, ui: &mut egui::Ui, rect: &egui::Rect, show_hide_layer: &mut bool) {
+    fn render_layer_icons(&self, project: &Project, layer: &Layer, ui: &mut egui::Ui, rect: &egui::Rect, show_hide_layer: &mut bool, lock_unlock_layer: &mut bool) {
+        let icon_width = 15.0; 
+
         let eye_text = if layer.show {
             match layer.kind {
                 LayerKind::Animation => egui_phosphor::regular::EYE,
@@ -77,12 +79,25 @@ impl FrameGridRow {
                 LayerKind::Group => egui_phosphor::regular::EYE_CLOSED
             }
         };
-        let eye_width = 15.0; 
-        let eye_rect = egui::Rect::from_min_size(rect.max - vec2(eye_width + ui.spacing().icon_spacing, rect.height()), vec2(eye_width, rect.height())); 
+        let eye_rect = egui::Rect::from_min_size(rect.max - vec2(2.0 * (icon_width + ui.spacing().icon_spacing), rect.height()), vec2(icon_width, rect.height())); 
         let eye_resp = ui.put(eye_rect, egui::Label::new(eye_text).selectable(false).sense(egui::Sense::click()));
         if eye_resp.clicked() {
             *show_hide_layer = true;
         }
+
+        let lock_rect = egui::Rect::from_min_size(rect.max - vec2(icon_width + ui.spacing().icon_spacing, rect.height()), vec2(icon_width, rect.height())); 
+        let lock_text = if layer.lock {
+            egui_phosphor::regular::LOCK_KEY
+        } else {
+            egui_phosphor::regular::LOCK_SIMPLE_OPEN
+        };
+        let lock_label = egui::Label::new(lock_text).selectable(false).sense(egui::Sense::click());
+        ui.add_enabled_ui(!Layer::parent_locked(project, layer), |ui| {
+            let lock_resp = ui.put(lock_rect, lock_label);
+            if lock_resp.clicked() {
+                *lock_unlock_layer = true;
+            }
+        });
     }
 
     fn render_layer(&self, timeline: &mut TimelinePanel, ui: &mut egui::Ui, rect: egui::Rect, state: &mut EditorState, systems: &mut EditorSystems, response: &egui::Response, layer_drop_idx: &mut Option<(usize, LayerParent)>, layer_group_triangle_width: f32) -> Option<()> {
@@ -91,6 +106,7 @@ impl FrameGridRow {
         let mut set_name = false;
         let mut delete_layer = false;
         let mut show_hide_layer = false; 
+        let mut lock_unlock_layer = false; 
         let mut open_close_layer = false;
         let mut set_layer_kind = None;
 
@@ -112,11 +128,12 @@ impl FrameGridRow {
                 state.active_layer = self.layer;
             }
 
-            self.render_layer_icons(layer, ui, &rect, &mut show_hide_layer);
+            self.render_layer_icons(&state.project, layer, ui, &rect, &mut show_hide_layer, &mut lock_unlock_layer);
         }
     
         let showing_layer = layer.show;
         let layer_open = layer.open;
+        let layer_locked = layer.lock;
         if let (Some(pointer), Some(payload)) = (
             ui.input(|i| i.pointer.hover_pos()),
             response.dnd_hover_payload::<ObjPtr<Layer>>(),
@@ -166,6 +183,11 @@ impl FrameGridRow {
         }
         if open_close_layer {
             if let Some(act) = Layer::set_open(&mut state.project, self.layer, !layer_open) {
+                state.actions.add(Action::from_single(act));
+            }
+        }
+        if lock_unlock_layer {
+            if let Some(act) = Layer::set_lock(&mut state.project, self.layer, !layer_locked) {
                 state.actions.add(Action::from_single(act));
             }
         }

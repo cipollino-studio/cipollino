@@ -108,7 +108,7 @@ impl ToolState for Cut {
 
         let mut acts = Vec::new();
 
-        for stroke_ptr in state.visible_strokes() {
+        for stroke_ptr in state.visible_strokes(true) {
             self.cut_unfilled_stroke(&mut state.project, stroke_ptr, &mut acts); 
         }
         

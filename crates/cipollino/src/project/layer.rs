@@ -77,6 +77,8 @@ pub struct Layer {
     #[field]
     pub show: bool,
     #[field]
+    pub lock: bool,
+    #[field]
     pub open: bool, // Only used for layer groups
     #[field]
     pub kind: LayerKind,
@@ -167,6 +169,25 @@ impl Layer {
         self.alpha < 0.999 || self.blending != BlendingMode::Normal || self.kind == LayerKind::Group
     }
 
+    pub fn locked(project: &Project, layer_ptr: ObjPtr<Layer>) -> bool {
+        if let Some(layer) = project.layers.get(layer_ptr) {
+            if layer.lock {
+                true
+            } else {
+                Self::parent_locked(project, layer)
+            }
+        } else {
+            false
+        } 
+    }
+
+    pub fn parent_locked(project: &Project, layer: &Layer) -> bool {
+        match layer.parent {
+            LayerParent::Graphic(_) => false,
+            LayerParent::Layer(parent_layer) => Layer::locked(project, parent_layer),
+        }
+    }
+
 }
 
 impl From<DynObjPtr> for LayerParent {
@@ -217,6 +238,7 @@ impl Default for Layer {
             parent: LayerParent::Graphic(ObjPtr::null()),
             name: "Layer".to_owned(),
             show: true,
+            lock: false,
             open: true,
             kind: LayerKind::Animation,
             alpha: 1.0,

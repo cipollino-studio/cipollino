@@ -91,8 +91,11 @@ impl EditorState {
         state
     }
 
-    fn visible_strokes_in_layer(&self, layer: &Layer, time: i32, strokes: &mut Vec<ObjPtr<Stroke>>) {
+    fn visible_strokes_in_layer(&self, layer_ptr: ObjPtr<Layer>, layer: &Layer, time: i32, strokes: &mut Vec<ObjPtr<Stroke>>, ignore_locked: bool) {
         if !layer.show {
+            return;
+        }
+        if ignore_locked && layer.lock { 
             return;
         }
         if layer.kind == LayerKind::Animation {
@@ -104,16 +107,16 @@ impl EditorState {
             }
         } else if layer.kind == LayerKind::Group {
             for layer in &layer.layers {
-                self.visible_strokes_in_layer(layer.get(&self.project), time, strokes);
+                self.visible_strokes_in_layer(layer_ptr, layer.get(&self.project), time, strokes, ignore_locked);
             } 
         }
     }
 
-    pub fn visible_strokes(&self) -> Vec<ObjPtr<Stroke>> {
+    pub fn visible_strokes(&self, ignore_locked: bool) -> Vec<ObjPtr<Stroke>> {
         let mut res = Vec::new();
         if let Some(graphic) = self.project.graphics.get(self.open_graphic) {
             for layer in &graphic.layers {
-                self.visible_strokes_in_layer(layer.get(&self.project), self.frame(), &mut res)
+                self.visible_strokes_in_layer(layer.make_ptr(), layer.get(&self.project), self.frame(), &mut res, ignore_locked)
             }            
         }
         res
